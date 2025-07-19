@@ -4,21 +4,23 @@ from typing import List, Dict, Optional
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from qdrant_client.http.models import Distance, VectorParams
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_core.documents import Document
 from dotenv import load_dotenv
-from typing import List, Union, Literal
-from sentence_transformers import SentenceTransformer
+from typing import List, Union, Literal, Callable
 from loguru import logger
-import requests
-from src.config.configs import *
 from tqdm import tqdm
+from PIL import Image
+from pathlib import Path
+
+from src.app.embedding.facenet_embedding import get_embedding
+from src.config.configs import *
 load_dotenv()
 
 class QdrantVectorStore:
     def __init__(
         self,
-        collection_name: str,
+        url: str = QDRANT_URL,
+        collection_name: str = 'face',
+        vector_size: int = VECTOR_SIZE
     ):
         """
         Initialize Qdrant vector store manager.
@@ -29,11 +31,12 @@ class QdrantVectorStore:
             qdrant_url (str): URL of the Qdrant server
         """
         self.collection_name = collection_name
-        self.vector_size = os.getenv("vector_size", 768)
+        self.vector_size = vector_size
         # Initialize Qdrant client
-        self.client = QdrantClient(url=QDRANT_URL)
+        logger.debug("Qdrant URL: {}", url)
+        self.client = QdrantClient(url=url)
 
-    def create_collection(self) -> bool:
+    def create_collection(self, collection_name:str) -> bool:
         """
         Create a new collection if it doesn't exist.
         
@@ -44,15 +47,15 @@ class QdrantVectorStore:
             collections = self.client.get_collections().collections
             collection_names = [collection.name for collection in collections]
             
-            if self.collection_name not in collection_names:
+            if collection_name not in collection_names:
                 self.client.create_collection(
-                    collection_name=self.collection_name,
+                    collection_name=collection_name,
                     vectors_config=VectorParams(
                         size=self.vector_size,
                         distance=Distance.COSINE
                     )
                 )
-                logger.info(f"Created collection: {self.collection_name}")
+                logger.info(f"Created collection: {collection_name}")
             return True
         except Exception as e:
             logger.error(f"Error creating collection: {str(e)}")
@@ -80,7 +83,7 @@ class QdrantVectorStore:
             logger.error(f"Error deleting collection: {str(e)}")
             return False
     
-    def add_documents(self, documents: List[Document], get_embedding: function) -> bool:
+    def add_vector(self, images: List[Image.Image], collection_name:str = "",get_embedding: Callable = get_embedding, metadata : List[Dict] = None) -> bool:
         """
         Add documents to the collection.
         
@@ -90,49 +93,52 @@ class QdrantVectorStore:
         Returns:
             bool: True if documents were added successfully
         """
+        if not collection_name:
+            collection_name = self.collection_name
         try:
             # Create collection if it doesn't exist
-            if not self.create_collection():
+            if not self.create_collection(collection_name=collection_name):
                 pass
             # Prepare documents for insertion
             points = []
-            embeddings = get_embedding([doc.page_content for doc in documents])
-            for doc, emb in zip(documents, embeddings):
-                # Generate embedding for the document text
-                # Create point with embedding and metadata
-                point = models.PointStruct(
+            embeddings = get_embedding(images, emb_by_img = True, verbose = True)
+
+            for data, emb_in_img in zip(metadata, embeddings):
+                points = []
+                points.extend([models.PointStruct(
                     id=str(uuid.uuid4()),
                     vector=emb,
-                    payload={
-                        "text": doc.page_content,
-                        "metadata": doc.metadata
-                    }
+                    payload=data
+                ) for emb in emb_in_img])
+                self.client.upsert(
+                    collection_name=collection_name,
+                    points=points
                 )
-                points.append(point)
-            
-            # Upload points to collection
-            self.client.upsert(
-                collection_name=self.collection_name,
-                points=points
-            )
             return True
             
         except Exception as e:
             logger.error(f"Error adding documents: {str(e)}")
             return False
         
-    def search(self, query: str, k: int = 5, get_embedding: function = None):
-        query_embedding = get_embedding([query], 'local')[0]
+    def search(self, query: Union[Image.Image, List[Image.Image]], collection_name : str = "", k: int = 5, get_embedding: Callable = get_embedding):
 
-        # Search for similar vectors
-        results = self.client.search(
-            collection_name=self.collection_name,
-            query_vector=query_embedding,
-            limit=k
-        )
-        return results
+        
+        query_embeddings = get_embedding(query)
+        query_embeddings = [emb.detach().numpy() for emb in query_embeddings]
+
+        all_results = []
+
+        for emb in query_embeddings:
+            results = self.client.query_points(
+                collection_name=collection_name,
+                query=emb,
+                limit=k
+            )
+            logger.debug(results)
+            all_results.append(results.points)
+        return all_results
     
-    def get_relevant_documents(self, query: str, k: int = 5) -> List[Dict]:
+    def get_relevant_faces(self, query: Union[Image.Image, List[Image.Image]], collection_name : str = "", k: int = 5) -> List[Dict]:
         """
         Search for similar documents using vector similarity.
         
@@ -142,17 +148,21 @@ class QdrantVectorStore:
             
         Returns:
             List[Dict]: List of similar documents with scores
+            
         """
+
+        if not collection_name:
+            collection_name = self.collection_name
         try:
             # Search for similar vectors
-            results = self.search(query, k)
+            results = self.search(query, collection_name = collection_name, k = k)
             processed_results = []
             for scored_point in results:
-                processed_results.append({
-                    "text": scored_point.payload["text"],
-                    "metadata": scored_point.payload.get("metadata", {}),
-                    "score": scored_point.score
-                })
+                for point in scored_point:
+                    processed_results.append({
+                        "metadata": point.payload.get("metadata", {}),
+                        "score": point.score
+                    })
             
             return processed_results
             
@@ -195,22 +205,14 @@ class QdrantVectorStore:
 
 def main():
     # Example usage
-    embeddings = GoogleGenerativeAIEmbeddings(
-            model=os.getenv("embedding_model", "models/embedding-001"),
-            google_api_key=os.getenv("GOOGLE_API_KEY"),
-            task_type = "RETRIEVAL_QUERY"
-        )
-    vector_store = QdrantVectorStore(collection_name="thue", embeddings=embeddings)    
+    vector_store = QdrantVectorStore()    
+    # input_img = [Image.open(img_path) for img_path in Path("tmp").glob("*")]
 
-    # Search for similar documents
-    query = "Thông tin các khoản chịu thuế"
-    results = vector_store.get_relevant_documents(query, k=10)
-    
-    logger.info("\nSearch Results:")
-    for i, result in enumerate(results, 1):
-        logger.info(f"\n{i}. Score: {result['score']:.4f}")
-        logger.info(f"Text: {result['text']}")
-        logger.info(f"Metadata: {result['metadata']}")
+    # vector_store.add_vector(input_img, metadata = [{} for _ in range(len(input_img))])
+
+    logger.info(vector_store.get_relevant_faces(
+        [Image.open("tmp/ce4f9595-07ab-4956-bce6-f106b8129feb-17360026626361641762035.webp")], 
+        k = 1))
 
 if __name__ == "__main__":
     main()
