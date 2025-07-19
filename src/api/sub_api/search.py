@@ -10,7 +10,7 @@ import json
 from src.config.depend import *
 from fastapi.responses import JSONResponse
 from src.database.qdrant import QdrantVectorStore
-
+from src.models.search_input_params import StudentTrackingInput
 
 qdrant_db = QdrantVectorStore()
 router = APIRouter()
@@ -25,12 +25,14 @@ def load_image_from_upload(file: UploadFile) -> Image.Image:
 
 @router.post("/faces/index")
 async def index_face(
-    images: Optional[List[UploadFile]] = File(None),
-    image_urls: Optional[List[HttpUrl]] = Form(None),
+    images: List[UploadFile] = File(None),
+    image_urls: List[HttpUrl] = Form(None),
     collection_name: str = Form(None),
-    data: Optional[List[str]] = Form([])
+    data: List[str] = Form([])
 ):
     pil_images = []
+
+    logger.info("data: {}", data)
 
     if images:
         for image in images:
@@ -55,26 +57,33 @@ async def index_face(
 
 @router.post("/faces/search")
 async def search_face(
-    images: Optional[List[UploadFile]] = File(None),
-    image_urls: Optional[List[HttpUrl]] = Form(None),
-    collection_name: str = Form(None)
+    images: UploadFile = File(None),
+    image_urls: HttpUrl = Form(None),
+    collection_name: str = Form(None),
+    tracking_frame: StudentTrackingInput = Form(None)
 ):
-    pil_images = []
+    pil_images = None
 
     logger.debug("images: {}", images)
 
     if images:
-        for image in images:
-            pil_images.append(load_image_from_upload(image))
+        pil_images.append(load_image_from_upload(images))
 
     elif image_urls:
-        for url in image_urls:
-            pil_images.append(load_image_from_url(str(url)))
+        pil_images.append(load_image_from_url(str(image_urls)))
 
     if not pil_images:
         return {"error": "No valid image input"}
 
-    search_data = qdrant_db.get_relevant_faces(query=pil_images, collection_name=collection_name, k = 1)
+    tracking_object = []
+
+    for bbox in tracking_frame.get("bbox", []):
+        tracking_object.append(pil_images.crop(bbox))
+
+    search_data = qdrant_db.get_relevant_faces(query=tracking_object, collection_name=collection_name, k = 1)
+
+    # for id, 
+
 
     if search_data:
         return JSONResponse(content={'status_code' : 200, 'status': "insert oke", "data": search_data}, status_code= status.HTTP_200_OK)
