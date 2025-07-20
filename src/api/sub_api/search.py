@@ -3,9 +3,10 @@ from typing import List, Optional, Dict
 from PIL import Image
 import requests
 from io import BytesIO
-from pydantic import HttpUrl
+from pydantic import HttpUrl, BaseModel
 from loguru import logger
 import json
+from collections import defaultdict
 
 from src.config.depend import *
 from fastapi.responses import JSONResponse
@@ -60,32 +61,56 @@ async def search_face(
     images: UploadFile = File(None),
     image_urls: HttpUrl = Form(None),
     collection_name: str = Form(None),
-    tracking_frame: StudentTrackingInput = Form(None)
+    tracking_frame: str = Form(None)
 ):
+    tracking_data = tracking_frame
+    if tracking_frame:
+        try:
+            tracking_data = StudentTrackingInput.model_validate(json.loads(tracking_frame))
+        except Exception as e:
+            return {"error": f"Invalid tracking_frame format: {e}"}
     pil_images = None
 
-    logger.debug("images: {}", images)
-
     if images:
-        pil_images.append(load_image_from_upload(images))
+        pil_images = load_image_from_upload(images)
 
     elif image_urls:
-        pil_images.append(load_image_from_url(str(image_urls)))
+        pil_images = load_image_from_url(str(image_urls))
 
     if not pil_images:
         return {"error": "No valid image input"}
 
     tracking_object = []
 
-    for bbox in tracking_frame.get("bbox", []):
+    logger.info("tracking_frame: {}", tracking_frame)
+
+    for bbox in tracking_data.bbox:
         tracking_object.append(pil_images.crop(bbox))
 
     search_data = qdrant_db.get_relevant_faces(query=tracking_object, collection_name=collection_name, k = 1)
 
-    # for id, 
+    result_data = []
+
+    for id, student_data in zip(tracking_data.id, search_data):
+        result_data.append({'id' : id, "infor" : student_data})
 
 
     if search_data:
-        return JSONResponse(content={'status_code' : 200, 'status': "insert oke", "data": search_data}, status_code= status.HTTP_200_OK)
+        return JSONResponse(content={'status_code' : 200, 'status': "insert oke", "data": result_data}, status_code= status.HTTP_200_OK)
     else:
         return JSONResponse(content={'status_code' : 422, 'status': "Insert failt", "data": None}, status_code= status.HTTP_422_UNPROCESSABLE_ENTITY)
+    
+
+class Item(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    tax: float | None = None
+
+
+@router.post("/items/{item_id}")
+async def update_item(item_id: int, item: Item, q: str | None = None):
+    result = {"item_id": item_id, **item.dict()}
+    if q:
+        result.update({"q": q})
+    return result
