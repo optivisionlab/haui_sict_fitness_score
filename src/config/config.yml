@@ -1,0 +1,17 @@
+# YOLO TRACKING
+YOLO_TRACKING:
+  model: 'yolo11n.pt'
+  tracker_config: 'src/config/botsort.yaml'  # Path to the BORTSORT configuration file
+  input_mode: 'video'  # Options: 'video', 'camera'
+  collection_name: 'face'  # Default collection name for search
+  video_path: None  # Path to the video file, if using video input
+  show_tracking: True  # Whether to display tracking results
+  stream: True  # Whether to stream the video
+  save_results: False  # Whether to save the tracking results
+  persist: True  # Whether to persist the tracking state
+  
+INPUT_MODE:
+  camera:
+    camera_id: 0  # Default camera ID for webcam input
+  video:
+    video_path: 'path_to_your_video.mp4'  # Default path for video
