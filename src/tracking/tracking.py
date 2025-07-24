@@ -3,18 +3,41 @@ from ultralytics import YOLO
 import cv2
 from src.engine.engine import convert_xyxy_to_xywh
 from src.config.config import BORTSORT_CONFIG, TRACKING_SHOW, TRACKING_STREAM, SAVE_TRACKING, PERSIST_TRACKING
+from src.search.curl_api_search import curl_post, send_tracking_to_api
+import json
+import numpy as np
 
 
-def tracking_in_frame(source, model):
-    '''
-    Function to perform tracking in a single frame using the YOLO model.
-    TO DO: multiple tracking
-    frame: input frame from the video or camera
-    '''
-    ids = []
-    xywh_boxes = []
-    xyxy_boxes = []
+def extract_tracking_info(result, target_class=0):
+    """
+    Trích xuất thông tin tracking từ 1 frame result.
+    Trả về danh sách ID, bbox XYWH, bbox XYXY cho class cụ thể.
+    """
+    if result.boxes is None:
+        return [], [], []
 
+    cls = [int(x) for x in result.boxes.cls.tolist()] if result.boxes.cls is not None else []
+    ids = [int(x) for x in result.boxes.id.tolist()] if result.boxes.id is not None else []
+    xywh = [[int(v) for v in box] for box in result.boxes.xywh.tolist()] if result.boxes.xywh is not None else []
+    xyxy = [[int(v) for v in box] for box in result.boxes.xyxy.tolist()] if result.boxes.xyxy is not None else []
+
+
+    id_out, xywh_out, xyxy_out = [], [], []
+    for cl, id, box_wh, box_xy in zip(cls, ids, xywh, xyxy):
+        if int(cl) == target_class:
+            id_out.append(id)
+            xywh_out.append(box_wh)
+            xyxy_out.append(box_xy)
+    return id_out, xywh_out, xyxy_out
+
+
+def tracking_in_frame(source, model, target_class=0, api_call_interval=30):
+    """
+    Gọi YOLO model tracking và xử lý kết quả theo class mong muốn.
+    """
+    # Khởi động thread worker gửi API
+    # Mô phỏng real-time tracking có xử lý trong tracking do API có thể lâu hơn tracking khiến tụt fps
+    frame_count = 0
     tracker = model.track(
         source=source,
         tracker=BORTSORT_CONFIG,
@@ -24,25 +47,21 @@ def tracking_in_frame(source, model):
         save=SAVE_TRACKING
     )
 
-    for r in tracker:
-        if r.boxes is None:
-            continue  # Không có object nào được detect
+    for result in tracker:
+        frame_count += 1
+        id_list, xywh_list, xyxy_list = extract_tracking_info(result, target_class)
+        if not id_list:
+            print("Không có đối tượng nào được phát hiện.")
+            continue
+        print('>>>> CURL API')
+        if frame_count % api_call_interval == 0:
+            response = send_tracking_to_api(ids=id_list, xyxy_boxes=xyxy_list, 
+                                            frame=result.orig_img, collection_name='face')
+            print("API response:", response.json() if response else "No response")
 
-        cls = r.boxes.cls.tolist() if r.boxes.cls is not None else []
-        id_list = r.boxes.id.tolist() if r.boxes.id is not None else []
-        xywh_list = r.boxes.xywh.tolist() if r.boxes.xywh is not None else []
-        xyxy_list = r.boxes.xyxy.tolist() if r.boxes.xyxy is not None else []
+        print('>>>> END CURL API')
 
-        # Lọc theo class (ví dụ chỉ lấy class 0)
-        for cl, id, xywh_box, xyxy_box in zip(cls, id_list, xywh_list, xyxy_list):
-            if int(cl) == 0:
-                ids.append(id)
-                xywh_boxes.append(xywh_box)
-                xyxy_boxes.append(xyxy_box)
 
-    return (ids, xywh_boxes, xyxy_boxes)
-
- 
 
 def draw_line_in_frame(frame, ratio_from_bottom=0.3):
     '''

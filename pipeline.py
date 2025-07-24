@@ -83,18 +83,11 @@ def video_tracking_and_search(video_path=None, model=None, collection_name='face
     cap.release()
 
 
-def yolo_tracking(video_path=None, model=None, collection_name='face', camera_mode=False):
-    if camera_mode:
-        ids, xywhs, xyxys = tracking_in_frame(source=CAMERA_INDEX, model=model)
-    else:
-        ids, xywhs, xyxys = tracking_in_frame(source=VIDEO_PATH, model=model)
 
 
 if __name__ == "__main__":
     # video_path = 'path_to_your_video.mp4'
     model = YOLO('yolo11n.pt') 
-    res = yolo_tracking(model=model, camera_mode=True)
-    for r in res:
-        print(r)
+    tracking_in_frame(source=CAMERA_INDEX, model=model)
       # Hoặc 'video' nếu bạn muốn sử dụng video
     # cv2.destroyAllWindows()
