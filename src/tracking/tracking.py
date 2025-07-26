@@ -6,6 +6,7 @@ from src.config.config import BORTSORT_CONFIG, TRACKING_SHOW, TRACKING_STREAM, S
 from src.search.curl_api_search import curl_post, send_tracking_to_api
 import json
 import numpy as np
+from src.engine.engine import draw_target
 
 
 def extract_tracking_info(result, target_class=0):
@@ -62,71 +63,38 @@ def tracking_in_frame(source, model, target_class=0, api_call_interval=30):
         print('>>>> END CURL API')
 
 
-
-def draw_line_in_frame(frame, ratio_from_bottom=0.3):
-    '''
-    Vẽ một đường ngang ở tỉ lệ chiều cao từ dưới lên và trả về tọa độ line.
-
-    Parameters:
-        frame: numpy array (OpenCV image)
-        ratio_from_bottom: float (tỉ lệ chiều cao từ dưới lên, mặc định 0.3)
-
-    Returns:
-        frame: Frame đã vẽ line
-        line: tuple (x1, y1, x2, y2) tọa độ đường vừa vẽ
-    '''
-    height, width = frame.shape[:2]
-
-    # Tính y cách đáy ratio% chiều cao
-    y = int(height * (1 - ratio_from_bottom))
-
-    # Tọa độ line từ trái sang phải
-    line = (0, y, width, y)
-
-    # Vẽ line
-    cv2.line(frame, (line[0], line[1]), (line[2], line[3]), (0, 255, 0), 2)
-
-    return frame, line
-
-    
-def line_begin_curl_api_search(line, box, mode='xywh'):
-    '''
-    Function to detect if any bounding box crosses a specified line.
-    Returns True if the box crosses the line, False otherwise.
-    '''
-    if mode == 'xyxy':
-        xywh = convert_xyxy_to_xywh(box)
-        x_center, y_center, width, height = xywh
-    else:
-        x_center, y_center, width, height = box
-
-    x1, y1 = line
-    if y_center > y1:
-        return True
-    else:
-        return False
-    
-
-def draw_tracking(frame, ids, boxes, fps=None):
+def frame_tracking(frame, model, target_class=0, api_call_interval=30):
     """
-    Vẽ bounding box và ID lên frame.
-    :param frame: frame ảnh (numpy array)
-    :param ids: list các ID đối tượng
-    :param boxes: list các bounding box [x1, y1, x2, y2]
+    Thực hiện tracking trên một frame duy nhất.
+    Giả định dùng YOLOv8 + ByteTrack để tracking, từng frame riêng biệt.
+    api_call_interval: Khoảng frame để gửi API một lần.
     """
-    for id, box in zip(ids, boxes):
-        x1, y1, x2, y2 = map(int, box)
-        # Vẽ rectangle
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        # Vẽ ID
-        cv2.putText(frame, f'ID: {id}', (x1, y1 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-    
-    if fps is not None:
-        cv2.putText(frame, f'FPS: {fps:.2f}', (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
-    return frame
+    results = model.track(
+        source=frame,
+        tracker=BORTSORT_CONFIG,
+        persist=PERSIST_TRACKING,
 
+    )
+    annotated_frame = frame.copy()
+
+    if results:
+        boxes = results[0].boxes
+        print(boxes)
+        for box in boxes:
+            print(f"Box: {box}")
+            xyxy = box.xyxy[0].cpu().numpy().astype(int)
+            track_id = int(box.id[0]) if box.id is not None else -1
+            class_id = int(box.cls[0]) if box.cls is not None else -1
+            
+            # Chỉ vẽ nếu là class mong muốn (ví dụ: người)
+            if class_id == target_class:
+                draw_target(annotated_frame, track_id=track_id, box=xyxy)
+
+    return annotated_frame
+
+
+def frame_tracking_callback(frame):
+    return frame_tracking(frame, model=YOLO('yolo11n.pt'))
 
 
 
