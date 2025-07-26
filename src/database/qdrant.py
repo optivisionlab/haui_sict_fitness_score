@@ -121,7 +121,7 @@ class QdrantVectorStore:
             logger.error(f"Error adding documents: {str(e)}")
             return False
         
-    def search(self, query: Union[Image.Image, List[Image.Image]], collection_name : str = "", k: int = 5, get_embedding: Callable = get_embedding):
+    def search(self, query: Union[Image.Image, List[Image.Image]], collection_name : str = "", k: int = 5, get_embedding: Callable = get_embedding, threshold = None):
 
         
         query_embeddings = get_embedding(query)
@@ -134,7 +134,8 @@ class QdrantVectorStore:
                 results = self.client.query_points(
                     collection_name=collection_name,
                     query=emb,
-                    limit=k
+                    limit=k,
+                    score_threshold=threshold
                 )
                 logger.debug(results)
                 all_results.append(results.points)
@@ -142,7 +143,7 @@ class QdrantVectorStore:
                 all_results.append([])
         return all_results
     
-    def get_relevant_faces(self, query: Union[Image.Image, List[Image.Image]], collection_name : str = "", k: int = 5) -> List[Dict]:
+    def get_relevant_faces(self, query: Union[Image.Image, List[Image.Image]], collection_name : str = "", k: int = 5, threshold = 0.65) -> List[Dict]:
         """
         Search for similar documents using vector similarity.
         
@@ -159,7 +160,7 @@ class QdrantVectorStore:
             collection_name = self.collection_name
         try:
             # Search for similar vectors
-            results = self.search(query, collection_name = collection_name, k = k)
+            results = self.search(query, collection_name = collection_name, k = k, threshold = threshold)
             processed_results = []
             for scored_point in results:
                 if scored_point:
@@ -169,7 +170,10 @@ class QdrantVectorStore:
                             "score": point.score
                         })
                 else:
-                    processed_results.append({})
+                    processed_results.append({
+                            "metadata": {},
+                            "score": 0.0
+                        })
             
             return processed_results
             

@@ -61,7 +61,8 @@ async def search_face(
     images: UploadFile = File(None),
     image_urls: HttpUrl = Form(None),
     collection_name: str = Form(None),
-    tracking_frame: str = Form(None)
+    tracking_frame: str = Form(None),
+    similarity_threshold: float = Form(0.65)
 ):
     tracking_data = tracking_frame
     if tracking_frame:
@@ -87,7 +88,7 @@ async def search_face(
     for bbox in tracking_data.bbox:
         tracking_object.append(pil_images.crop(bbox))
 
-    search_data = qdrant_db.get_relevant_faces(query=tracking_object, collection_name=collection_name, k = 1)
+    search_data = qdrant_db.get_relevant_faces(query=tracking_object, collection_name=collection_name, k = 1, threshold= similarity_threshold)
 
     result_data = []
     for id, student_data in zip(tracking_data.id, search_data):
