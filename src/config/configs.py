@@ -19,6 +19,7 @@ yaml.SafeLoader.add_constructor('!ENV', env_constructor)
 with open("configs.yml", "r") as f:
     config = yaml.load(f, Loader=yaml.SafeLoader)
 
-RESNET_EMBEDDING_PATH = config.get("RESNET_EMBEDDING_PATH")
-QDRANT_URL = config.get("QDRANT_URL")
-VECTOR_SIZE = config.get('VECTOR_SIZE')
+RESNET_EMBEDDING_PATH = config.get("RESNET_EMBEDDING_PATH", "vggface2")
+QDRANT_URL = config.get("QDRANT_URL", "http://localhost:6333")
+VECTOR_SIZE = config.get('VECTOR_SIZE', 512)
+MTCNN_CONFIG = config.get("MTCNN_CONFIG", {})

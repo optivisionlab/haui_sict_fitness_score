@@ -4,7 +4,7 @@ from torchvision.transforms import  Compose, Resize, ToTensor
 
 
 resnet_embedding = InceptionResnetV1(pretrained=RESNET_EMBEDDING_PATH).eval()
-mtcnn = MTCNN(image_size=512)
+mtcnn = MTCNN(**MTCNN_CONFIG)
 to_tensor_transform = Compose([
     Resize((224, 224)),  
     ToTensor()
