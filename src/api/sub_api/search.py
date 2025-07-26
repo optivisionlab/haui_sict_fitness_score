@@ -90,27 +90,9 @@ async def search_face(
     search_data = qdrant_db.get_relevant_faces(query=tracking_object, collection_name=collection_name, k = 1)
 
     result_data = []
-
     for id, student_data in zip(tracking_data.id, search_data):
-        result_data.append({'id' : id, "infor" : student_data})
-
-
-    if search_data:
-        return JSONResponse(content={'status_code' : 200, 'status': "insert oke", "data": result_data}, status_code= status.HTTP_200_OK)
-    else:
-        return JSONResponse(content={'status_code' : 422, 'status': "Insert failt", "data": None}, status_code= status.HTTP_422_UNPROCESSABLE_ENTITY)
+        result_data.append({'id' : id, "infor" : student_data if student_data else None})
     
-
-class Item(BaseModel):
-    name: str
-    description: str | None = None
-    price: float
-    tax: float | None = None
-
-
-@router.post("/items/{item_id}")
-async def update_item(item_id: int, item: Item, q: str | None = None):
-    result = {"item_id": item_id, **item.dict()}
-    if q:
-        result.update({"q": q})
-    return result
+    return JSONResponse(content={'status_code' : 200, 'status': "insert oke", "data": result_data}, status_code= status.HTTP_200_OK)
+    # else:
+    #     return JSONResponse(content={'status_code' : 422, 'status': "Search failt", "data": None}, status_code= status.HTTP_422_UNPROCESSABLE_ENTITY)

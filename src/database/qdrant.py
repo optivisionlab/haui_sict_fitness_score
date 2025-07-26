@@ -101,19 +101,20 @@ class QdrantVectorStore:
                 pass
             # Prepare documents for insertion
             points = []
-            embeddings = get_embedding(images, emb_by_img = True, verbose = True)
+            embeddings = get_embedding(images, verbose = True)
 
             for data, emb_in_img in zip(metadata, embeddings):
-                points = []
-                points.extend([models.PointStruct(
-                    id=str(uuid.uuid4()),
-                    vector=emb,
-                    payload=data
-                ) for emb in emb_in_img])
-                self.client.upsert(
-                    collection_name=collection_name,
-                    points=points
-                )
+                if emb_in_img is not None:
+                    points = []
+                    points.extend([models.PointStruct(
+                        id=str(uuid.uuid4()),
+                        vector=emb,
+                        payload=data
+                    ) for emb in emb_in_img])
+                    self.client.upsert(
+                        collection_name=collection_name,
+                        points=points
+                    )
             return True
             
         except Exception as e:
@@ -124,18 +125,21 @@ class QdrantVectorStore:
 
         
         query_embeddings = get_embedding(query)
-        query_embeddings = [emb.detach().numpy() for emb in query_embeddings]
+        query_embeddings = [emb.detach().numpy()[0] if emb is not None else None for emb in query_embeddings]
 
         all_results = []
 
         for emb in query_embeddings:
-            results = self.client.query_points(
-                collection_name=collection_name,
-                query=emb,
-                limit=k
-            )
-            logger.debug(results)
-            all_results.append(results.points)
+            if emb is not None:
+                results = self.client.query_points(
+                    collection_name=collection_name,
+                    query=emb,
+                    limit=k
+                )
+                logger.debug(results)
+                all_results.append(results.points)
+            else:
+                all_results.append([])
         return all_results
     
     def get_relevant_faces(self, query: Union[Image.Image, List[Image.Image]], collection_name : str = "", k: int = 5) -> List[Dict]:
@@ -158,17 +162,20 @@ class QdrantVectorStore:
             results = self.search(query, collection_name = collection_name, k = k)
             processed_results = []
             for scored_point in results:
-                for point in scored_point:
-                    processed_results.append({
-                        "metadata": point.payload.get("metadata", {}),
-                        "score": point.score
-                    })
+                if scored_point:
+                    for point in scored_point:
+                        processed_results.append({
+                            "metadata": point.payload,
+                            "score": point.score
+                        })
+                else:
+                    processed_results.append({})
             
             return processed_results
             
         except Exception as e:
-            logger.error(f"Error searching documents: {str(e)}")
-            return []
+            logger.exception(f"Error searching documents: {str(e)}")
+            return [{} for _ in range(len(query))]
     
     def get_collection_info(self) -> Dict:
         """

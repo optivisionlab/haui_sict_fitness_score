@@ -9,27 +9,26 @@ import numpy as np
 from loguru import logger
 import os 
 
-def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False, emb_by_img= False):
+def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False):
     if isinstance(images, Image.Image):
         images = [images]
 
     all_faces = []
     face_counts = []  
-
     for img_idx, image in enumerate(images):
-        face_bbox, _ = mtcnn.detect(image)
+        face_bbox,conf = mtcnn.detect(image)
 
         if face_bbox is None:
             logger.warning(f"No face detected in image {img_idx}")
             face_counts.append(0)
             continue
-
         logger.info("Image {} - face_bbox count: {}", img_idx, len(face_bbox))
 
         faces = []
         for box_idx, box in enumerate(face_bbox):
             face = image.crop(box)
             if verbose:
+                logger.info("face_bbox: {}, conf: {}", face_bbox, conf)
                 os.makedirs('tmp/debug_img', exist_ok=True)
                 face.save(f"tmp/debug_img/img{img_idx}_face{box_idx}.jpg")
             faces.append(face)
@@ -38,23 +37,23 @@ def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False, 
         face_counts.append(len(faces))
 
     if not all_faces:
-        return []
+        return [None for _ in range(len(images))]
 
     face_images = torch.stack([to_tensor_transform(face) for face in all_faces])
     all_embeddings = resnet_embedding(face_images)
-
-    if emb_by_img:
-        embeddings_per_image = []
-        idx = 0
-        for count in face_counts:
-            embeddings_per_image.append(all_embeddings[idx:idx+count])
+    result = []
+    idx = 0
+    for count in face_counts:
+        if count == 0:
+            result.append(None)
+        else:
+            result.append(all_embeddings[idx:idx + count])
             idx += count
-
-        return embeddings_per_image
-
-    return all_embeddings
-
+    return result
 
 if __name__ == "__main__":
-    img = Image.open('/home/chuhuyhoang/code/haui_sict_fitness_score/tmp/jakc-4-1150.jpg')
-    logger.debug("embedidng shape: {}", get_embedding(image=img, verbose=True).shape)
+    img1 = Image.open('/home/chuhuyhoang/code/haui_sict_fitness_score/tmp/ce4f9595-07ab-4956-bce6-f106b8129feb-17360026626361641762035.webp')
+    img2 = Image.open('//home/chuhuyhoang/code/haui_sict_fitness_score/tmp/jakc-4-1150.jpg')
+    emb_list = get_embedding(images=[img1, img2], verbose=True)
+    for emb in emb_list:
+        logger.debug("embedidng shape: {}", emb.shape if emb is not None else None)
