@@ -104,14 +104,16 @@ class SetUpEvaluate():
         # Tính thời gian giữa các camera liên tiếp
         time_details = {}
         total_time = 0
-        for i in range(len(ordered_cams) - 1):
-            cam_a = ordered_cams[i]
-            cam_b = ordered_cams[i + 1]
+        for i in range(len(ordered_cams)):
+            cam_a = ordered_cams[i] 
+            cam_b = ordered_cams[(i + 1) % len(ordered_cams)]
             
             if cam_a not in cam_time_map or cam_b not in cam_time_map:
                 raise ValueError(f"Thiếu dữ liệu thời gian cho {cam_a} hoặc {cam_b}.")
 
             delta_time = cam_time_map[cam_b] - cam_time_map[cam_a]
+            if delta_time < 0:
+                raise ValueError(f"Thời gian tại {cam_b} nhỏ hơn {cam_a}, dữ liệu không hợp lệ.")
             time_details[(cam_a, cam_b)] = delta_time
             total_time += delta_time
 
