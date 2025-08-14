@@ -16,6 +16,14 @@ def convert_xyxy_to_xywh(box):
     return [x_center, y_center, width, height]
 
 
+def tlwh_to_xyah(tlwh):
+    x, y, w, h = tlwh
+    cx = x + w / 2.
+    cy = y + h / 2.
+    a = w / float(h)
+    return np.array([cx, cy, a, h])
+
+
 def draw_line_in_frame(frame, ratio_from_bottom=0.3):
     '''
     Vẽ một đường ngang ở tỉ lệ chiều cao từ dưới lên và trả về tọa độ line.
@@ -60,20 +68,31 @@ def line_begin_curl_api_search(line, box, mode='xywh'):
         return False
     
 
-def draw_target(frame, track_id, box, color=(0, 255, 0), thickness=2):
-    '''
-    Vẽ bounding box lên frame.
-    box: [x1, y1, x2, y2]
-    '''
-    x1, y1, x2, y2 = box
+def draw_target(frame, track_id, box, name=None, color=(0, 255, 0), thickness=2):
+    """
+    Vẽ bounding box và thông tin ID + name lên frame.
+    box: [x1, y1, x2, y2] (tọa độ pixel dạng xyxy)
+    """
+    x1, y1, x2, y2 = map(int, box)
+
+    # Vẽ khung
     cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
+
+    # Chuẩn bị text hiển thị
+    if name:
+        text = f"ID: {track_id} | {name}"
+    else:
+        text = f"ID: {track_id}"
+
+    # Vẽ text phía trên box
     cv2.putText(
         frame,
-        f"ID: {track_id}",
+        text,
         (x1, y1 - 10),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.6,
-        (0, 255, 0),
+        color,
         2
     )
+
     return frame
