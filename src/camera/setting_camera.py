@@ -3,7 +3,7 @@ import threading
 
 
 class CameraSettings:
-    def __init__(self, camera_id, width=640, height=480, fps=30):
+    def __init__(self, camera_id, width=640, height=480, fps=60):
         self.camera_id = camera_id
         self.width = width
         self.height = height
@@ -16,12 +16,27 @@ class CameraSettings:
     
 
 class CameraViewer:
-    def __init__(self, camera_id=0, source=0, settings=None, on_frame_callback=None):
+    def __init__(self, camera_id=0, source=0, settings=None, on_frame_callback=None, save_results=False, save_path=None):
         self.camera_id = camera_id
         self.settings = settings if settings else CameraSettings(camera_id)
         self.source = source
         self.camera = cv2.VideoCapture(self.source)
-        self.settings.apply_settings(self.camera)
+        self.save_results = save_results  # Default to not saving results
+        self.save_path = save_path  # Path to save results if needed
+        if self.save_results:
+            if not self.save_path:
+                self.save_path = f"camera_{camera_id}_results.avi"
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+
+            # ✅ Lấy kích thước thật từ camera thay vì dùng self.settings
+            actual_width = int(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
+            actual_height = int(self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+            self.out = cv2.VideoWriter(self.save_path, fourcc, self.settings.fps, (actual_width, actual_height))
+
+
+        if self.source == 0:
+            self.settings.apply_settings(self.camera)
         if not self.camera.isOpened():
             raise Exception(f"Không thể mở camera với ID {camera_id} và source {source}.")
 
@@ -38,6 +53,7 @@ class CameraViewer:
 
     def _run(self):
         window_name = f"Camera {self.camera_id}"
+        frame_count = 0
         while not self.stop_flag:
             ret, frame = self.camera.read()
             if not ret:
@@ -47,15 +63,20 @@ class CameraViewer:
             with self._lock:
                 if self.on_frame_callback:
                     try:
-                        frame = self.on_frame_callback(frame)
+                        frame = self.on_frame_callback(frame, frame_count)
                     except Exception as e:
                         print(f"Lỗi trong callback: {e}")
-
+            
             cv2.imshow(window_name, frame)
+            if self.save_results:
+                # Logic to save results can be added here
+                self.out.write(frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 self.stop_flag = True
                 break
 
+            frame_count += 1
+            
         self._safe_cleanup(window_name)
 
     def stop(self):
