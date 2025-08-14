@@ -63,7 +63,8 @@ def send_tracking_to_api(ids, xyxy_boxes, frame, collection_name="face"):
     print('tracking_frame:', tracking_frame)
     payload = {
         'collection_name': collection_name,
-        'tracking_frame': tracking_frame
+        'tracking_frame': tracking_frame,
+        'similarity_threshold': 0.25,
     }
 
     # Encode frame thành ảnh JPEG
@@ -82,7 +83,7 @@ def send_tracking_to_api(ids, xyxy_boxes, frame, collection_name="face"):
     
     # Gửi request
     response = curl_post(
-        url='https://a848efb1b90e.ngrok-free.app/faces/search',  # chỉnh lại URL thực tế
+        url='https://5015285cb473.ngrok-free.app/faces/search',  # chỉnh lại URL thực tế
         payload=payload,
         files=files,
         method='POST'
