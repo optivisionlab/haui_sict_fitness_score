@@ -1,5 +1,6 @@
 import cv2
 import threading
+from loguru import logger
 
 
 class CameraSettings:
@@ -46,9 +47,11 @@ class CameraViewer:
         self._lock = threading.Lock()
 
     def start(self):
+        logger.info(f"Starting camera {self.camera_id} with source {self.source}")
+        logger.info(self.thread)
         if self.thread is None or not self.thread.is_alive():
             self.stop_flag = False
-            self.thread = threading.Thread(target=self._run, daemon=True)
+            self.thread = threading.Thread(target=self._run, daemon=False)
             self.thread.start()
 
     def _run(self):

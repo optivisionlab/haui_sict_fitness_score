@@ -1,121 +1,71 @@
 import numpy as np
 from typing import Union
+from collections import defaultdict
+from loguru import logger
 
 
 class SetUpEvaluate():
-    # khởi tạo chu trình
-    def __init__(self, id_run_process: Union[list, np.ndarray], user_info: Union[dict], mean_velocity=[8, 12]):
+    def __init__(self, id_run_process: Union[list, np.ndarray], mean_velocity=[8, 12]):
         """
-        Khởi tạo các biến truyền vào
         Input:
-            - id_run_process: Chu trình setup camera
-            - user_info: Thông tin dạng dict gồm tên và thời gian chạy, ...
-            - mean_velocity: vận tốc chạy trung bình của người bình thường
-        TODO:
-            - thuật toán tính điểm theo vận tốc, hoặc một cách gì đó
+            - id_run_process: Chu trình setup camera (list hoặc array)
+            - mean_velocity: khoảng vận tốc chạy trung bình
         """
-        self.id_run_process = id_run_process
-        self.user_info = user_info
+        self.id_run_process = np.array(id_run_process) if isinstance(id_run_process, list) else id_run_process
         self.mean_velocity = mean_velocity
-    
-    # Lấy chu trình 
-    def __get_process(self):
-        if isinstance(self.id_run_process, list):
-            self.id_run_process = np.array(self.id_run_process)
 
-        return self.id_run_process
-    
-    # validate chu trình của 1 user
-    def __validate_process(self, **kwargs):
+        # Lưu trạng thái cho từng user
+        self.laps = defaultdict(int)                         # laps[user_id]
+        self.progress_idx = defaultdict(lambda: -1)          # user đang ở bước thứ mấy trong chu trình
+        self.last_timestamp = defaultdict(lambda: None)      # lưu thời gian lần cuối update
+
+    def update(self, user_id, cam_id, timestamp=None):
         """
-        Hàm validate chu trình
+        Cập nhật khi 1 người xuất hiện ở camera
         Input:
-            - cam_ids: list/array chứa id camera
-            - time_accesses: list/array chứa thời gian tương ứng
-            HOẶC
-            - cam_time_dict: dict {cam_id: time_access}
+            - user_id: ID của người
+            - cam_id: ID camera
+            - timestamp: thời gian (nếu cần)
         """
-        cam_ids = None
-        time_accesses = None
+        if cam_id not in self.id_run_process:
+            raise ValueError(f"Camera {cam_id} không thuộc chu trình.")
 
-        # Nếu input là 2 mảng riêng
-        if 'cam_ids' in kwargs and 'time_accesses' in kwargs:
-            cam_ids = kwargs['cam_ids']
-            time_accesses = kwargs['time_accesses']
-        
-        # Nếu input là dictionary
-        elif 'cam_time_dict' in kwargs:
-            cam_time_dict = kwargs['cam_time_dict']
-            cam_ids = list(cam_time_dict.keys())
-            time_accesses = list(cam_time_dict.values())
+        expected_next = 0 if self.progress_idx[user_id] == -1 else (self.progress_idx[user_id] + 1) % len(self.id_run_process)
+
+        if cam_id == self.id_run_process[expected_next]:
+            # Đi đúng trình tự
+            self.progress_idx[user_id] = expected_next
+            self.last_timestamp[user_id] = timestamp
+
+            if self.progress_idx[user_id] == 0:  # quay lại điểm đầu -> hoàn thành 1 vòng
+                self.laps[user_id] += 1
+                logger.info(f"✅ User {user_id} hoàn thành vòng {self.laps[user_id]}")
+
         else:
-            raise ValueError("Input không hợp lệ. Cần truyền cam_ids + time_accesses hoặc cam_time_dict.")
+            # Nếu đi sai thứ tự thì reset progress
+            self.progress_idx[user_id] = -1
 
-        # Validate tập ID
-        if set(cam_ids) != set(self.id_run_process):
-            return False
-
-        original_cam_ids = list(cam_ids)
-
-        # Validate từng phần tử
-        for cam_id, time_access in zip(cam_ids, time_accesses):
-            if not isinstance(cam_id, (int, str)):
-                return False
-            if not isinstance(time_access, (int, float)):
-                return False
-
-        sort_time = sorted(zip(cam_ids, time_accesses), key=lambda x: x[1])
-        sorted_cam_ids, _ = zip(*sort_time)
-        
-        return list(sorted_cam_ids) == original_cam_ids
-            
+    def get_status(self, user_id):
+        return {
+            "laps": self.laps[user_id],
+            "progress_idx": self.progress_idx[user_id],
+            "last_timestamp": self.last_timestamp[user_id]
+        }
     
-    def __eval(self, **kwargs):
+
+class GlobalEvaluator:
+    def __init__(self, id_run_process, mean_velocity=[8, 12]):
+        self.evaluator = SetUpEvaluate(id_run_process, mean_velocity)
+
+    def process_detection(self, detections, cam_id, timestamp=None):
         """
-        Đánh giá thời gian một người đi qua toàn bộ chu trình.
-        Input giống __validate_process:
-            - cam_ids + time_accesses
-            HOẶC
-            - cam_time_dict
-        Output:
-            - total_time: tổng thời gian từ cam đầu đến cam cuối
-            - time_details: dict {("camX", "camY"): delta_time}
+        detections: list các user_id đã search được sau API
+        cam_id: ID của camera hiện tại
+        timestamp: thời gian frame
         """
-        cam_ids = None
-        time_accesses = None
-
-        # Lấy dữ liệu input
-        if 'cam_ids' in kwargs and 'time_accesses' in kwargs:
-            cam_ids = kwargs['cam_ids']
-            time_accesses = kwargs['time_accesses']
-        elif 'cam_time_dict' in kwargs:
-            cam_time_dict = kwargs['cam_time_dict']
-            cam_ids = list(cam_time_dict.keys())
-            time_accesses = list(cam_time_dict.values())
-        else:
-            raise ValueError("Input không hợp lệ. Cần truyền cam_ids + time_accesses hoặc cam_time_dict.")
-
-        # Chuyển thành dict để dễ lookup
-        cam_time_map = dict(zip(cam_ids, time_accesses))
-
-        # Duyệt theo đúng thứ tự chu trình
-        ordered_cams = list(self.id_run_process)
-
-        # Tính thời gian giữa các camera liên tiếp
-        time_details = {}
-        total_time = 0
-        for i in range(len(ordered_cams)):
-            cam_a = ordered_cams[i] 
-            cam_b = ordered_cams[(i + 1) % len(ordered_cams)]
-            
-            if cam_a not in cam_time_map or cam_b not in cam_time_map:
-                raise ValueError(f"Thiếu dữ liệu thời gian cho {cam_a} hoặc {cam_b}.")
-
-            delta_time = cam_time_map[cam_b] - cam_time_map[cam_a]
-            if delta_time < 0:
-                raise ValueError(f"Thời gian tại {cam_b} nhỏ hơn {cam_a}, dữ liệu không hợp lệ.")
-            time_details[(cam_a, cam_b)] = delta_time
-            total_time += delta_time
-
-        return total_time, time_details
+        results = []
+        for user_id in detections:
+            self.evaluator.update(user_id, cam_id, timestamp)
+            results.append(self.evaluator.get_status(user_id))
+        return results
 
