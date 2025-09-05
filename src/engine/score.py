@@ -54,18 +54,24 @@ class SetUpEvaluate():
     
 
 class GlobalEvaluator:
+    """
+    Giữ 1 evaluator duy nhất cho toàn bộ hệ thống.
+    Các tracker sẽ gọi process_from_tracker để cập nhật.
+    """
     def __init__(self, id_run_process, mean_velocity=[8, 12]):
         self.evaluator = SetUpEvaluate(id_run_process, mean_velocity)
 
-    def process_detection(self, detections, cam_id, timestamp=None):
+    def process_from_tracker(self, detections, cam_id, timestamp=None):
         """
-        detections: list các user_id đã search được sau API
-        cam_id: ID của camera hiện tại
-        timestamp: thời gian frame
+        detections: list user_id đã detect sau API
+        cam_id: ID camera
         """
-        results = []
         for user_id in detections:
             self.evaluator.update(user_id, cam_id, timestamp)
-            results.append(self.evaluator.get_status(user_id))
-        return results
+
+    def get_status(self, user_id):
+        return self.evaluator.get_status(user_id)
+
+    def get_all_status(self):
+        return {uid: self.evaluator.get_status(uid) for uid in self.evaluator.laps.keys()}
 

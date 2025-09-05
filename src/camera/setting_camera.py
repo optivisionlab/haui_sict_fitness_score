@@ -9,6 +9,7 @@ class CameraSettings:
         self.width = width
         self.height = height
         self.fps = fps
+        
 
     def apply_settings(self, camera):
         camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
@@ -48,7 +49,6 @@ class CameraViewer:
 
     def start(self):
         logger.info(f"Starting camera {self.camera_id} with source {self.source}")
-        logger.info(self.thread)
         if self.thread is None or not self.thread.is_alive():
             self.stop_flag = False
             self.thread = threading.Thread(target=self._run, daemon=False)
@@ -70,7 +70,7 @@ class CameraViewer:
                     except Exception as e:
                         print(f"Lỗi trong callback: {e}")
             
-            cv2.imshow(window_name, frame)
+            # cv2.imshow(window_name, frame)
             if self.save_results:
                 # Logic to save results can be added here
                 self.out.write(frame)
