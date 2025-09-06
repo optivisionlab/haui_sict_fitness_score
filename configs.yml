@@ -7,5 +7,4 @@ VECTOR_SIZE: 512
 
 MTCNN_CONFIG:
   image_size: 512
-  min_face_size: 100
   device: 'cpu'

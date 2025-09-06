@@ -62,7 +62,7 @@ async def search_face(
     image_urls: HttpUrl = Form(None),
     collection_name: str = Form(None),
     tracking_frame: str = Form(None),
-    similarity_threshold: float = Form(0.65)
+    s: float = Form(0.65)
 ):
     tracking_data = tracking_frame
     if tracking_frame:
