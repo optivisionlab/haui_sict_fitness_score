@@ -28,7 +28,7 @@ class CameraViewer:
         if self.save_results:
             if not self.save_path:
                 self.save_path = f"camera_{camera_id}_results.avi"
-            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            fourcc = cv2.VideoWriter_fourcc(*'YV12')
 
             # ✅ Lấy kích thước thật từ camera thay vì dùng self.settings
             actual_width = int(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))

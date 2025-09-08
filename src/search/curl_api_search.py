@@ -9,6 +9,8 @@ from loguru import logger
 from src.config.config import SEARCH_API_URL
 
 
+session = requests.Session()
+
 def curl_post(url, payload=None, files=None, headers=None, method="POST"):
     """
     Gửi request (POST/PUT) đến một URL với payload, file upload và headers.
@@ -27,12 +29,13 @@ def curl_post(url, payload=None, files=None, headers=None, method="POST"):
         headers = {'accept': 'application/json'}
 
     try:
-        response = requests.request(
+        response = session.request(
             method,
             url,
             headers=headers,
             data=payload,
-            files=files
+            files=files,
+            timeout=20,
         )
         response.raise_for_status()
         return response

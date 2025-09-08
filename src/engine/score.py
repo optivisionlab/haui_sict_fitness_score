@@ -7,7 +7,7 @@ from src.engine.engine import write_txt
 
 
 class SetUpEvaluate():
-    def __init__(self, id_run_process: Union[list, np.ndarray], mean_velocity=[8, 12]):
+    def __init__(self, id_run_process: Union[list, np.ndarray], mean_velocity=[8, 12], test_mode=False):
         """
         Input:
             - id_run_process: Chu trình setup camera (list hoặc array)
@@ -23,7 +23,7 @@ class SetUpEvaluate():
         self.last_cam = defaultdict(lambda: None)  # lưu camera cuối cùng
         self.start_cam = defaultdict(lambda: None)  # lưu camera bắt đầu
         self.direction = defaultdict(lambda: None)  # hướng di chuyển (tăng hay giảm cam_id)
-
+        self.test_mode = test_mode
 
     def update(self, user_id, cam_id, timestamp=None):
         if cam_id not in self.id_run_process:
@@ -32,21 +32,33 @@ class SetUpEvaluate():
         prev_idx = self.progress_idx[user_id]
         expected_next = 0 if prev_idx == -1 else (prev_idx + 1) % len(self.id_run_process)
         logger.info(f"user {user_id} prev_idx={prev_idx}, expected_next={expected_next}, cam_id={cam_id}")
+        write_txt('results.txt', f"user {user_id} prev_idx={prev_idx}, expected_next={expected_next}, cam_id={cam_id}")
 
-        # Phần này debug việc search ra kết quả liên tục ở 1 cam
+
+        # Tránh trùng cam liên tiếp
         if self.last_cam[user_id] == cam_id:
             logger.debug(f"User {user_id} bị trùng cam {cam_id} -> bỏ qua update")
             return
 
         if cam_id == self.id_run_process[expected_next]:
             # Đi đúng thứ tự
-            if expected_next == 0 and prev_idx == len(self.id_run_process) - 1:
-                # Chỉ cộng vòng khi từ cam cuối quay lại cam đầu
-                self.laps[user_id] += 1
-                logger.info(f"User {user_id} hoàn thành vòng {self.laps[user_id]}")
-                write_txt('results.txt', f"User {user_id} hoàn thành vòng {self.laps[user_id]}")
+            if self.test_mode:
+                # 🔹 Test tuần tự: coi chạm cam cuối là hoàn thành vòng
+                if prev_idx == len(self.id_run_process) - 1:
+                    self.laps[user_id] += 1
+                    logger.info(f"User {user_id} hoàn thành vòng {self.laps[user_id]} (test mode)")
+                    write_txt('results.txt', f"User {user_id} hoàn thành vòng {self.laps[user_id]}")
+                    self.progress_idx[user_id] = 0
+                else:
+                    self.progress_idx[user_id] = expected_next
+            else:
+                # 🔹 Bình thường: phải quay lại cam đầu
+                if expected_next == 0 and prev_idx == len(self.id_run_process) - 1:
+                    self.laps[user_id] += 1
+                    logger.info(f"User {user_id} hoàn thành vòng {self.laps[user_id]}")
+                    write_txt('results.txt', f"User {user_id} hoàn thành vòng {self.laps[user_id]}")
+                self.progress_idx[user_id] = expected_next
 
-            self.progress_idx[user_id] = expected_next
             self.last_timestamp[user_id] = timestamp
             self.last_cam[user_id] = cam_id
 
@@ -70,6 +82,7 @@ class SetUpEvaluate():
         direction = self.direction[user_id]
 
         logger.info(f"[User {user_id}] prev_idx={prev_idx}, cam_id={cam_id}, start_cam={start_cam}, direction={direction}")
+        write_txt('logs.txt', f"[User {user_id}] prev_idx={prev_idx}, cam_id={cam_id}, start_cam={start_cam}, direction={direction}")
 
         # nếu user đã có progress và detect trùng cam liên tiếp -> bỏ qua (spam)
         if prev_idx != -1 and self.last_cam[user_id] == cam_id:
@@ -87,7 +100,7 @@ class SetUpEvaluate():
             self.last_cam[user_id] = cam_id
             self.last_timestamp[user_id] = timestamp
             self.direction[user_id] = None
-            logger.info(f"[User {user_id}] Khởi động lại tại cam {cam_id}")
+            logger.info(f"[User {user_id}] Khởi động bắt đầu tại cam {cam_id}")
             return
 
         # index của cam start trong cam_list
@@ -127,20 +140,33 @@ class SetUpEvaluate():
 
         # progress_idx là số bước đã đi kể từ start (0..N-1)
         expected_idx = (prev_idx + 1) % N
-        expected_cam = seq[expected_idx]
-
+        expected_cam = int(seq[expected_idx])
+        cam_id = int(cam_id)
+        logger.info(f"[User {user_id}] direction={self.direction[user_id]}, expected_cam={expected_cam}, cam_id={cam_id}")
         if cam_id == expected_cam:
             # đi đúng thứ tự
             self.progress_idx[user_id] = expected_idx
             self.last_timestamp[user_id] = timestamp
             self.last_cam[user_id] = cam_id
-
             # nếu quay lại start (expected_idx == 0) -> hoàn thành vòng
-            if expected_idx == 0:
+          # 🔹 Test mode: coi khi đi hết 1 vòng (expected_idx == N-1) là hoàn thành
+            if self.test_mode and expected_idx == N - 1:
+                logger.info(f"prev_idx={prev_idx}, N-1={N-1}, expected_idx={expected_idx}")
+                self.laps[user_id] += 1
+                logger.info(f"[TEST MODE] User {user_id} hoàn thành vòng {self.laps[user_id]}")
+                write_txt('results.txt', f"[TEST MODE] User {user_id} hoàn thành vòng {self.laps[user_id]}")
+
+                self.direction[user_id] = None
+                self.progress_idx[user_id] = -1  # reset để chạy vòng mới
+                return
+
+            # 🔹 Normal mode: chỉ tính vòng khi quay lại start
+            if not self.test_mode and expected_idx == 0:
                 self.laps[user_id] += 1
                 logger.info(f"User {user_id} hoàn thành vòng {self.laps[user_id]}")
-                # cho phép đổi hướng ở vòng tiếp theo
+                write_txt('results.txt', f"[TEST MODE] User {user_id} hoàn thành vòng {self.laps[user_id]}")
                 self.direction[user_id] = None
+                return
             return
 
         # nếu đến đây -> đi sai thứ tự => reset sạch để user có thể restart
@@ -166,8 +192,8 @@ class GlobalEvaluator:
     Giữ 1 evaluator duy nhất cho toàn bộ hệ thống.
     Các tracker sẽ gọi process_from_tracker để cập nhật.
     """
-    def __init__(self, id_run_process, mean_velocity=[8, 12]):
-        self.evaluator = SetUpEvaluate(id_run_process, mean_velocity)
+    def __init__(self, id_run_process, mean_velocity=[8, 12], test_mode=False):
+        self.evaluator = SetUpEvaluate(id_run_process, mean_velocity, test_mode=test_mode)
 
     def process_from_tracker(self, detections, cam_id, timestamp=None):
         """

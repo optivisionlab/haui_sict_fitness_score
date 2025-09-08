@@ -11,11 +11,11 @@ from loguru import logger
 # setup model YOLO
 # yolo_model = YOLO('/u01/quanlm/fitness_tracking/haui_sict_fitness_score/yolo11n.pt')   # load model detect person
 
-evaluator = GlobalEvaluator(id_run_process=[1, 2, 3])
+evaluator = GlobalEvaluator(id_run_process=[1, 2, 3, 4], test_mode=True)  # chu trình 1→2→3-4
 # setup tracker (ví dụ cam_id=1, chu trình 1→2→3)
 trackers = {
     cam_id: SimpleTracker(detection_model=YOLO('/u01/quanlm/fitness_tracking/haui_sict_fitness_score/yolo11n.pt'), cam_id=cam_id, global_evaluator=evaluator)
-    for cam_id in [1, 2, 3]
+    for cam_id in [1, 2, 3, 4]
 }
 
 result_store = {}
@@ -35,13 +35,13 @@ def make_callback(cam_id):
     return on_frame
 
 video_sources = {
-    1: r"D:\NCKH_Cham_diem_the_duc\assets\test\lan1\Chaylanmot.mp4",
-    2: r"D:\NCKH_Cham_diem_the_duc\assets\test\lan1\H1.mp4",
-    3: r"D:\NCKH_Cham_diem_the_duc\assets\test\lan1\lan1.mp4",
-    # 4: r"D:\NCKH_Cham_diem_the_duc\assets\cam4.avi",
+    1: r"D:\NCKH_Cham_diem_the_duc\assets\test\lan1\chaylan1.mp4",
+    2: r"D:\NCKH_Cham_diem_the_duc\assets\test\lan1\chaylan1.2.mp4",
+    3: r"D:\NCKH_Cham_diem_the_duc\assets\test\lan1\chaylan1.3.mp4",
+    4: r"D:\NCKH_Cham_diem_the_duc\assets\test\lan1\chaylan1.4.mp4",
 }
 
-for cam_id in [1, 2, 3]:
+for cam_id in [1, 2, 3, 4]:
     viewer = CameraViewer(
         camera_id=cam_id,
         source=video_sources[cam_id],
