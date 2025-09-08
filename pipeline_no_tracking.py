@@ -9,13 +9,13 @@ from loguru import logger
 
 
 # setup model YOLO
-yolo_model = YOLO('/u01/quanlm/fitness_tracking/haui_sict_fitness_score/yolo11n.pt')   # load model detect person
+# yolo_model = YOLO('/u01/quanlm/fitness_tracking/haui_sict_fitness_score/yolo11n.pt')   # load model detect person
 
-evaluator = GlobalEvaluator(id_run_process=[1, 2, 3, 4])
+evaluator = GlobalEvaluator(id_run_process=[1, 2, 3])
 # setup tracker (ví dụ cam_id=1, chu trình 1→2→3)
 trackers = {
-    cam_id: SimpleTracker(detection_model=yolo_model, cam_id=cam_id, global_evaluator=evaluator)
-    for cam_id in [1, 2, 3, 4]
+    cam_id: SimpleTracker(detection_model=YOLO('/u01/quanlm/fitness_tracking/haui_sict_fitness_score/yolo11n.pt'), cam_id=cam_id, global_evaluator=evaluator)
+    for cam_id in [1, 2, 3]
 }
 
 result_store = {}
@@ -23,36 +23,33 @@ result_store = {}
 def make_callback(cam_id):
     def on_frame(frame, frame_idx):
         # process_frame đã gọi update qua GlobalEvaluator
-        trackers[cam_id].process_frame(frame, timestamp=frame_idx)
+        frame_with_boxes = trackers[cam_id].process_frame(frame)
 
         # lưu lại trạng thái hiện tại của tất cả user
         result_store[cam_id] = {
             user_id: evaluator.get_status(user_id) 
             for user_id in evaluator.evaluator.laps.keys()
         }
-
-        return result_store[cam_id]
+        logger.info(f"[Cam {cam_id}] Frame {frame_idx} - Result: {result_store[cam_id]}")
+        return frame_with_boxes
     return on_frame
 
+video_sources = {
+    1: r"D:\NCKH_Cham_diem_the_duc\assets\test\lan1\Chaylanmot.mp4",
+    2: r"D:\NCKH_Cham_diem_the_duc\assets\test\lan1\H1.mp4",
+    3: r"D:\NCKH_Cham_diem_the_duc\assets\test\lan1\lan1.mp4",
+    # 4: r"D:\NCKH_Cham_diem_the_duc\assets\cam4.avi",
+}
 
-viewers = [
-    CameraViewer(camera_id=cam_id, source=r'/u01/quanlm/fitness_tracking/haui_sict_fitness_score/assets/0.avi',
-                 on_frame_callback=make_callback(cam_id),
-                 save_results=True)
-    for cam_id in [1, 2, 3, 4]
-]
+for cam_id in [1, 2, 3]:
+    viewer = CameraViewer(
+        camera_id=cam_id,
+        source=video_sources[cam_id],
+        on_frame_callback=make_callback(cam_id),
+        save_results=True,
+    )
+    viewer.start()
+    viewer.thread.join()  # đợi chạy xong video
 
-# start camera
-# start tất cả camera
-for v in viewers:
-    v.start()
-
-# giữ chương trình chạy cho đến khi tất cả stop
-try:
-    while any(not v.stop_flag for v in viewers):
-        time.sleep(0.1)
-except KeyboardInterrupt:
-    for v in viewers:
-        v.stop()
 
 

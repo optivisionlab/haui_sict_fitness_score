@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import json
 
 
 def convert_xyxy_to_xywh(box):
@@ -96,3 +97,10 @@ def draw_target(frame, track_id, box, name=None, color=(0, 255, 0), thickness=2)
     )
 
     return frame
+
+
+def write_txt(path, data):
+    with open(path, 'a', encoding="utf-8-sig") as f:
+        for line in data:
+            f.write(f"{line}")
+        f.write("\n")

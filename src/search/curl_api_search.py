@@ -5,6 +5,8 @@ import numpy as np
 from io import BytesIO
 from queue import Queue
 import threading
+from loguru import logger
+from src.config.config import SEARCH_API_URL
 
 
 def curl_post(url, payload=None, files=None, headers=None, method="POST"):
@@ -35,8 +37,8 @@ def curl_post(url, payload=None, files=None, headers=None, method="POST"):
         response.raise_for_status()
         return response
     except requests.RequestException as e:
-        print('payload: ', payload)
-        print(f"Error: {e}")
+        logger.error('payload: {}', payload)
+        logger.error(f"Error: {e}")
         return None
 
 
@@ -51,7 +53,7 @@ def send_tracking_to_api(ids, xyxy_boxes, frame, collection_name="face"):
         collection_name (str): Tên tập dữ liệu (collection).
     """
     if not ids or frame is None:
-        print("Không có ID hoặc frame để gửi.")
+        logger.error("Không có ID hoặc frame để gửi.")
         return
 
     # Tạo payload JSON
@@ -60,17 +62,17 @@ def send_tracking_to_api(ids, xyxy_boxes, frame, collection_name="face"):
         'bbox': xyxy_boxes
     })
 
-    print('tracking_frame:', tracking_frame)
+    logger.debug('tracking_frame: {}', tracking_frame)
     payload = {
         'collection_name': collection_name,
         'tracking_frame': tracking_frame,
-        'similarity_threshold': 0.25,
+        # 'similarity_threshold': 0.25,
     }
 
     # Encode frame thành ảnh JPEG
     success, encoded_image = cv2.imencode('.jpg', frame)
     if not success:
-        print("Không thể encode frame.")
+        logger.error("Không thể encode frame.")
         return
 
     # Chuyển ảnh thành bytes cho requests
@@ -83,17 +85,14 @@ def send_tracking_to_api(ids, xyxy_boxes, frame, collection_name="face"):
     
     # Gửi request
     response = curl_post(
-        url='https://5015285cb473.ngrok-free.app/faces/search',  # chỉnh lại URL thực tế
+        url=f'{SEARCH_API_URL}/faces/search',  # chỉnh lại URL thực tế
         payload=payload,
         files=files,
         method='POST'
     )
     
     if response:
-        print("API response:", response.json())
-    else:
-        cv2.imwrite('error_frame.jpg', frame)
-        print("Gửi API thất bại.")
+        logger.info("API response: {}", response.json())
 
     return response
 

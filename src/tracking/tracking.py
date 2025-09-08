@@ -8,6 +8,7 @@ import json
 import numpy as np
 from src.engine.engine import draw_target
 from src.tracking.deep_sort.deep_sort.detection import Detection
+from loguru import logger
 
 
 id_to_name = {}
@@ -57,11 +58,11 @@ def tracking_in_frame(source, model, target_class=0, api_call_interval=30):
         frame_count += 1
         id_list, xywh_list, xyxy_list = extract_tracking_info(result, target_class)
         if not id_list:
-            print("Không có đối tượng nào được phát hiện.")
+            logger.error("Không có đối tượng nào được phát hiện.")
             continue
-        print('>>>> CURL API')
+        logger.info('>>>> CURL API')
 
-        print('>>>> END CURL API')
+        logger.info('>>>> END CURL API')
 
 
 def frame_tracking(frame, model, target_class=0, api_call_interval=30, frame_number=0):
@@ -144,13 +145,13 @@ def deepsort_tracking_in_frame(
 
     if ids and frame_idx % api_call_interval == 0:
         try:
-            print('>>>> Gửi tracking đến API')
+            logger.info('>>>> Gửi tracking đến API')
             response = send_tracking_to_api(ids, xyxy_boxes, frame)
-            print(response)
+            logger.info(response)
             if response and response.status_code == 200:
                 response_data = response.json()
                 api_data = response_data.get('data', {})
-                print(api_data)
+                logger.info(api_data)
                 for entry in api_data:
                     infor = entry.get("infor")
                     if infor and isinstance(infor, dict):
@@ -159,11 +160,11 @@ def deepsort_tracking_in_frame(
                     else:
                         name = "Unknown"  # hoặc "Unknown"
                     id_to_name[entry["id"]] = name
-                print('id_to_name: ', id_to_name)
+                logger.info('id_to_name: ', id_to_name)
             else:
-                print(f"Failed to send tracking data: {response.status_code}")
+                logger.info(f"Failed to send tracking data: {response.status_code}")
         except Exception as e:
-            print(f"Lỗi khi gửi hoặc parse JSON từ API: {e}")
+            logger.info(f"Lỗi khi gửi hoặc parse JSON từ API: {e}")
             pass
 
     for track_id, bbox in zip(ids, xyxy_boxes):

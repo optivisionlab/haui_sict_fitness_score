@@ -60,7 +60,7 @@ class CameraViewer:
         while not self.stop_flag:
             ret, frame = self.camera.read()
             if not ret:
-                print("Không thể đọc frame từ camera.")
+                logger.error("Không thể đọc frame từ camera.")
                 break
 
             with self._lock:
@@ -68,7 +68,7 @@ class CameraViewer:
                     try:
                         frame = self.on_frame_callback(frame, frame_count)
                     except Exception as e:
-                        print(f"Lỗi trong callback: {e}")
+                        logger.exception(f"Lỗi trong callback: {e}")
             
             # cv2.imshow(window_name, frame)
             if self.save_results:
