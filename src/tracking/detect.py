@@ -81,7 +81,7 @@ class SimpleTracker:
                     if pair and pair[0] is not None:
                         user_id, name = pair
                         draw_target(frame_with_boxes, user_id, box, name=name, color=(0, 255, 0), thickness=2)
-                        detections.append(user_id)
+                        detections.append(name)
                     else:
                         # nếu API không trả mapping cho local_id này, có thể vẽ "Unknown" hoặc bỏ vẽ
                         draw_target(frame_with_boxes, local_id, box, name='Unknown', color=(0, 255, 255), thickness=1)

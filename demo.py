@@ -1,6 +1,6 @@
 import gradio as gr
 import cv2
-import numpy as np
+import json
 from ultralytics import YOLO
 from src.tracking.detect import SimpleTracker
 from src.engine.score import GlobalEvaluator
@@ -27,29 +27,28 @@ def stream_videos(v1, v2, v3, v4):
     }
 
     while True:
-        rets, frames = {}, {}
         for cam_id, cap in caps.items():
             ret, frame = cap.read()
             if not ret:
                 return  # hết video
-            frames[cam_id] = trackers[cam_id].process_frame(frame)
+            trackers[cam_id].process_frame(frame)
 
-            # update result_store
-            result_store[cam_id] = {
-                user_id: evaluator.get_status(user_id)
-                for user_id in evaluator.evaluator.laps.keys()
-            }
+        # cập nhật log
+        logs = {
+            user_id: evaluator.get_status(user_id)
+            for user_id in evaluator.evaluator.laps.keys()
+        }
 
-        # ghép 4 frame thành layout 2x2
-        top = np.hstack([frames[1], frames[2]])
-        bottom = np.hstack([frames[3], frames[4]])
-        merged = np.vstack([top, bottom])
+        # đọc file JSON server giả tưởng
+        try:
+            with open(evaluator.evaluator.server_file, "r", encoding="utf-8") as f:
+                server_json = f.read()
+        except FileNotFoundError:
+            server_json = "{}"
 
-        # convert BGR -> RGB để hiển thị
-        merged_rgb = cv2.cvtColor(merged, cv2.COLOR_BGR2RGB)
+        # stream ra Gradio UI
+        yield server_json
 
-        logs = str(result_store)
-        yield merged_rgb, logs  # stream ra Gradio UI
 
 # --- UI ---
 with gr.Blocks() as demo:
@@ -57,18 +56,20 @@ with gr.Blocks() as demo:
 
     with gr.Row():
         with gr.Column():
-            v1 = gr.File(label="Video Cam 1", file_types=[".mp4"])
-            v2 = gr.File(label="Video Cam 2", file_types=[".mp4"])
-            v3 = gr.File(label="Video Cam 3", file_types=[".mp4"])
-            v4 = gr.File(label="Video Cam 4", file_types=[".mp4"])
+            v1 = gr.File(label="Video Cam 1", file_types=[".mp4", ".mov"])
+            v2 = gr.File(label="Video Cam 2", file_types=[".mp4", ".mov"])
+            v3 = gr.File(label="Video Cam 3", file_types=[".mp4", ".mov"])
+            v4 = gr.File(label="Video Cam 4", file_types=[".mp4", ".mov"])
             btn = gr.Button("Start Streaming")
         with gr.Column():
-            image_out = gr.Image(label="Merged Live Result", type="numpy")
-            log_out = gr.Textbox(label="Log vòng chạy", lines=20)
+            # log_out = gr.Textbox(label="Log vòng chạy", lines=10)
+            server_out = gr.Textbox(label="📂 Server JSON", lines=20)
 
-    # stream generator -> Gradio
-    btn.click(fn=stream_videos, 
-              inputs=[v1, v2, v3, v4], 
-              outputs=[image_out, log_out])
+    btn.click(
+        fn=stream_videos,
+        inputs=[v1, v2, v3, v4],
+        outputs=[server_out]
+    )
 
 demo.launch()
+

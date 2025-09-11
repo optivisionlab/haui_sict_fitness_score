@@ -53,7 +53,7 @@ class SetUpEvaluate():
         with open(self.server_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
             
-            
+
     def update_flags(self, user_id, cam_id, timestamp=None):
         user_id = str(user_id)
         cam_id = str(cam_id)
@@ -61,45 +61,67 @@ class SetUpEvaluate():
         # Nếu user chưa có trong server thì tạo mới
         if user_id not in self.server_data:
             self.server_data[user_id] = {str(cam): False for cam in self.id_run_process}
-            self.last_cam[user_id] = None
             self.laps[user_id] = 0
 
-        # Lấy cam trước đó
-        prev_cam = self.last_cam.get(user_id, None)
+        # ✅ bật cờ cho cam_id hiện tại
+        self.server_data[user_id][cam_id] = True
 
-        # Nếu lần đầu → cho phép bất kỳ cam
-        if prev_cam is None:
-            self.server_data[user_id][cam_id] = True
-            self.last_cam[user_id] = cam_id
-        else:
-            # Tìm index trong id_run_process
-            if cam_id == prev_cam:
-                return
-
-            cams = list(map(str, self.id_run_process))
-            prev_idx = cams.index(prev_cam)
-            allowed_next = {cams[(prev_idx - 1) % len(cams)], cams[(prev_idx + 1) % len(cams)]}
-
-            if cam_id in allowed_next:
-                # ✅ Hợp lệ → bật cờ
-                self.server_data[user_id][cam_id] = True
-                self.last_cam[user_id] = cam_id
-            else:
-                # Sai thứ tự → reset flags & last_cam (logic giữ nguyên)
-                self.server_data[user_id] = {str(cam): False for cam in self.id_run_process}
-                self.last_cam[user_id] = None
-                logger.info(f"⚠️ User {user_id} đi sai thứ tự, reset vòng")
-
-        # Nếu tất cả True → cộng lap
+        # Nếu tất cả cam đều True → hoàn thành 1 vòng
         if all(self.server_data[user_id].values()):
             self.laps[user_id] += 1
             logger.info(f"✅ User {user_id} hoàn thành vòng {self.laps[user_id]}")
 
-            # Reset cờ
+            # Reset cờ cho vòng tiếp theo
             self.server_data[user_id] = {str(cam): False for cam in self.id_run_process}
-            self.last_cam[user_id] = None
 
         self._save_server()
+     
+    # def update_flags(self, user_id, cam_id, timestamp=None):
+    #     user_id = str(user_id)
+    #     cam_id = str(cam_id)
+
+    #     # Nếu user chưa có trong server thì tạo mới
+    #     if user_id not in self.server_data:
+    #         self.server_data[user_id] = {str(cam): False for cam in self.id_run_process}
+    #         self.last_cam[user_id] = None
+    #         self.laps[user_id] = 0
+
+    #     # Lấy cam trước đó
+    #     prev_cam = self.last_cam.get(user_id, None)
+
+    #     # Nếu lần đầu → cho phép bất kỳ cam
+    #     if prev_cam is None:
+    #         self.server_data[user_id][cam_id] = True
+    #         self.last_cam[user_id] = cam_id
+    #     else:
+    #         # Tìm index trong id_run_process
+    #         if cam_id == prev_cam:
+    #             return
+
+    #         cams = list(map(str, self.id_run_process))
+    #         prev_idx = cams.index(prev_cam)
+    #         allowed_next = {cams[(prev_idx - 1) % len(cams)], cams[(prev_idx + 1) % len(cams)]}
+
+    #         if cam_id in allowed_next:
+    #             # ✅ Hợp lệ → bật cờ
+    #             self.server_data[user_id][cam_id] = True
+    #             self.last_cam[user_id] = cam_id
+    #         else:
+    #             # Sai thứ tự → reset flags & last_cam (logic giữ nguyên)
+    #             self.server_data[user_id] = {str(cam): False for cam in self.id_run_process}
+    #             self.last_cam[user_id] = None
+    #             logger.info(f"⚠️ User {user_id} đi sai thứ tự, reset vòng")
+
+    #     # Nếu tất cả True → cộng lap
+    #     if all(self.server_data[user_id].values()):
+    #         self.laps[user_id] += 1
+    #         logger.info(f"✅ User {user_id} hoàn thành vòng {self.laps[user_id]}")
+
+    #         # Reset cờ
+    #         self.server_data[user_id] = {str(cam): False for cam in self.id_run_process}
+    #         self.last_cam[user_id] = None
+
+    #     self._save_server()
 
         
     def update_random_direction(self, user_id, cam_id, timestamp=None):
@@ -184,7 +206,7 @@ class SetUpEvaluate():
                 logger.info(f"prev_idx={prev_idx}, N-1={N-1}, expected_idx={expected_idx}")
                 self.laps[user_id] += 1
                 logger.info(f"[TEST MODE] User {user_id} hoàn thành vòng {self.laps[user_id]}")
-                write_txt('results.txt', f"[TEST MODE] User {user_id} hoàn thành vòng {self.laps[user_id]}")
+                # write_txt('results.txt', f"[TEST MODE] User {user_id} hoàn thành vòng {self.laps[user_id]}")
 
                 self.direction[user_id] = None
                 self.progress_idx[user_id] = -1  # reset để chạy vòng mới
@@ -194,7 +216,7 @@ class SetUpEvaluate():
             if not self.test_mode and expected_idx == 0:
                 self.laps[user_id] += 1
                 logger.info(f"User {user_id} hoàn thành vòng {self.laps[user_id]}")
-                write_txt('results.txt', f"[TEST MODE] User {user_id} hoàn thành vòng {self.laps[user_id]}")
+                # write_txt('results.txt', f"[TEST MODE] User {user_id} hoàn thành vòng {self.laps[user_id]}")
                 self.direction[user_id] = None
                 return
             return
