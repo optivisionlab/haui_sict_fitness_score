@@ -59,7 +59,7 @@ class SimpleTracker:
                 if response and response.status_code == 200:
                     api_data = response.json().get("data", [])
                     for entry in api_data:
-                        sent_local_id = entry.get("id")  # kỳ vọng đây là id bạn gửi
+                        sent_local_id = entry.get("id")
                         infor = entry.get("infor", {}) or {}
                         metadata = infor.get("metadata", {}) if isinstance(infor, dict) else {}
                         user_id = metadata.get("id") or metadata.get("user_id") or metadata.get("uid")
@@ -94,7 +94,4 @@ class SimpleTracker:
                 logger.error(f"Lỗi khi gửi API: {e}")
 
         return frame_with_boxes
-                
-    def get_user_status(self, user_id):
-        """Lấy số vòng & trạng thái camera của 1 user từ evaluator chung"""
-        return self.global_evaluator.get_status(user_id)
+
