@@ -7,6 +7,7 @@ from loguru import logger
 import io
 import requests
 from src.kafka.kafka_produce import KafkaFrameProducer
+from confluent_kafka import KafkaException, KafkaError
 
 
 def video_worker(video_path: str, camera_id: int, producer: KafkaFrameProducer, respect_fps: bool = True):
@@ -31,7 +32,7 @@ def video_worker(video_path: str, camera_id: int, producer: KafkaFrameProducer, 
                 if not ret:
                     break
 
-                sent = producer.send_frame(camera_id, frame, headers=[('frame_index', str(frame_index).encode)])
+                sent = producer.send_frame(camera_id, frame, headers=[('frame_index', str(frame_index).encode())])
                 frame_index += 1
                 if not sent:
                     pass

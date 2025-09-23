@@ -1,3 +1,5 @@
 ultralytics==8.3.169
 tensorflow==2.14.0
 opencv-python==4.8.0.76
+confluence_kafka
+pymongo

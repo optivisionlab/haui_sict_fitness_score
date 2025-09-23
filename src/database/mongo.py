@@ -1,6 +1,6 @@
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
-from src.config.configs import MONGDB_URI,MONGDB_DB
+from src.config.config import MONGO_URI,MONGO_DB
 from dateutil import parser
 from loguru import logger
 from pymongo.results import InsertOneResult, InsertManyResult, UpdateResult
@@ -8,7 +8,7 @@ from typing import Optional, Any, List, Optional
 
 
 class MongoDBManager:
-    def __init__(self, uri: str = MONGDB_URI, db_name: str = MONGDB_DB):
+    def __init__(self, uri: str = MONGO_URI, db_name: str = MONGO_DB):
         try:
             self.client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             self.client.admin.command("ping")
@@ -42,7 +42,7 @@ class MongoDBManager:
     def upsert(self, collection: str, filter_doc: dict, update_doc: dict) -> UpdateResult:
         try:
             result = self.db[collection].update_one(
-                filter_doc, {"$set": update_doc}, upsert=True
+                filter_doc, update_doc, upsert=True
             )
             logger.info(
                 f"✅ Upsert vào '{collection}': matched={result.matched_count}, "

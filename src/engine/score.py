@@ -5,6 +5,7 @@ from loguru import logger
 import json
 from src.engine.engine import write_txt
 from src.depend.depend import mongo_db
+from src.config.config import MONGO_FLAGS_COLLECTION, MONGO_LAPS_COLLECTION
 import time
 from datetime import datetime
 import time
@@ -30,42 +31,43 @@ class SetUpEvaluate:
         user_id = str(user_id)
         cam_id = str(cam_id)
 
-        # --- Bật cờ duy nhất cam_id bằng $set ---
-        mongo_db.collection(self.mongo_flags).update_one(
-            {"_id": user_id},
-            {
-                "$set": {
-                    f"flags.{cam_id}": True,
-                    "timestamp": time.time()
-                },
-                # bảo đảm document luôn có đầy đủ key flags.<cam> = False khi mới tạo
-                "$setOnInsert": {
-                    **{f"flags.{c}": False for c in self.id_run_process if c != cam_id},
-                    "created_at": time.time()
-                }
+        # --- Bật cờ duy nhất cam_id bằng upsert ---
+        # set flags.<cam_id> = True và timestamp hiện tại
+        # đồng thời tạo các flags khác False nếu mới tạo document
+        update_doc = {
+            "$set": {
+                f"flags.{cam_id}": True,
+                "timestamp": time.time()
             },
-            upsert=True
-        )
+            "$setOnInsert": {
+                **{f"flags.{c}": False for c in self.id_run_process if c != cam_id},
+                "created_at": time.time()
+            }
+        }
+        mongo_db.upsert(self.mongo_flags, {"_id": user_id}, update_doc)
 
-        # --- Đếm số cờ hiện tại ---
-        doc = mongo_db.collection(self.mongo_flags).find_one({"_id": user_id})
+        # --- Lấy document hiện tại ---
+        doc = mongo_db.find_one(self.mongo_flags, {"_id": user_id})
         if not doc:
             return
 
         flags = doc.get("flags", {})
         # kiểm tra tất cả camera đã True
-        if all(flags.get(c) for c in self.id_run_process):
-            # +1 vòng và reset cờ
+        if all(flags.get(str(c)) for c in self.id_run_process):
+            # +1 vòng trong laps_db
             logger.info(f"✅ User {user_id} hoàn thành 1 vòng")
-            mongo_db.collection(self.mongo_laps).update_one(
+            mongo_db.upsert(
+                self.mongo_laps,
                 {"_id": user_id},
-                {"$inc": {"laps": 1}, "$set": {"updated_at": time.time()}},
-                upsert=True
+                {"$inc": {"laps": 1}, "$set": {"updated_at": time.time()}}
             )
+
             # reset toàn bộ flags về False
-            mongo_db.collection(self.mongo_flags).update_one(
+            reset_flags = {f"flags.{c}": False for c in self.id_run_process}
+            mongo_db.upsert(
+                self.mongo_flags,
                 {"_id": user_id},
-                {"$set": {f"flags.{c}": False for c in self.id_run_process}}
+                {"$set": reset_flags}
             )
 
 
@@ -190,7 +192,7 @@ class GlobalEvaluator:
     Các tracker sẽ gọi process_from_tracker để cập nhật.
     """
     def __init__(self, id_run_process, mean_velocity=[8, 12]):
-        self.evaluator = SetUpEvaluate(id_run_process, mean_velocity)
+        self.evaluator = SetUpEvaluate(id_run_process, mongo_flags=MONGO_FLAGS_COLLECTION, mongo_laps=MONGO_LAPS_COLLECTION)
 
     def process_from_tracker(self, detections, cam_id):
         """
@@ -205,4 +207,3 @@ class GlobalEvaluator:
 
     def get_all_status(self):
         return {uid: self.evaluator.get_status(uid) for uid in self.evaluator.laps.keys()}
-

@@ -7,7 +7,8 @@ from ultralytics import YOLO
 from loguru import logger
 from src.engine.engine import draw_target, line_begin_curl_api_search
 import cv2
-from src.config.config import LINE_BEGIN_SEARCH
+from src.config.config import LINE_BEGIN_SEARCH, QDRANT_COLLECTION
+
 
 class SimpleTracker:
     def __init__(self, detection_model, cam_id, global_evaluator):
@@ -52,7 +53,7 @@ class SimpleTracker:
         if valid_ids:
             try:
                 # Gửi API chỉ những người vượt line
-                response = send_tracking_to_api(valid_ids, valid_boxes, frame)
+                response = send_tracking_to_api(valid_ids, valid_boxes, frame, collection_name=QDRANT_COLLECTION)
 
                 # map từ local_id (bạn gửi) -> (user_id, name) do API trả
                 map_local_to_user = {}
@@ -88,10 +89,10 @@ class SimpleTracker:
 
                 # update evaluator bằng danh sách user_id thực (nếu có)
                 if detections:
-                    self.global_evaluator.process_from_tracker(detections, self.cam_id, timestamp)
+                    self.global_evaluator.process_from_tracker(detections, self.cam_id)
 
             except Exception as e:
-                logger.error(f"Lỗi khi gửi API: {e}")
+                logger.exception(f"Lỗi khi gửi API: {e}")
 
         return frame_with_boxes
 
