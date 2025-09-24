@@ -7,17 +7,20 @@ from src.config.depend import resnet_embedding, mtcnn, to_tensor_transform
 from typing import Union, List
 import numpy as np
 from loguru import logger
-import os 
+import os
+from src.app.embedding.align_face import align_face_5pts
+
 
 def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False):
+    
     if isinstance(images, Image.Image):
         images = [images]
 
     all_faces = []
     face_counts = []  
     for img_idx, image in enumerate(images):
-        face_bbox,conf = mtcnn.detect(image)
-
+        image = image.convert("RGB")
+        face_bbox, conf, landmarks = mtcnn.detect(image, landmarks=True)
         if face_bbox is None:
             logger.warning(f"No face detected in image {img_idx}")
             face_counts.append(0)
@@ -25,12 +28,14 @@ def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False):
         logger.info("Image {} - face_bbox count: {}", img_idx, len(face_bbox))
 
         faces = []
-        for box_idx, box in enumerate(face_bbox):
-            face = image.crop(box)
+        for box_idx, (box, landmark) in enumerate(zip(face_bbox, landmarks)):
+            # face = image.crop(box)
+            face = align_face_5pts(np.array(image), landmark, img_size=224)
             if verbose:
-                logger.info("face_bbox: {}, conf: {}", face_bbox, conf)
+                logger.info("face_bbox: {}, conf: {}, landmark: {}", face_bbox, conf, landmark)
                 os.makedirs('tmp/debug_img', exist_ok=True)
-                face.save(f"tmp/debug_img/img{img_idx}_face{box_idx}.jpg")
+                face_pil = Image.fromarray(face)
+                face_pil.save(f"tmp/debug_img/img{img_idx}_face{box_idx}.jpg")
             faces.append(face)
 
         all_faces.extend(faces)
@@ -39,7 +44,10 @@ def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False):
     if not all_faces:
         return [None for _ in range(len(images))]
 
-    face_images = torch.stack([to_tensor_transform(face) for face in all_faces])
+    face_images = torch.stack([
+        to_tensor_transform(Image.fromarray(face)) if isinstance(face, np.ndarray) else to_tensor_transform(face)
+        for face in all_faces
+    ])
     all_embeddings = resnet_embedding(face_images)
     result = []
     idx = 0
@@ -52,8 +60,8 @@ def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False):
     return result
 
 if __name__ == "__main__":
-    img1 = Image.open('/home/chuhuyhoang/code/haui_sict_fitness_score/tmp/ce4f9595-07ab-4956-bce6-f106b8129feb-17360026626361641762035.webp')
-    img2 = Image.open('//home/chuhuyhoang/code/haui_sict_fitness_score/tmp/jakc-4-1150.jpg')
+    img1 = Image.open('/u01/quanlm/fitness_tracking/haui_sict_fitness_score/Screenshot 2025-06-12 100448.png')
+    img2 = Image.open('/u01/quanlm/fitness_tracking/haui_sict_fitness_score/Screenshot 2025-06-12 103845.png')
     emb_list = get_embedding(images=[img1, img2], verbose=True)
     for emb in emb_list:
         logger.debug("embedidng shape: {}", emb.shape if emb is not None else None)
