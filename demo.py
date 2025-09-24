@@ -5,22 +5,24 @@ import cv2
 import gradio as gr
 import numpy as np
 from loguru import logger
-from confluent_kafka import Consumer
 from ultralytics import YOLO
+from collections import OrderedDict
+import pandas as pd
+
 from src.tracking.detect import SimpleTracker
 from src.engine.score import GlobalEvaluator
 from src.depend.depend import mongo_db
 from src.kafka.kafka_produce import KafkaFrameProducer
 from src.kafka.kafka_consumers import KafkaFrameConsumer
 from src.kafka.kafka_process import video_worker, create_topic
-from collections import OrderedDict
-import pandas as pd
 
 # ========= 1. Config =========
 MODEL_PATH = "/u01/quanlm/fitness_tracking/haui_sict_fitness_score/yolo11n.pt"
 CAM_IDS = [1, 2, 3, 4]
 TOPIC_TEMPLATE = "camera-{cid}"
-NUM_PARTITIONS = 3
+NUM_PARTITIONS = 1
+FPS_TARGET = 20
+FRAME_INTERVAL = 1.0 / FPS_TARGET
 
 # Buffer frame cho Gradio: mỗi cam có queue giữ frame mới nhất
 frame_buffers = {cid: queue.Queue(maxsize=1) for cid in CAM_IDS}
@@ -32,15 +34,24 @@ trackers = {
     for cid in CAM_IDS
 }
 
-# ========= 2. Kafka Producer =========
+# ========= 2. Kafka Producer per camera =========
 producer_conf = {
     'bootstrap.servers': '10.100.200.119:9098',
     'compression.type': 'lz4',
-    'linger.ms': 10,
-    'batch.num.messages': 10000,
+    'linger.ms': 1,
+    'batch.num.messages': 500,
     'message.max.bytes': 10000000,
 }
-producer = KafkaFrameProducer(producer_conf, topic_template="camera-{camera_id}", jpeg_quality=70, drop_on_full=True)
+
+producers = {
+    cid: KafkaFrameProducer(
+        producer_conf,
+        topic_template=f"camera-{cid}",
+        jpeg_quality=70,
+        drop_on_full=True,
+    )
+    for cid in CAM_IDS
+}
 
 # ========= 3. Tạo topic =========
 topics = [TOPIC_TEMPLATE.format(cid=cid) for cid in CAM_IDS]
@@ -52,8 +63,7 @@ consumer_conf = {"bootstrap.servers": "10.100.200.119:9098", "group.id": "gradio
 def kafka_consumer_worker(cid):
     topic = TOPIC_TEMPLATE.format(cid=cid)
     consumer = KafkaFrameConsumer(consumer_conf, topic, group_id=f"group-{topic}")
-
-    frame_dict = OrderedDict()  # tự động theo thứ tự insert
+    frame_dict = OrderedDict()
 
     def handle_frame(msg):
         headers = dict(msg.headers() or [])
@@ -61,63 +71,50 @@ def kafka_consumer_worker(cid):
 
         nparr = np.frombuffer(msg.value(), np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-        out_frame = trackers[cid].process_frame(frame)
-        rgb_frame = cv2.cvtColor(out_frame, cv2.COLOR_BGR2RGB)
+        ids, boxes = trackers[cid].detect_frame(frame)
+        # out_frame = trackers[cid].handle_api(frame, boxes, ids)
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         rgb_frame = cv2.resize(rgb_frame, (640, 360))
 
         frame_dict[frame_index] = rgb_frame
 
-        # Giữ tối đa 10 frame trong buffer
-        if len(frame_dict) > 10:
-            for i in sorted(frame_dict.keys())[:len(frame_dict)-10]:
+        # Giữ tối đa 20 frame
+        if len(frame_dict) > 20:
+            for i in sorted(frame_dict.keys())[:len(frame_dict)-20]:
                 frame_dict.pop(i)
 
-        # Luôn lấy **frame index liên tiếp tiếp theo** để hiển thị
-        # Giả sử last_index là frame cuối cùng đã hiển thị
-        if not hasattr(handle_frame, "last_index"):
-            handle_frame.last_index = -1
-
-        next_index = handle_frame.last_index + 1
-        if next_index in frame_dict:
+        # Lấy frame index cao nhất
+        if frame_dict:
+            latest_index = max(frame_dict.keys())
+            latest_frame = frame_dict.pop(latest_index)
             if frame_buffers[cid].full():
                 try:
                     frame_buffers[cid].get_nowait()
                 except queue.Empty:
                     pass
-            frame_buffers[cid].put(frame_dict[next_index])
-            frame_dict.pop(next_index)
-            handle_frame.last_index = next_index
+            frame_buffers[cid].put(latest_frame)
 
     consumer.start(handle_frame)
 
+# ========= 5. Convert MongoDB data to DataFrame =========
 def json_to_dataframe(data):
-    """
-    Chuyển list dict MongoDB thành pandas DataFrame 2 cột: 'Tên', 'Vòng'
-    """
     if not data:
         return pd.DataFrame(columns=["Tên", "Vòng"])
-    
-    rows = []
-    for item in data:
-        rows.append({
-            "Tên": item.get("name", ""),
-            "Vòng": item.get("laps", "")
-        })
-    return pd.DataFrame(rows)
+    return pd.DataFrame([{"Tên": item.get("name",""), "Vòng": item.get("laps","")} for item in data])
 
-# ========= 5. Gradio stream =========
+# ========= 6. Gradio stream =========
 def stream_ui(path1, path2, path3, path4):
     sources = {1: path1, 2: path2, 3: path3, 4: path4}
+    last_frames = {cid: None for cid in CAM_IDS}
 
-    # start producer threads (dùng video_worker sẵn có)
+    # start producer threads (1 producer / camera)
     for cid, src in sources.items():
         if not src:
             continue
         if not any(t.name == f"producer-{cid}" for t in threading.enumerate()):
             t = threading.Thread(
                 target=video_worker,
-                args=(src, cid, producer),
+                args=(src, cid, producers[cid]),  # mỗi cam dùng producer riêng
                 daemon=True,
                 name=f"producer-{cid}"
             )
@@ -134,13 +131,25 @@ def stream_ui(path1, path2, path3, path4):
             )
             t.start()
 
+    # ⏳ chờ ít nhất 1 frame từ tất cả camera
+    while any(last_frames[cid] is None for cid in CAM_IDS):
+        for cid in CAM_IDS:
+            try:
+                frame = frame_buffers[cid].get(timeout=0.1)
+                last_frames[cid] = frame
+            except queue.Empty:
+                pass
+        time.sleep(0.01)
+
+    # 🔄 vòng lặp chính (~15-20 FPS)
     while True:
         frames = []
         for cid in CAM_IDS:
             try:
-                frame = frame_buffers[cid].get(timeout=0.1)
+                frame = frame_buffers[cid].get(timeout=0.05)
+                last_frames[cid] = frame
             except queue.Empty:
-                frame = None
+                frame = last_frames[cid]
             frames.append(frame)
 
         try:
@@ -151,10 +160,9 @@ def stream_ui(path1, path2, path3, path4):
 
         server_df = json_to_dataframe(server_json)
         yield (*frames, server_df)
-        time.sleep(0.03)  # ~30 FPS UI
+        time.sleep(FRAME_INTERVAL)
 
-# ========= 6. Gradio UI =========
-
+# ========= 7. Gradio UI =========
 with gr.Blocks() as demo:
     gr.Markdown("## 🎥 Fitness Tracking Stream Demo")
     with gr.Row():

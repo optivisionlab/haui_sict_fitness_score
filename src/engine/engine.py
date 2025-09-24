@@ -91,7 +91,7 @@ def draw_target(frame, track_id, box, name=None, color=(0, 255, 0), thickness=2)
         text,
         (x1, y1 - 10),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.6,
+        1.0,
         color,
         2
     )
