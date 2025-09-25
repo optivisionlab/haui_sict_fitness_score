@@ -12,7 +12,7 @@ class YOLO11:
     Assumes the exported ONNX model has NMS enabled.
     """
 
-    def __init__(self, images: Union[np.ndarray, List[np.ndarray]], yolo_session, confidence_thres: float = 0.5):
+    def __init__(self, images: Union[np.ndarray, List[np.ndarray]], yolo_session, confidence_thres: float = 0.5, imgsz=640):
         """
         Args:
             images (np.ndarray or list[np.ndarray]): Single or batch of images (HWC) or [(H,W,C), ...]
@@ -25,16 +25,15 @@ class YOLO11:
         self.classes = ['licence_plate']
         self.color_palette = np.random.uniform(0, 255, size=(len(self.classes), 3))
 
-        # Get input size from ONNX model
-        input_shape = self.session.get_inputs()[0].shape
-        self.input_height, self.input_width = input_shape[2], input_shape[3]
+        # # Get input size from ONNX model
+        self.input_height, self.input_width = imgsz, imgsz
 
     @staticmethod
     def letterbox(img: np.ndarray, new_shape: Tuple[int,int] = (640,640)) -> Tuple[np.ndarray, Tuple[int,int]]:
         """Resize and pad image keeping aspect ratio."""
         shape = img.shape[:2]
         r = min(new_shape[0]/shape[0], new_shape[1]/shape[1])
-        new_unpad = int(shape[1]*r), int(shape[0]*r)
+        new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
         dw, dh = new_shape[1]-new_unpad[0], new_shape[0]-new_unpad[1]
         dw /= 2
         dh /= 2
@@ -56,6 +55,7 @@ class YOLO11:
         batch_data = []
         pads = []
         for img in self.images:
+            print(img.shape)
             h0, w0 = img.shape[:2]
             img_rgb = img[..., ::-1]  # BGR->RGB
             img_padded, pad = self.letterbox(img_rgb, (self.input_height, self.input_width))
@@ -131,13 +131,13 @@ class YOLO11:
 
 if __name__ == "__main__":
     # ==== Cấu hình ====
-    yolo_path = '/u01/quanlm/fitness_tracking/haui_sict_fitness_score/models/yolo11n.onnx'
+    yolo_path = r'D:\NCKH_Cham_diem_the_duc\models\yolo11n.onnx'
     session = ort.InferenceSession(yolo_path, providers=['CPUExecutionProvider'])
     
-    image_folder = "imgs"
-    image_paths = glob.glob(os.path.join('/u01/quanlm/fitness_tracking/haui_sict_fitness_score', image_folder, "*.png"))
+    image_folder = "assets"
+    image_paths = glob.glob(os.path.join(r'D:\NCKH_Cham_diem_the_duc', image_folder, "*.png"))
+    print(image_paths)
     images = [cv2.imread(p) for p in image_paths]
-    
     model = YOLO11(images, session, confidence_thres=0.5)
     
     results = model.infer()
