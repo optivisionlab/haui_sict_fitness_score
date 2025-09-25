@@ -34,7 +34,7 @@ class YOLO11:
         """Resize and pad image keeping aspect ratio."""
         shape = img.shape[:2]
         r = min(new_shape[0]/shape[0], new_shape[1]/shape[1])
-        new_unpad = int(shape[1]*r), int(shape[0]*r)
+        new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
         dw, dh = new_shape[1]-new_unpad[0], new_shape[0]-new_unpad[1]
         dw /= 2
         dh /= 2
@@ -56,6 +56,7 @@ class YOLO11:
         batch_data = []
         pads = []
         for img in self.images:
+            print(img.shape)
             h0, w0 = img.shape[:2]
             img_rgb = img[..., ::-1]  # BGR->RGB
             img_padded, pad = self.letterbox(img_rgb, (self.input_height, self.input_width))
@@ -135,9 +136,8 @@ if __name__ == "__main__":
     session = ort.InferenceSession(yolo_path, providers=['CPUExecutionProvider'])
     
     image_folder = "imgs"
-    image_paths = glob.glob(os.path.join('/u01/quanlm/fitness_tracking/haui_sict_fitness_score', image_folder, "*.png"))
+    image_paths = glob.glob(os.path.join('/u01/quanlm/fitness_tracking/haui_sict_fitness_score/assets', image_folder, "*.png"))
     images = [cv2.imread(p) for p in image_paths]
-    
     model = YOLO11(images, session, confidence_thres=0.5)
     
     results = model.infer()
