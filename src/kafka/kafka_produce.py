@@ -38,6 +38,7 @@ class KafkaFrameProducer:
             return None
         return buf.tobytes()
 
+
     def _topic_for(self, camera_id) -> str:
         return self.topic_template.format(camera_id=camera_id)
 
