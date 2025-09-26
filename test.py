@@ -1,30 +1,12 @@
-from src.engine.score import GlobalEvaluator
+from ultralytics import YOLO
+import time
+from loguru import logger
 
 
-ge = GlobalEvaluator([1,2,3,4], test_mode=True)  # chu trình 4 cam
-
-# user đi đúng
-
-ge.process_from_tracker([1], cam_id=1, timestamp=1)
-print(ge.get_status(1))
-
-ge.process_from_tracker([1], cam_id=2, timestamp=0)
-print(ge.get_status(1)) 
-
-ge.process_from_tracker([1], cam_id=3, timestamp=1)
-print(ge.get_status(1)) 
-
-ge.process_from_tracker([1], cam_id=4, timestamp=1)
-print(ge.get_status(1)) 
-
-ge.process_from_tracker([1], cam_id=1, timestamp=1)
-print(ge.get_status(1))
-
-ge.process_from_tracker([1], cam_id=2, timestamp=0)
-print(ge.get_status(1)) 
-
-ge.process_from_tracker([1], cam_id=3, timestamp=1)
-print(ge.get_status(1)) 
-
-ge.process_from_tracker([1], cam_id=4, timestamp=1)
-print(ge.get_status(1)) 
+model = YOLO('/u01/quanlm/fitness_tracking/haui_sict_fitness_score/models/yolo11n.pt')
+start_time = time.time()
+print('start_time: ', start_time)
+logger.info('start_time: {}', start_time)
+model.predict('/u01/quanlm/fitness_tracking/haui_sict_fitness_score/assets/imgs', conf=0.5, iou=0.5, device=0, batch=1)
+print('time: ', time.time()-start_time)
+logger.info('time: {}', time.time()-start_time)
