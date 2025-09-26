@@ -95,7 +95,7 @@ def tracker_producer_worker(cid: int, video_path: str):
         cap.release()
         logger.info(f"[Producer-{cid}] finished")
 
-
+frame_dict = {}
 # ================== CONSUMER (1 per camera) ==================
 def consumer_worker(cid: int):
     topic = TOPIC_TEMPLATE.format(cid=cid)
@@ -108,6 +108,7 @@ def consumer_worker(cid: int):
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             logger.info(frame.shape)
             # 👉 ở đây bạn có thể hiển thị frame, push UI, ghi DB, v.v.
+            frame_dict[cid] = frame
         except Exception as e:
             logger.error(f"[Consumer-{cid}] error: {e}")
 
