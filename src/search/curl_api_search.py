@@ -11,7 +11,7 @@ from src.config.config import SEARCH_API_URL
 
 session = requests.Session()
 
-def curl_post(url, payload=None, files=None, headers=None, method="POST"):
+async def curl_post(url, payload=None, files=None, headers=None, method="POST"):
     """
     Gửi request (POST/PUT) đến một URL với payload, file upload và headers.
 
@@ -45,7 +45,7 @@ def curl_post(url, payload=None, files=None, headers=None, method="POST"):
         return None
 
 
-def send_tracking_to_api(ids, xyxy_boxes, frame, collection_name="face"):
+async def send_tracking_to_api(ids, xyxy_boxes, frame, collection_name="face"):
     """
     Gửi dữ liệu tracking cùng frame ảnh đến API.
     
@@ -69,7 +69,7 @@ def send_tracking_to_api(ids, xyxy_boxes, frame, collection_name="face"):
     payload = {
         'collection_name': collection_name,
         'tracking_frame': tracking_frame,
-        # 'similarity_threshold': 0.25,
+        'similarity_threshold': 0.7,
     }
 
     # Encode frame thành ảnh JPEG
@@ -87,7 +87,7 @@ def send_tracking_to_api(ids, xyxy_boxes, frame, collection_name="face"):
     ]
     
     # Gửi request
-    response = curl_post(
+    response = await curl_post(
         url=f'{SEARCH_API_URL}/faces/search',  # chỉnh lại URL thực tế
         payload=payload,
         files=files,

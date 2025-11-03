@@ -9,201 +9,96 @@ from src.config.config import MONGO_FLAGS_COLLECTION, MONGO_LAPS_COLLECTION
 import time
 from datetime import datetime
 import time
+from src.database.sql_model import PostgresHandler
 
 
 class SetUpEvaluate:
-    def __init__(self, id_run_process, mongo_flags="flags_db", mongo_laps="laps_db"):
+    def __init__(self, distance=None, redis_client=None, pg_handler=None):
         """
         id_run_process : list cam_id theo chu trình
         mongo_flags    : collection lưu cờ từng camera cho mỗi user
         mongo_laps     : collection lưu tổng số vòng của mỗi user
         """
-        self.id_run_process = [str(cam) for cam in id_run_process]
-        self.mongo_flags = mongo_flags
-        self.mongo_laps = mongo_laps
+        # self.id_run_process = [str(cam) for cam in id_run_process]
+        # self.mongo_laps_collection = mongo_laps_collection
+        # self.mongo_exams_collection = mongo_exams_collection
+        self.redis_client = redis_client
+        self.pg_handler = pg_handler  # placeholder nếu cần dùng PostgreSQL
+        self.distance = distance  # khoảng cách giữa các camera (mét)
 
 
-    def update_flags(self, user_id, cam_id):
+    def set_flag_redis(self, user_id, cam_id):
         """
-        Bật cờ cho 1 camera của user.
-        - Nếu tất cả cờ đều True → +1 vòng trong collection laps_db
+        Ghi flag và thời điểm detect người ở camera cam_id.
         """
         user_id = str(user_id)
         cam_id = str(cam_id)
+        key_user = f"user:{user_id}:data"
+        now = datetime.now()
 
-        # --- Bật cờ duy nhất cam_id bằng upsert ---
-        # set flags.<cam_id> = True và timestamp hiện tại
-        # đồng thời tạo các flags khác False nếu mới tạo document
-        update_doc = {
-            "$set": {
-                f"flags.{cam_id}": True,
-                "timestamp": time.time()
-            },
-            "$setOnInsert": {
-                **{f"flags.{c}": False for c in self.id_run_process if c != cam_id},
-                "created_at": time.time()
-            }
-        }
-        mongo_db.upsert(self.mongo_flags, {"_id": user_id}, update_doc)
-
-        # --- Lấy document hiện tại ---
-        doc = mongo_db.find_one(self.mongo_flags, {"_id": user_id})
-        if not doc:
-            return
-
-        flags = doc.get("flags", {})
-        # kiểm tra tất cả camera đã True
-        if all(flags.get(str(c)) for c in self.id_run_process):
-            # +1 vòng trong laps_db
-            logger.info(f"✅ User {user_id} hoàn thành 1 vòng")
-            mongo_db.upsert(
-                self.mongo_laps,
-                {"_id": user_id},
-                {"$inc": {"laps": 1}, "$set": {"updated_at": time.time()}}
-            )
-
-            # reset toàn bộ flags về False
-            reset_flags = {f"flags.{c}": False for c in self.id_run_process}
-            mongo_db.upsert(
-                self.mongo_flags,
-                {"_id": user_id},
-                {"$set": reset_flags}
-            )
-
-
-    def get_status(self, user_id):
-        user_id = str(user_id)
-        flags_doc = mongo_db.find_one(self.mongo_flags, {"_id": user_id}) or {}
-        laps_doc  = mongo_db.find_one(self.mongo_laps,  {"_id": user_id}) or {}
-        return {
-            "laps":  laps_doc.get("laps", 0),
-            "flags": flags_doc.get("flags", {cam: False for cam in self.id_run_process}),
-            "timestamp": laps_doc.get("timestamp")
-        }
-
-        
-    def update_random_direction(self, user_id, cam_id, timestamp=None):
-        # cam_id phải thuộc chu trình
-        if cam_id not in self.id_run_process:
-            raise ValueError(f"Camera {cam_id} không thuộc chu trình.")
-
-        prev_idx = self.progress_idx[user_id]
-        start_cam = self.start_cam[user_id]
-        direction = self.direction[user_id]
-
-        logger.info(f"[User {user_id}] prev_idx={prev_idx}, cam_id={cam_id}, start_cam={start_cam}, direction={direction}")
-        write_txt('logs.txt', f"[User {user_id}] prev_idx={prev_idx}, cam_id={cam_id}, start_cam={start_cam}, direction={direction}")
-
-        # nếu user đã có progress và detect trùng cam liên tiếp -> bỏ qua (spam)
-        if prev_idx != -1 and self.last_cam[user_id] == cam_id:
-            logger.debug(f"[User {user_id}] Trùng cam {cam_id} -> bỏ qua")
-            return
-
-        cam_list = list(self.id_run_process)
-        N = len(cam_list)
-
-        # ---------- 1) reset / khởi động mới ----------
-        if prev_idx == -1:
-            # user bắt đầu ở cam này
-            self.start_cam[user_id] = cam_id
-            self.progress_idx[user_id] = 0
-            self.last_cam[user_id] = cam_id
-            self.last_timestamp[user_id] = timestamp
-            self.direction[user_id] = None
-            logger.info(f"[User {user_id}] Khởi động bắt đầu tại cam {cam_id}")
-            return
-
-        # index của cam start trong cam_list
-        start_idx = cam_list.index(self.start_cam[user_id])
-
-        # ---------- 2) nếu chưa biết hướng -> xác định ở bước 2 ----------
-        if direction is None:
-            cw_next  = cam_list[(start_idx + 1) % N]
-            ccw_next = cam_list[(start_idx - 1) % N]
-
-            if cam_id == cw_next:
-                self.direction[user_id] = "cw"
-                self.progress_idx[user_id] = 1
-                self.last_cam[user_id] = cam_id
-                self.last_timestamp[user_id] = timestamp
-                logger.info(f"[User {user_id}] Chọn hướng cw (bước 2)")
-                return
-            elif cam_id == ccw_next:
-                self.direction[user_id] = "ccw"
-                self.progress_idx[user_id] = 1
-                self.last_cam[user_id] = cam_id
-                self.last_timestamp[user_id] = timestamp
-                logger.info(f"[User {user_id}] Chọn hướng ccw (bước 2)")
-                return
-            else:
-                # không đi sang 2 cam kế tiếp từ start -> coi là sai và reset
-                self.progress_idx[user_id] = -1
-                self.last_cam[user_id] = None
-                logger.warning(f"[User {user_id}] Sai hướng ngay bước 2 -> reset")
-                return
-
-        # ---------- 3) nếu đã biết hướng -> build sequence theo start+direction ----------
-        if self.direction[user_id] == "cw":
-            seq = [cam_list[(start_idx + i) % N] for i in range(N)]
-        else:  # ccw
-            seq = [cam_list[(start_idx - i) % N] for i in range(N)]
-
-        # progress_idx là số bước đã đi kể từ start (0..N-1)
-        expected_idx = (prev_idx + 1) % N
-        expected_cam = int(seq[expected_idx])
-        cam_id = int(cam_id)
-        logger.info(f"[User {user_id}] direction={self.direction[user_id]}, expected_cam={expected_cam}, cam_id={cam_id}")
-        if cam_id == expected_cam:
-            # đi đúng thứ tự
-            self.progress_idx[user_id] = expected_idx
-            self.last_timestamp[user_id] = timestamp
-            self.last_cam[user_id] = cam_id
-            # nếu quay lại start (expected_idx == 0) -> hoàn thành vòng
-          # 🔹 Test mode: coi khi đi hết 1 vòng (expected_idx == N-1) là hoàn thành
-            if self.test_mode and expected_idx == N - 1:
-                logger.info(f"prev_idx={prev_idx}, N-1={N-1}, expected_idx={expected_idx}")
-                self.laps[user_id] += 1
-                logger.info(f"[TEST MODE] User {user_id} hoàn thành vòng {self.laps[user_id]}")
-                # write_txt('results.txt', f"[TEST MODE] User {user_id} hoàn thành vòng {self.laps[user_id]}")
-
-                self.direction[user_id] = None
-                self.progress_idx[user_id] = -1  # reset để chạy vòng mới
-                return
-
-            # 🔹 Normal mode: chỉ tính vòng khi quay lại start
-            if not self.test_mode and expected_idx == 0:
-                self.laps[user_id] += 1
-                logger.info(f"User {user_id} hoàn thành vòng {self.laps[user_id]}")
-                # write_txt('results.txt', f"[TEST MODE] User {user_id} hoàn thành vòng {self.laps[user_id]}")
-                self.direction[user_id] = None
-                return
-            return
-
-        # nếu đến đây -> đi sai thứ tự => reset sạch để user có thể restart
-        self.progress_idx[user_id] = -1
-        self.direction[user_id] = None
-        self.last_cam[user_id] = None
-        logger.warning(f"[User {user_id}] Sai thứ tự tại cam {cam_id} -> reset")
+        self.redis_client.hset(key_user, f"flag_{cam_id}", 1)
+        self.redis_client.hset(key_user, f"in_cam_{cam_id}", now.isoformat())
+        self.redis_client.hset(key_user, "last_update", now.strftime("%Y-%m-%d %H:%M:%S"))
     
 
+    
 class GlobalEvaluator:
-    """
-    Giữ 1 evaluator duy nhất cho toàn bộ hệ thống.
-    Các tracker sẽ gọi process_from_tracker để cập nhật.
-    """
-    def __init__(self, id_run_process, mean_velocity=[8, 12]):
-        self.evaluator = SetUpEvaluate(id_run_process, mongo_flags=MONGO_FLAGS_COLLECTION, mongo_laps=MONGO_LAPS_COLLECTION)
+    def __init__(self, id_run_process, redis_client=None, pg_handler=None):
+        self.id_run_process = [str(c) for c in id_run_process]
+        self.redis_client = redis_client
+        self.pg_handler = pg_handler
 
-    def process_from_tracker(self, detections, cam_id):
-        """
-        detections: list user_id đã detect sau API
-        cam_id: ID camera
-        """
-        for user_id in detections:
-            self.evaluator.update_flags(user_id, cam_id)
+    def check_lap_completion(self, user_id):
+        user_id = str(user_id)
+        key_user = f"user:{user_id}:data"
 
-    def get_status(self, user_id):
-        return self.evaluator.get_status(user_id)
+        # Lấy toàn bộ flags
+        user_data = self.redis_client.hgetall(key_user)
+        flags = {
+            cam: int(user_data.get(f"flag_{cam}", 0))
+            for cam in self.id_run_process
+        }
 
-    def get_all_status(self):
-        return {uid: self.evaluator.get_status(uid) for uid in self.evaluator.laps.keys()}
+        # Nếu tất cả đều = 1 → hoàn thành 1 vòng
+        if all(v == 1 for v in flags.values()):
+            lap_number_raw = self.redis_client.hget(key_user, "lap_number")
+            lap_number = int(lap_number_raw) + 1 if lap_number_raw else 1
+
+            self.redis_client.hset(key_user, "lap_number", lap_number)
+
+            # Tính thời gian & vận tốc
+            cam_times = {}
+            for cam in self.id_run_process:
+                t_str = user_data.get(f"in_cam_{cam}")
+                if t_str:
+                    cam_times[cam] = datetime.fromisoformat(t_str)
+            if len(cam_times) >= 2:
+                start = min(cam_times.values())
+                end = max(cam_times.values())
+                duration = (end - start).total_seconds()
+                distance = 100.0
+                velocity = distance / duration if duration > 0 else 0
+            else:
+                duration = 0
+                velocity = 0
+                start = end = datetime.now()
+
+            print(f"✅ User {user_id} hoàn thành vòng {lap_number}: {velocity:.2f} m/s")
+
+            # Ghi DB
+            if self.pg_handler:
+                self.pg_handler.insert_lap(
+                    user_id=user_id,
+                    lap_number=lap_number,
+                    start_time=start,
+                    end_time=end,
+                    lap_duration=duration,
+                    velocity=velocity,
+                    cam_times=cam_times,
+                )
+
+            # Reset flag
+            pipe = self.redis_client.pipeline()
+            for cam in self.id_run_process:
+                pipe.hset(key_user, f"flag_{cam}", 0)
+            pipe.execute()

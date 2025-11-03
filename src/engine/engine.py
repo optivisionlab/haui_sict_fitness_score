@@ -81,7 +81,7 @@ def draw_target(frame, track_id, box, name=None, color=(0, 255, 0), thickness=2)
 
     # Chuẩn bị text hiển thị
     if name:
-        text = f"Name: {name}"
+        text = f"{name}"
     else:
         text = f"ID: {track_id}"
 

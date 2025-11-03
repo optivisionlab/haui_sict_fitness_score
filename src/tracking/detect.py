@@ -9,6 +9,7 @@ from src.engine.engine import draw_target, line_begin_curl_api_search
 import cv2
 from src.config.config import LINE_BEGIN_SEARCH, QDRANT_COLLECTION
 import torch
+import asyncio
 
 
 class SimpleTracker:
@@ -37,22 +38,25 @@ class SimpleTracker:
 
 
     def detect_frame(self, frame):
-        result = self.detection_model(frame, conf=0.5, iou=0.5, verbose=False)[0]
-        return self._parse_result(frame, result)
-
+        try:
+            result = self.detection_model(frame, conf=0.5, iou=0.5, verbose=False)[0]
+            return self._parse_result(frame, result)
+        finally:
+            torch.cuda.empty_cache()
 
     def detect_batch(self, frames):
-        results = self.detection_model(frames, conf=0.5, iou=0.5, verbose=False)
-        return [self._parse_result(frame, res) for frame, res in zip(frames, results)]
+        with torch.inference_mode():
+            results = self.detection_model(frames, conf=0.6, iou=0.7, verbose=False, device=0)
+            return [self._parse_result(frame, res) for frame, res in zip(frames, results)]
     
 
 class APIHandler:
-    def __init__(self, global_evaluator, collection_name=QDRANT_COLLECTION):
-        self.global_evaluator = global_evaluator
+    def __init__(self, evaluator, collection_name=QDRANT_COLLECTION):
+        self.evaluator = evaluator
         self.collection_name = collection_name
         self.id_to_name = {}
 
-    def process(self, frame, xyxy_boxes, ids):
+    def process(self, cam_id, frame, xyxy_boxes, ids):
         copy_frame = frame.copy()
 
         valid_ids, valid_boxes = [], []
@@ -63,10 +67,10 @@ class APIHandler:
 
         logger.info('valid_ids, valid_boxes: {}, {}'.format(valid_ids, valid_boxes))
         if not valid_ids:
-            return copy_frame
+            return
 
         try:
-            response = send_tracking_to_api(valid_ids, valid_boxes, copy_frame, collection_name=self.collection_name)
+            response = asyncio.run(send_tracking_to_api(valid_ids, valid_boxes, copy_frame, collection_name=self.collection_name))
 
             map_local_to_user = {}
             if response and response.status_code == 200:
@@ -91,15 +95,13 @@ class APIHandler:
                 pair = map_local_to_user.get(local_id)
                 if pair and pair[0] is not None:
                     user_id, name = pair
-                    draw_target(copy_frame, user_id, box, name=name, color=(0, 255, 0), thickness=2)
+                    # draw_target(copy_frame, user_id, box, name=name, color=(0, 255, 0), thickness=2)
                     detections.append(name)
-                else:
-                    draw_target(copy_frame, local_id, box, name='Person', color=(0, 255, 255), thickness=1)
 
             if detections:
-                self.global_evaluator.process_from_tracker(detections, "from_consumer")
+                for user_id in detections:
+                    self.evaluator.set_flag_redis(user_id, cam_id)
 
         except Exception as e:
             logger.exception(f"Lỗi khi gửi API: {e}")
 
-        return copy_frame
