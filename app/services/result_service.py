@@ -13,11 +13,21 @@ def get_result(db: Session, result_id: int) -> Optional[Result]:
     return db.get(Result, result_id)
 
 
-def get_result_by_user_exam(db: Session, user_id: int, exam_id: int) -> Optional[Result]:
-    """Get result for a specific user and exam (unique constraint)"""
+def get_results_by_user_exam(db: Session, user_id: int, exam_id: int) -> List[Result]:
+    """Return all results for a given user and exam (multiple attempts / steps).
+
+    Use this when you need the full history of attempts.
+    """
+    return db.exec(
+        select(Result).where((Result.user_id == user_id) & (Result.exam_id == exam_id)).order_by(Result.step)
+    ).all()
+
+
+def get_result_by_user_exam_step(db: Session, user_id: int, exam_id: int, step: int) -> Optional[Result]:
+    """Return a single result matching (user, exam, step) if present."""
     return db.exec(
         select(Result).where(
-            (Result.user_id == user_id) & (Result.exam_id == exam_id)
+            (Result.user_id == user_id) & (Result.exam_id == exam_id) & (Result.step == step)
         )
     ).first()
 
@@ -42,15 +52,25 @@ def create_result(db: Session, result_in: ResultCreate) -> Result:
     if not exam:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
     
-    # Check if result already exists (unique constraint: user_id + exam_id)
-    existing = get_result_by_user_exam(db, result_in.user_id, result_in.exam_id)
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Result already exists for this user and exam"
-        )
-    
-    result = Result(**result_in.dict())
+    # If a specific step is provided, ensure uniqueness on (user, exam, step).
+    if result_in.step is not None:
+        existing = get_result_by_user_exam_step(db, result_in.user_id, result_in.exam_id, result_in.step)
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Result already exists for this user, exam and step",
+            )
+        result_data = result_in.dict()
+    else:
+        # Auto-assign step = max(existing steps) + 1 (or 1 if none exist)
+        last = db.exec(
+            select(Result).where((Result.user_id == result_in.user_id) & (Result.exam_id == result_in.exam_id)).order_by(Result.step.desc()).limit(1)
+        ).first()
+        next_step = 1 if not last or last.step is None else (last.step + 1)
+        result_data = result_in.dict()
+        result_data["step"] = next_step
+
+    result = Result(**result_data)
     db.add(result)
     db.commit()
     db.refresh(result)
