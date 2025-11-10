@@ -1,6 +1,7 @@
 from datetime import datetime, date
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import Column, ForeignKey
 from enum import Enum
 
 if TYPE_CHECKING:
@@ -23,8 +24,12 @@ class UserStatus(str, Enum):
 class UserClass(SQLModel, table=True):
     __tablename__ = "user_class"
     
-    user_id: int = Field(foreign_key="users.user_id", primary_key=True)
-    class_id: int = Field(foreign_key="classes.class_id", primary_key=True)
+    user_id: int = Field(
+        sa_column=Column(ForeignKey("users.user_id", ondelete="CASCADE", onupdate="CASCADE"), primary_key=True)
+    )
+    class_id: int = Field(
+        sa_column=Column(ForeignKey("classes.class_id", ondelete="CASCADE", onupdate="CASCADE"), primary_key=True)
+    )
 
 
 class UserBase(SQLModel):

@@ -1,14 +1,16 @@
 from datetime import datetime, date
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import Column, ForeignKey
 from enum import Enum
+
+# Import UserClass to use as link_model
+from app.models.user import UserClass
+from app.models.exams import ClassExam
 
 if TYPE_CHECKING:
     from app.models.user import User
     from app.models.exams import Exam
-
-# Import UserClass to use as link_model
-from app.models.user import UserClass
 
 
 class CourseType(str, Enum):
@@ -36,7 +38,10 @@ class Class(ClassBase, table=True):
     __tablename__ = "classes"
     
     class_id: Optional[int] = Field(default=None, primary_key=True)
-    teacher_id: Optional[int] = Field(default=None, foreign_key="users.user_id")
+    teacher_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(ForeignKey("users.user_id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True),
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     
@@ -49,4 +54,5 @@ class Class(ClassBase, table=True):
         back_populates="enrolled_classes",
         link_model=UserClass
     )
-    exams: List["Exam"] = Relationship(back_populates="class_")
+    # Many-to-many relationship to exams via ClassExam
+    exams: List["Exam"] = Relationship(back_populates="classes", link_model=ClassExam)
