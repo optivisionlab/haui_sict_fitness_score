@@ -1,10 +1,15 @@
 from typing import Optional, List
 from sqlmodel import Session, select
 from fastapi import HTTPException, status
+from sqlalchemy import text
 
 from app.models.user import User
 from app.schemas.users import UserCreate, UserUpdate
-from app.core.security import get_password_hash, verify_password
+from app.core.security import hash_password, verify_password
+
+from app.models.user import User
+from app.schemas.users import UserCreate, UserUpdate
+from app.core.security import hash_password, verify_password
 
 
 def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
@@ -30,7 +35,7 @@ def create_user(db: Session, user_in: UserCreate) -> User:
     if get_user_by_username(db, user_in.user_name):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already registered")
 
-    hashed = get_password_hash(user_in.password)
+    hashed = hash_password(user_in.password)
     db_user = User(**user_in.dict(exclude={"password"}), password=hashed)
     db.add(db_user)
     try:
@@ -49,7 +54,7 @@ def update_user(db: Session, user_id: int, user_in: UserUpdate) -> User:
 
     data = user_in.dict(exclude_unset=True)
     if "password" in data and data["password"]:
-        data["password"] = get_password_hash(data["password"])
+        data["password"] = hash_password(data["password"])
 
     for field, value in data.items():
         setattr(user, field, value)
@@ -64,6 +69,20 @@ def delete_user(db: Session, user_id: int) -> None:
     user = get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    # Cleanup related data explicitly to keep behavior consistent across DBs.
+    # 1) Set teacher_id = NULL for classes taught by this user
+    db.execute(text("""
+        UPDATE classes SET teacher_id = NULL WHERE teacher_id = :uid
+        """), {"uid": user_id})
+    # 2) Delete enrollments
+    db.execute(text("""
+        DELETE FROM user_class WHERE user_id = :uid
+        """), {"uid": user_id})
+    # 3) Delete results
+    db.execute(text("""
+        DELETE FROM results WHERE user_id = :uid
+        """), {"uid": user_id})
+
     db.delete(user)
     db.commit()
 

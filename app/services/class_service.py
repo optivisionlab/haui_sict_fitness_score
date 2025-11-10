@@ -30,6 +30,7 @@ def update_class(db: Session, class_id: int, data: dict) -> Class:
     db.refresh(db_class)
     return db_class
 
+
 def delete_class(db: Session, class_id: int) -> None:
     db_class = get_class(db, class_id)
     if not db_class:

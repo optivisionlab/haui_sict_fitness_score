@@ -2,6 +2,7 @@ from typing import List, Optional
 from sqlmodel import Session, select
 from fastapi import HTTPException, status
 from datetime import datetime
+from sqlalchemy.exc import IntegrityError
 
 from app.models.result import Result
 from app.models.exams import Exam
@@ -72,7 +73,16 @@ def create_result(db: Session, result_in: ResultCreate) -> Result:
 
     result = Result(**result_data)
     db.add(result)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # This should be rare because we checked uniqueness above, but
+        # handle the DB-level uniqueness violation gracefully.
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Result violates a database constraint (possibly duplicate user/exam/step).",
+        )
     db.refresh(result)
     return result
 
@@ -83,12 +93,51 @@ def update_result(db: Session, result_id: int, result_in: ResultUpdate) -> Resul
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
     
     data = result_in.dict(exclude_unset=True)
+    # If updating any of user_id, exam_id or step we must ensure the
+    # uniqueness constraint (user_id, exam_id, step) is preserved.
+    # Reject explicit nulls for non-nullable DB columns to avoid IntegrityError.
+    for required_field in ("user_id", "exam_id", "step"):
+        if required_field in data and data[required_field] is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"'{required_field}' cannot be null",
+            )
+
+    new_user_id = data.get("user_id", result.user_id)
+    new_exam_id = data.get("exam_id", result.exam_id)
+    # If step is omitted, keep existing step; if provided, we already rejected None above
+    new_step = data.get("step") if ("step" in data) else result.step
+
+    # If any of these changed (or even if not), check for an existing row
+    # with the same tuple but a different result_id.
+    conflict = db.exec(
+        select(Result).where(
+            (Result.user_id == new_user_id)
+            & (Result.exam_id == new_exam_id)
+            & (Result.step == new_step)
+            & (Result.result_id != result_id)
+        )
+    ).first()
+
+    if conflict:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Another result with the same user_id, exam_id and step already exists",
+        )
+
     for k, v in data.items():
         setattr(result, k, v)
-    
+
     result.updated_at = datetime.utcnow()
     db.add(result)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Result update violates a database constraint (possibly duplicate user/exam/step).",
+        )
     db.refresh(result)
     return result
 
