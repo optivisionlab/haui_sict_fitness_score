@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User, UserStatus, UserRole
 from app.schemas.users import UserCreate, UserUpdate, Token, UserRead, UserLogin
+from app.services.user_service import delete_user as service_delete_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -218,6 +219,8 @@ def update_user_by_id(
     return user
 
 
+from fastapi.responses import JSONResponse
+
 @router.delete("/{user_id}")
 def delete_user_by_id(
     user_id: int,
@@ -227,20 +230,17 @@ def delete_user_by_id(
     """
     Delete a user by ID. Allowed for admin or the user themself.
     """
-    # Permission check
-    if not (current_user.user_role == UserRole.admin or current_user.user_id == user_id):
+    if not (current_user.user_role == UserRole.admin):
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
-    user = db.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    db.delete(user)
-    db.commit()
-    logger.info("user deleted user_id=%s by=%s", user.user_id, getattr(current_user, "user_id", None))
-    # Return an empty Response for 204 to avoid sending a response body
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
+    service_delete_user(db, user_id)
+    
+    logger.info("user deleted user_id=%s by=%s", user_id, getattr(current_user, "user_id", None))
+    
+    return JSONResponse(
+        content={"message": f"User with ID {user_id} deleted successfully."},
+        status_code=status.HTTP_200_OK
+    )
 
 @router.get("/by-code/{user_code}", response_model=UserRead)
 def get_user_by_code(
