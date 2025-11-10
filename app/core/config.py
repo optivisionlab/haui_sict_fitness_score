@@ -1,5 +1,7 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from urllib.parse import quote_plus
+
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Fitness Score API"
@@ -10,13 +12,23 @@ class Settings(BaseSettings):
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
     POSTGRES_SERVER: str
-    POSTGRES_PORT: str 
+    POSTGRES_PORT: str
     POSTGRES_DB: str
-    
+
     @property
     def DATABASE_URL(self) -> str:
-    
-        return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        """Build a properly quoted SQLAlchemy URL for Postgres.
+
+        We quote the user and password using urllib.parse.quote_plus so
+        special characters (for example '@' in the password) are encoded
+        and won't break the URL parsing.
+        """
+        user = quote_plus(self.POSTGRES_USER)
+        password = quote_plus(self.POSTGRES_PASSWORD)
+        return (
+            f"postgresql+psycopg2://{user}:{password}@{self.POSTGRES_SERVER}"
+            f":{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        )
     
     SECRET_KEY: str = "a8f12d9d8b4f5f3f4e7d81e4a2f9d8a3fbd7c23ac4e6b5e13e7d95b0a1e6d8c9"
     ALGORITHM: str = "HS256"
