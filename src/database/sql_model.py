@@ -5,18 +5,17 @@ from loguru import logger
 
 
 # --- Định nghĩa model ORM ---
-class LapHistory(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+class Results(SQLModel, table=True):
+    result_id: int | None = Field(default=None, primary_key=True)
     user_id: str
-    lap_number: int
+    exam_id: str | None = None
+    step: int
     start_time: datetime
     end_time: datetime
-    lap_duration: float
-    velocity: float
-    cam1_time: datetime
-    cam2_time: datetime
-    cam3_time: datetime
-    cam4_time: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
 
 # --- Handler ---
 class PostgresHandler:
@@ -27,19 +26,17 @@ class PostgresHandler:
         SQLModel.metadata.create_all(self.engine)
 
 
-    def insert_lap(self, user_id, lap_number, start_time, end_time, lap_duration, velocity, cam_times: dict = None):
+    def insert_lap(self, user_id, lap_number, start_time, end_time, exam_id, created_at, updated_at, result_id):
         with Session(self.engine) as session:
-            lap = LapHistory(
+            lap = Results(
                 user_id=user_id,
+                exam_id=exam_id,
                 lap_number=lap_number,
                 start_time=start_time,
                 end_time=end_time,
-                lap_duration=lap_duration,
-                velocity=velocity,
-                cam1_time=cam_times.get("1"),
-                cam2_time=cam_times.get("2"),
-                cam3_time=cam_times.get("3"),
-                cam4_time=cam_times.get("4"),
+                created_at=created_at,
+                updated_at=updated_at,
+                result_id=result_id
             )
             session.add(lap)
             session.commit()
@@ -47,13 +44,13 @@ class PostgresHandler:
 
     def get_last_lap(self, user_id: str):
         with Session(self.engine) as session:
-            statement = select(LapHistory).where(LapHistory.user_id == user_id).order_by(LapHistory.lap_number.desc())
+            statement = select(Results).where(Results.user_id == user_id).order_by(Results.lap_number.desc())
             result = session.exec(statement).first()
             return result
 
     def update_velocity(self, lap_id: int, new_velocity: float):
         with Session(self.engine) as session:
-            lap = session.get(LapHistory, lap_id)
+            lap = session.get(Results, lap_id)
             if lap:
                 lap.velocity = new_velocity
                 session.add(lap)
@@ -64,7 +61,7 @@ class PostgresHandler:
 
     def delete_lap(self, lap_id: int):
         with Session(self.engine) as session:
-            lap = session.get(LapHistory, lap_id)
+            lap = session.get(Results, lap_id)
             if lap:
                 session.delete(lap)
                 session.commit()

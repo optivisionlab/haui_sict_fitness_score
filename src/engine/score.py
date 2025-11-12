@@ -13,92 +13,109 @@ from src.database.sql_model import PostgresHandler
 
 
 class SetUpEvaluate:
-    def __init__(self, distance=None, redis_client=None, pg_handler=None):
-        """
-        id_run_process : list cam_id theo chu trình
-        mongo_flags    : collection lưu cờ từng camera cho mỗi user
-        mongo_laps     : collection lưu tổng số vòng của mỗi user
-        """
-        # self.id_run_process = [str(cam) for cam in id_run_process]
-        # self.mongo_laps_collection = mongo_laps_collection
-        # self.mongo_exams_collection = mongo_exams_collection
-        self.redis_client = redis_client
-        self.pg_handler = pg_handler  # placeholder nếu cần dùng PostgreSQL
-        self.distance = distance  # khoảng cách giữa các camera (mét)
+    """
+    Chỉ chịu trách nhiệm ghi flag camera vào Redis.
+    """
 
+    def __init__(self, id_run_process, redis_client=None):
+        self.id_run_process = [str(c) for c in id_run_process]
+        self.redis_client = redis_client
 
     def set_flag_redis(self, user_id, cam_id):
         """
-        Ghi flag và thời điểm detect người ở camera cam_id.
+        Ghi flag camera nếu user đang active.
         """
         user_id = str(user_id)
         cam_id = str(cam_id)
         key_user = f"user:{user_id}:data"
-        now = datetime.now()
 
+        # Nếu key chưa tồn tại hoặc không active → bỏ qua
+        if not self.redis_client.exists(key_user):
+            return
+        if self.redis_client.hget(key_user, "state") != "active":
+            return
+
+        # Ghi flag
         self.redis_client.hset(key_user, f"flag_{cam_id}", 1)
-        self.redis_client.hset(key_user, f"in_cam_{cam_id}", now.isoformat())
-        self.redis_client.hset(key_user, "last_update", now.strftime("%Y-%m-%d %H:%M:%S"))
-    
 
-    
+
 class GlobalEvaluator:
+    """
+    Kiểm tra lap hoàn thành và ghi PostgreSQL khi backend gửi end.
+    """
+
     def __init__(self, id_run_process, redis_client=None, pg_handler=None):
         self.id_run_process = [str(c) for c in id_run_process]
         self.redis_client = redis_client
         self.pg_handler = pg_handler
 
     def check_lap_completion(self, user_id):
-        user_id = str(user_id)
+        """
+        Kiểm tra user hoàn thành vòng → tăng lap_number, ghi DB.
+        end_time vẫn để NULL.
+        """
         key_user = f"user:{user_id}:data"
+        if not self.redis_client.exists(key_user):
+            return
+        if self.redis_client.hget(key_user, "state") != "active":
+            return
 
-        # Lấy toàn bộ flags
-        user_data = self.redis_client.hgetall(key_user)
-        flags = {
-            cam: int(user_data.get(f"flag_{cam}", 0))
-            for cam in self.id_run_process
-        }
+        # Lấy flags
+        flags = {c: int(self.redis_client.hget(key_user, f"flag_{c}")) for c in self.id_run_process}
 
-        # Nếu tất cả đều = 1 → hoàn thành 1 vòng
-        if all(v == 1 for v in flags.values()):
-            lap_number_raw = self.redis_client.hget(key_user, "lap_number")
-            lap_number = int(lap_number_raw) + 1 if lap_number_raw else 1
-
+        if all(flags.values()):
+            # Tăng lap_number
+            lap_number = int(self.redis_client.hget(key_user, "lap_number") or 0) + 1
             self.redis_client.hset(key_user, "lap_number", lap_number)
 
-            # Tính thời gian & vận tốc
-            cam_times = {}
-            for cam in self.id_run_process:
-                t_str = user_data.get(f"in_cam_{cam}")
-                if t_str:
-                    cam_times[cam] = datetime.fromisoformat(t_str)
-            if len(cam_times) >= 2:
-                start = min(cam_times.values())
-                end = max(cam_times.values())
-                duration = (end - start).total_seconds()
-                distance = 100.0
-                velocity = distance / duration if duration > 0 else 0
-            else:
-                duration = 0
-                velocity = 0
-                start = end = datetime.now()
+            # Lấy thông tin exam_id và start_time
+            user_data = self.redis_client.hgetall(key_user)
+            exam_id = user_data.get("exam_id")
+            start_time_str = user_data.get("start_time")
+            start_time = datetime.fromisoformat(start_time_str) if start_time_str else None
 
-            print(f"✅ User {user_id} hoàn thành vòng {lap_number}: {velocity:.2f} m/s")
-
-            # Ghi DB
+            # Ghi vào DB (end_time = None)
             if self.pg_handler:
-                self.pg_handler.insert_lap(
+                self.pg_handler.insert_or_update_lap(
                     user_id=user_id,
+                    exams_id=exam_id,
                     lap_number=lap_number,
-                    start_time=start,
-                    end_time=end,
-                    lap_duration=duration,
-                    velocity=velocity,
-                    cam_times=cam_times,
+                    start_time=start_time,
+                    end_time=None  # chưa có end_time
                 )
 
-            # Reset flag
+            # Reset flags cho vòng tiếp theo
             pipe = self.redis_client.pipeline()
-            for cam in self.id_run_process:
-                pipe.hset(key_user, f"flag_{cam}", 0)
+            for c in self.id_run_process:
+                pipe.hset(key_user, f"flag_{c}", 0)
             pipe.execute()
+
+
+    def finalize_exam(self, user_id, end_time: datetime):
+        """
+        Khi backend gửi end, update end_time trong DB.
+        """
+        key_user = f"user:{user_id}:data"
+        if not self.redis_client.exists(key_user):
+            return
+
+        # Lấy lap_number, exam_id, start_time từ Redis
+        user_data = self.redis_client.hgetall(key_user)
+        lap_number = int(user_data.get("lap_number") or 0)
+        exam_id = user_data.get("exam_id")
+        start_time_str = user_data.get("start_time")
+        start_time = datetime.fromisoformat(start_time_str) if start_time_str else None
+
+        # Update end_time trong DB
+        if self.pg_handler:
+            self.pg_handler.insert_or_update_lap(
+                user_id=user_id,
+                exams_id=exam_id,
+                lap_number=lap_number,
+                start_time=start_time,
+                end_time=end_time
+            )
+
+        # Xóa Redis key → detect/search bỏ qua user
+        self.redis_client.delete(key_user)
+
