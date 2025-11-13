@@ -1,10 +1,16 @@
+import sys, os
+sys.path.insert(0, "/u01/quanlm/fitness_tracking/haui_sict_fitness_score")
 import onnxruntime as ort
 import numpy as np
 import cv2
 from typing import List, Tuple, Union
 import glob
 import os
-
+from src.onnx_model.nms import nms_np, xywh2xyxy_np
+import torch
+import time
+from loguru import logger
+import matplotlib.pyplot as plt
 
 class YOLO11:
     """
@@ -12,7 +18,7 @@ class YOLO11:
     Assumes the exported ONNX model has NMS enabled.
     """
 
-    def __init__(self, images: Union[np.ndarray, List[np.ndarray]], yolo_session, confidence_thres: float = 0.5, imgsz=640):
+    def __init__(self, images: Union[np.ndarray, List[np.ndarray]], yolo_session, imgsz=640, conf: float = 0.5, iou: float = 0.5):
         """
         Args:
             images (np.ndarray or list[np.ndarray]): Single or batch of images (HWC) or [(H,W,C), ...]
@@ -21,12 +27,34 @@ class YOLO11:
         """
         self.images = images if isinstance(images, list) else [images]
         self.session = yolo_session
-        self.confidence_thres = confidence_thres
-        self.classes = ['licence_plate']
-        self.color_palette = np.random.uniform(0, 255, size=(len(self.classes), 3))
+        self.confidence_thresh = conf
+        self.iou_thresh = iou
+        self.classes = [
+            "person","bicycle","car","motorcycle","airplane","bus","train","truck","boat","traffic light",
+            "fire hydrant","stop sign","parking meter","bench","bird","cat","dog","horse","sheep","cow",
+            "elephant","bear","zebra","giraffe","backpack","umbrella","handbag","tie","suitcase","frisbee",
+            "skis","snowboard","sports ball","kite","baseball bat","baseball glove","skateboard","surfboard",
+            "tennis racket","bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple",
+            "sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake","chair","couch",
+            "potted plant","bed","dining table","toilet","tv","laptop","mouse","remote","keyboard",
+            "cell phone","microwave","oven","toaster","sink","refrigerator","book","clock","vase",
+            "scissors","teddy bear","hair drier","toothbrush"
+        ]
+        np.random.seed(42)  # fix seed để màu không đổi giữa các lần chạy
+        self.color_palette = np.random.randint(0, 255, size=(len(self.classes), 3))
 
-        # # Get input size from ONNX model
+        # Get input size from ONNX model
+        # input_shape = self.session.get_inputs()[0].shape
         self.input_height, self.input_width = imgsz, imgsz
+
+    @staticmethod
+    def scale_coords(coords, pad, gain, orig_shape):
+        coords[:, [0,2]] -= pad[1]           # Trừ padding bên trái (x) khỏi x1 và x2
+        coords[:, [1,3]] -= pad[0]           # Trừ padding trên (y) khỏi y1 và y2
+        coords[:, :4] /= gain                 # Chia cho scale factor đã dùng khi resize (hồi về kích thước gốc)
+        coords[:, [0,2]] = np.clip(coords[:, [0,2]], 0, orig_shape[1])  # Clamp x1,x2 trong [0,width]
+        coords[:, [1,3]] = np.clip(coords[:, [1,3]], 0, orig_shape[0])  # Clamp y1,y2 trong [0,height]
+        return coords
 
     @staticmethod
     def letterbox(img: np.ndarray, new_shape: Tuple[int,int] = (640,640)) -> Tuple[np.ndarray, Tuple[int,int]]:
@@ -54,9 +82,11 @@ class YOLO11:
         """
         batch_data = []
         pads = []
+        original_shape = []
         for img in self.images:
             print(img.shape)
             h0, w0 = img.shape[:2]
+            original_shape.append((h0, w0))
             img_rgb = img[..., ::-1]  # BGR->RGB
             img_padded, pad = self.letterbox(img_rgb, (self.input_height, self.input_width))
             img_norm = img_padded.astype(np.float32)/255.0
@@ -64,34 +94,45 @@ class YOLO11:
             batch_data.append(img_chw)
             pads.append(pad)
         batch_data = np.stack(batch_data, axis=0)  # (B,3,H,W)
-        return batch_data, pads
+        return batch_data, pads, original_shape
 
-    def postprocess(self, output: np.ndarray, pads: List[Tuple[int,int]]) -> List[List[dict]]:
-        """
-        Postprocess ONNX outputs (with NMS already applied).
 
-        Args:
-            output (np.ndarray): ONNX output of shape (B, N, 6) [x1,y1,x2,y2,score,class]
-            pads (list of tuple): Padding applied to each image
-
-        Returns:
-            results (list of list): Each element is a list of dict {box:[x1,y1,x2,y2], score, class}
-        """
+    def postprocess(self, outputs: np.ndarray, pads: list, original_shape: list) -> list:
         results = []
-        for i, pad in enumerate(pads):
-            pad_top, pad_left = pad
-            bboxes = []
-            for det in output[i]:
-                x1, y1, x2, y2, score, cls = det
-                if score < self.confidence_thres:
-                    continue
-                # Remove padding and scale back to original image
-                left = max(int(x1 - pad_left), 0)
-                top = max(int(y1 - pad_top), 0)
-                right = int(x2 - pad_left)
-                bottom = int(y2 - pad_top)
-                bboxes.append({"box":[left,top,right,bottom], "score":float(score), "class":int(cls)})
-            results.append(bboxes)
+        B = outputs.shape[0]
+
+        for b in range(B):
+            pad_top, pad_left = pads[b]
+            h0, w0 = original_shape[b]
+            gain = min(self.input_height/h0, self.input_width/w0)
+
+            out = outputs[b].T  # (N,84)
+            boxes = out[:, :4]       # cx,cy,w,h normalized
+            cls_probs = out[:, 4:]   # 80 class probs
+
+            cls_ids = np.argmax(cls_probs, axis=1)
+            scores = cls_probs[np.arange(cls_probs.shape[0]), cls_ids]
+
+            # lọc theo confidence
+            mask = scores >= self.confidence_thresh
+            boxes, scores, cls_ids = boxes[mask], scores[mask], cls_ids[mask]
+
+            # convert xywh -> xyxy
+            boxes = xywh2xyxy_np(boxes)
+
+            # scale về ảnh gốc
+            boxes = self.scale_coords(boxes, (pad_top, pad_left), gain, (h0, w0))
+
+            # NMS
+            keep = nms_np(boxes, scores, self.iou_thresh)
+            dets = []
+            for idx in keep:
+                dets.append({
+                    "box": boxes[idx].astype(int).tolist(),
+                    "score": float(scores[idx]),
+                    "class": int(cls_ids[idx])
+                })
+            results.append(dets)
         return results
     
     def draw_results(images: list[np.ndarray], detections: list[list[dict]], color_palette: np.ndarray, classes: list[str]) -> list[np.ndarray]:
@@ -105,7 +146,7 @@ class YOLO11:
                 x1, y1, x2, y2 = det['box']
                 cls_id = det['class']
                 score = det['score']
-                color = color_palette[cls_id]
+                color = tuple(int(c) for c in color_palette[cls_id])
                 cv2.rectangle(img_drawn, (x1, y1), (x2, y2), color, 2)
                 label = f"{classes[cls_id]}:{score:.2f}"
                 (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
@@ -122,35 +163,48 @@ class YOLO11:
         Returns:
             results (list of list): Detection results for each image
         """
-        batch_data, pads = self.preprocess()
+        start_time = time.time()
+        batch_data, pads, original_shape = self.preprocess()
+        logger.info('preprocess_time: {}', time.time() - start_time)
+        start_time = time.time()
         input_name = self.session.get_inputs()[0].name
+        logger.info('inference_time: {}', time.time() - start_time)
         outputs = self.session.run(None, {input_name: batch_data})
-        # For ONNX NMS=true export, output shape is (B,N,6)
-        return self.postprocess(outputs[0], pads)
+        # For ONNX NMS=false export, output shape is (B,N,6)
+        start_time = time.time()
+        results = self.postprocess(outputs[0], pads, original_shape)
+        logger.info('postprocess_time: {}', time.time() - start_time)
+        return results
 
 
 if __name__ == "__main__":
     # ==== Cấu hình ====
-    yolo_path = r'D:\NCKH_Cham_diem_the_duc\models\yolo11n.onnx'
-    session = ort.InferenceSession(yolo_path, providers=['CPUExecutionProvider'])
+    yolo_path = '/u01/quanlm/fitness_tracking/haui_sict_fitness_score/models/yolo11n.onnx'
+    session = ort.InferenceSession(yolo_path, providers=['CPUExecutionProvider'],)
     
-    image_folder = "assets"
-    image_paths = glob.glob(os.path.join(r'D:\NCKH_Cham_diem_the_duc', image_folder, "*.png"))
-    print(image_paths)
+    image_folder = "imgs"
+    image_paths = glob.glob(os.path.join('/u01/quanlm/fitness_tracking/haui_sict_fitness_score/assets', image_folder, "*.jpg"))
     images = [cv2.imread(p) for p in image_paths]
-    model = YOLO11(images, session, confidence_thres=0.5)
+    model = YOLO11(images, session, conf=0.5, iou=0.5)
+    times = []
+    for i in range(50):
+        start_time = time.time()
+        results = model.infer()
+        times.append(time.time() - start_time)
+        logger.info('time: {}', time.time() - start_time)
     
-    results = model.infer()
-    drawn_images = YOLO11.draw_results(images, results, model.color_palette, model.classes)
-
+    plt.plot(times)
+    plt.savefig('time.png')
+    exit()
+    # drawn_images = YOLO11.draw_results(images, results, model.color_palette, model.classes)
     # ==== Lưu ảnh ra folder output ====
-    save_dir = "output"
-    os.makedirs(save_dir, exist_ok=True)
-    for img, path in zip(drawn_images, image_paths):
-        filename = os.path.basename(path)
-        save_path = os.path.join(save_dir, filename)
-        cv2.imwrite(save_path, img)
-        print(f"Saved: {save_path}")
+    # save_dir = "output"
+    # os.makedirs(save_dir, exist_ok=True)
+    # for img, path in zip(drawn_images, image_paths):
+    #     filename = os.path.basename(path)
+    #     save_path = os.path.join(save_dir, filename)
+    #     cv2.imwrite(save_path, img)
+    #     print(f"Saved: {save_path}")
 
     # ==== In ra kết quả bbox ====
     for i, dets in enumerate(results):
