@@ -8,13 +8,13 @@ import sys
 import json
 from typing import List, Optional
 from src.depend.depend import BatchTrackRequest
-
+import uvicorn
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.database.sql_model import PostgresHandler
-from src.config.config import POSTGRES_DSN
+# from src.config.config import POSTGRE_USER, POSTGRE_PASSWORD, POSTGRE_HOST, POSTGRE_PORT, POSTGRE_DB
 
 # ================== CONFIG ==================
 # Kết nối Redis
@@ -35,7 +35,7 @@ except redis.ConnectionError as e:
     # sys.exit(1)
 
 # Kết nối PostgreSQL
-pg_handler = PostgresHandler(dsn=POSTGRES_DSN)
+
 
 app = FastAPI()
 
@@ -70,3 +70,7 @@ async def track_batch(req: BatchTrackRequest):
             results.append({"user_id": u.user_id, "status": "error", "detail": str(e)})
 
     return {"results": results}
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="localhost", port=8001)
