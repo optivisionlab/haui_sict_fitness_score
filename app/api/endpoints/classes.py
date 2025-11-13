@@ -14,6 +14,38 @@ from app.services import exam_service
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
+DISTANCE = 2
+
+from datetime import datetime
+
+
+def _compute_avg_speed(start_time, end_time, distance_km: float = DISTANCE) -> Optional[float]:
+    """Compute average speed (distance_km / hours) from start and end datetimes.
+
+    Returns rounded float (2 decimals) or None when unavailable.
+    """
+    if not start_time or not end_time:
+        return None
+    try:
+        # support both datetime objects and ISO strings
+        if isinstance(start_time, str):
+            s = datetime.fromisoformat(start_time)
+        else:
+            s = start_time
+        if isinstance(end_time, str):
+            e = datetime.fromisoformat(end_time)
+        else:
+            e = end_time
+
+        secs = (e - s).total_seconds()
+        if secs <= 0:
+            return None
+        hours = secs / 3600.0
+        speed = distance_km / hours
+        return round(speed, 2)
+    except Exception:
+        return None
+
 router = APIRouter()
 
 
@@ -106,6 +138,7 @@ def list_classes(
 @router.get("/{class_id}", response_model=ClassRead)
 def read_class(
     class_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Any:
     """
@@ -116,6 +149,11 @@ def read_class(
         raise HTTPException(
             status_code=404,
             detail="Class not found"
+        )
+    if current_user.user_role not in [UserRole.admin, UserRole.teacher]:
+        raise HTTPException(
+            status_code=403,
+            detail="Not enough permissions"
         )
     return db_class
 
@@ -137,7 +175,7 @@ def update_class(
             detail="Class not found"
         )
     
-    if current_user.user_role not in [UserRole.admin, UserRole.teacher] and db_class.teacher_id != current_user.user_id:
+    if current_user.user_role not in [UserRole.admin]:
         raise HTTPException(
             status_code=403,
             detail="Not enough permissions"
@@ -181,7 +219,7 @@ def delete_class(
             detail="Class not found"
         )
     
-    if current_user.user_role not in [UserRole.admin, UserRole.teacher] and db_class.teacher_id != current_user.user_id:
+    if current_user.user_role not in [UserRole.admin]:
         raise HTTPException(
             status_code=403,
             detail="Not enough permissions"
@@ -279,6 +317,7 @@ def get_user_results_in_class(
             "step": getattr(res, "step", None),
             "start_time": getattr(res, "start_time", None),
             "end_time": getattr(res, "end_time", None),
+            "avg_speed": _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None)),
             "created_at": getattr(res, "created_at", None),
             "updated_at": getattr(res, "updated_at", None),
             "exam": {
@@ -300,6 +339,112 @@ def get_user_results_in_class(
     }
 
     return {"user": user_info, "results": results}
+
+
+@router.get("/{class_id}/user/{user_id}/exams/results/top")
+def get_user_exams_results_in_class(
+    class_id: int,
+    user_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Any:
+    """Return a user's results for exams in the given class (exam-level view).
+
+    Access: admin, class teacher, or the user themself.
+    Returns a list of exam+result entries with exam metadata and avg_speed.
+    """
+    db_class = db.get(Class, class_id)
+    if not db_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    # Permission check: admin, teacher of class, or the user themself
+    if not (
+        current_user.user_role == UserRole.admin
+        or db_class.teacher_id == current_user.user_id
+        or current_user.user_id == user_id
+    ):
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Query: exams linked to the class and results for the user
+    q = (
+        select(Exam, Result, ClassExam)
+        .join(ClassExam, Exam.exam_id == ClassExam.exam_id)
+        .join(Result, Result.exam_id == Exam.exam_id)
+        .where(ClassExam.class_id == class_id, Result.user_id == user_id)
+        .order_by(Result.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+
+    rows = db.exec(q).all()
+
+    # For each exam choose the result attempt with highest avg_speed (tie-breaker: latest created_at)
+    best_by_exam: dict[int, dict] = {}
+    for exam, res, ce in rows:
+        if res is None:
+            continue
+        eid = getattr(exam, "exam_id", None)
+        if eid is None:
+            continue
+
+        speed = _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None))
+        speed_val = speed if speed is not None else -1.0
+
+        cur = best_by_exam.get(eid)
+        if cur is None:
+            best_by_exam[eid] = {
+                "exam": exam,
+                "class_exam": ce,
+                "result": res,
+                "speed": speed_val,
+            }
+        else:
+            # compare speeds
+            if speed_val > cur["speed"]:
+                best_by_exam[eid] = {"exam": exam, "class_exam": ce, "result": res, "speed": speed_val}
+            elif speed_val == cur["speed"]:
+                # tie-breaker: choose later created_at
+                prev = cur["result"]
+                try:
+                    prev_ct = getattr(prev, "created_at", None)
+                    cur_ct = getattr(res, "created_at", None)
+                    if prev_ct is None or (cur_ct is not None and cur_ct > prev_ct):
+                        best_by_exam[eid] = {"exam": exam, "class_exam": ce, "result": res, "speed": speed_val}
+                except Exception:
+                    pass
+
+    out = []
+    for eid, info in best_by_exam.items():
+        exam = info["exam"]
+        ce = info.get("class_exam")
+        res = info.get("result")
+        out.append({
+            "result_id": getattr(res, "result_id", None),
+            "exam_id": getattr(res, "exam_id", None),
+            "exam_title": getattr(exam, "title", None),
+            "exam_description": getattr(exam, "description", None),
+            "exam_date": getattr(ce, "exam_date", None),
+            "step": getattr(res, "step", None),
+            "start_time": getattr(res, "start_time", None),
+            "end_time": getattr(res, "end_time", None),
+            "avg_speed": _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None)),
+            "created_at": getattr(res, "created_at", None),
+        })
+
+    return {"user": {
+        "user_id": user.user_id,
+        "user_name": user.user_name,
+        "full_name": user.full_name,
+        "email": user.email,
+        "phone_number": user.phone_number,
+        "user_code": user.user_code,
+    }, "results": out}
 
 
 @router.get("/{class_id}/user/{user_id}/exam/{exam_id}/results")
@@ -364,6 +509,7 @@ def get_user_exam_result_in_class(
             "step": getattr(res, "step", None),
             "start_time": getattr(res, "start_time", None),
             "end_time": getattr(res, "end_time", None),
+            "avg_speed": _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None)),
             "created_at": getattr(res, "created_at", None),
         })
 
@@ -425,6 +571,7 @@ def get_class_exam_results(
             "step": getattr(res, "step", None),
             "start_time": getattr(res, "start_time", None),
             "end_time": getattr(res, "end_time", None),
+            "avg_speed": _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None)),
             "created_at": getattr(res, "created_at", None),
         })
 
@@ -499,10 +646,195 @@ def get_class_exam_results_grouped_by_user(
                 "step": getattr(res, "step", None),
                 "start_time": getattr(res, "start_time", None),
                 "end_time": getattr(res, "end_time", None),
+                "avg_speed": _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None)),
                 "created_at": getattr(res, "created_at", None),
             })
 
     # Convert grouped dict to list
+    out = list(grouped.values())
+    return {"count": len(out), "items": out}
+
+
+@router.get("/{class_id}/exam/{exam_id}/results/by-user/top")
+def get_class_exam_top_result_by_user(
+    class_id: int,
+    exam_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Any:
+    """Return, for each enrolled user in the class, the single result with the highest avg_speed
+    for the specified exam. Access: admin or the class teacher.
+    """
+    # Validate class and exam
+    db_class = db.get(Class, class_id)
+    if not db_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    exam = db.get(Exam, exam_id)
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+
+    # Ensure exam is linked to this class
+    linked = db.exec(select(ClassExam).where((ClassExam.class_id == class_id) & (ClassExam.exam_id == exam_id))).first()
+    if not linked:
+        raise HTTPException(status_code=404, detail="Exam is not linked to this class")
+
+    # Permission: only admin or the class teacher
+    if not (current_user.user_role == UserRole.admin or db_class.teacher_id == current_user.user_id):
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    # Query users enrolled in class left-joined with results for the exam
+    stmt = (
+        select(User, Result)
+        .join(UserClass, User.user_id == UserClass.user_id)
+        .outerjoin(Result, (Result.user_id == User.user_id) & (Result.exam_id == exam_id))
+        .where(UserClass.class_id == class_id)
+        .order_by(User.full_name)
+        .offset(skip)
+        .limit(limit)
+    )
+
+    rows = db.exec(stmt).all()
+
+    # For each user pick the result with highest avg_speed (tie-breaker: latest created_at)
+    grouped = {}
+    for user_obj, res in rows:
+        uid = user_obj.user_id
+        if uid not in grouped:
+            grouped[uid] = {
+                "user": {
+                    "user_id": user_obj.user_id,
+                    "user_name": user_obj.user_name,
+                    "full_name": user_obj.full_name,
+                    "email": user_obj.email,
+                    "phone_number": user_obj.phone_number,
+                    "user_code": user_obj.user_code,
+                },
+                "top_result": None,
+                "_top_speed": None,
+            }
+
+        if res is None:
+            continue
+
+        speed = _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None))
+        # treat missing speed as -1 so any valid speed beats it
+        speed_val = speed if speed is not None else -1.0
+
+        current_best = grouped[uid]["_top_speed"]
+        if current_best is None or speed_val > current_best:
+            grouped[uid]["_top_result"] = res
+            grouped[uid]["_top_speed"] = speed_val
+        elif speed_val == current_best:
+            # tie-breaker: prefer the more recent created_at
+            prev = grouped[uid].get("_top_result")
+            try:
+                prev_ct = getattr(prev, "created_at", None)
+                cur_ct = getattr(res, "created_at", None)
+                if prev_ct is None or (cur_ct is not None and cur_ct > prev_ct):
+                    grouped[uid]["_top_result"] = res
+            except Exception:
+                pass
+
+    out = []
+    for uid, info in grouped.items():
+        top = info.get("_top_result")
+        if top is None:
+            out.append({"user": info["user"], "result": None})
+        else:
+            out.append({
+                "user": info["user"],
+                "result": {
+                    "result_id": getattr(top, "result_id", None),
+                    "exam_id": getattr(top, "exam_id", None),
+                    "step": getattr(top, "step", None),
+                    "start_time": getattr(top, "start_time", None),
+                    "end_time": getattr(top, "end_time", None),
+                    "avg_speed": _compute_avg_speed(getattr(top, "start_time", None), getattr(top, "end_time", None)),
+                    "created_at": getattr(top, "created_at", None),
+                }
+            })
+
+    return {"count": len(out), "items": out}
+
+
+@router.get("/{class_id}/exams/results/by-user")
+def get_selected_exams_results_by_user(
+    class_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Any:
+    """Return results for exams with ids [1,2,3] for all users in the class.
+
+    For each enrolled user return user info and a list of results for the
+    selected exams (may be empty). Access: admin or the class teacher.
+    """
+    # Validate class
+    db_class = db.get(Class, class_id)
+    if not db_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    # Permission: admin or the class teacher
+    if not (current_user.user_role == UserRole.admin or db_class.teacher_id == current_user.user_id):
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    # Fixed set of exam IDs requested by the user story
+    requested_exam_ids = [1, 2, 3]
+
+    # Determine which of the requested exams are linked to this class
+    rows = db.exec(select(ClassExam.exam_id).where((ClassExam.class_id == class_id) & (ClassExam.exam_id.in_(requested_exam_ids)))).all()
+    linked_ids = [r[0] if isinstance(r, tuple) else r for r in rows]
+    if not linked_ids:
+        # none of the requested exams are linked to this class
+        raise HTTPException(status_code=404, detail="Requested exams are not linked to this class")
+
+    # Query users enrolled in class left-joined with results for the selected exams
+    stmt = (
+        select(User, Result, Exam, ClassExam)
+        .join(UserClass, User.user_id == UserClass.user_id)
+        .outerjoin(Result, (Result.user_id == User.user_id) & (Result.exam_id.in_(linked_ids)))
+        .outerjoin(Exam, Result.exam_id == Exam.exam_id)
+        .outerjoin(ClassExam, (ClassExam.exam_id == Exam.exam_id) & (ClassExam.class_id == class_id))
+        .where(UserClass.class_id == class_id)
+        .order_by(User.full_name)
+        .offset(skip)
+        .limit(limit)
+    )
+
+    rows = db.exec(stmt).all()
+
+    grouped = {}
+    for user_obj, res, ex, ce in rows:
+        uid = user_obj.user_id
+        if uid not in grouped:
+            grouped[uid] = {
+                "user": {
+                    "user_id": user_obj.user_id,
+                    "user_name": user_obj.user_name,
+                    "full_name": user_obj.full_name,
+                    "email": user_obj.email,
+                    "phone_number": user_obj.phone_number,
+                    "user_code": user_obj.user_code,
+                },
+                "results": []
+            }
+        if res is not None:
+            grouped[uid]["results"].append({
+                "result_id": getattr(res, "result_id", None),
+                "exam_id": getattr(res, "exam_id", None),
+                "exam_title": getattr(ex, "title", None),
+                "exam_date": getattr(ce, "exam_date", None),
+                "step": getattr(res, "step", None),
+                "start_time": getattr(res, "start_time", None),
+                "end_time": getattr(res, "end_time", None),
+                "avg_speed": _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None)),
+                "created_at": getattr(res, "created_at", None),
+            })
+
     out = list(grouped.values())
     return {"count": len(out), "items": out}
 
