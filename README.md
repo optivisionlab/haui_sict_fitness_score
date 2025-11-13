@@ -69,7 +69,7 @@ Trong file `app/core/config.py`, thuộc tính `DATABASE_URL` hiện đang trả
 ## 5) Chạy ứng dụng (development)
 
 ```bash
-python uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 - Health check: http://localhost:8000/health
 - Root: http://localhost:8000/
