@@ -1,0 +1,6 @@
+WORKDIR /app
+
+RUN pip install redis && pip install fastapi uvicorn
+
+COPY src/ ./src/
+
