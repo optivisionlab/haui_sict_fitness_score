@@ -778,9 +778,16 @@ def get_selected_exams_results_by_user(
     if not db_class:
         raise HTTPException(status_code=404, detail="Class not found")
 
-    # Permission: admin or the class teacher
-    if not (current_user.user_role == UserRole.admin or db_class.teacher_id == current_user.user_id):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+    # Permission: admin or the class teacher can view all users' results.
+    # A regular enrolled user may call this endpoint but will only receive their own data.
+    view_all = False
+    if current_user.user_role == UserRole.admin or db_class.teacher_id == current_user.user_id:
+        view_all = True
+    else:
+        # ensure the caller is enrolled in the class before allowing access to their own data
+        enrolled = db.exec(select(UserClass).where((UserClass.class_id == class_id) & (UserClass.user_id == current_user.user_id))).first()
+        if not enrolled:
+            raise HTTPException(status_code=403, detail="Not enough permissions")
 
     # Fixed set of exam IDs requested by the user story
     requested_exam_ids = [1, 2, 3]
@@ -800,10 +807,13 @@ def get_selected_exams_results_by_user(
         .outerjoin(Exam, Result.exam_id == Exam.exam_id)
         .outerjoin(ClassExam, (ClassExam.exam_id == Exam.exam_id) & (ClassExam.class_id == class_id))
         .where(UserClass.class_id == class_id)
-        .order_by(User.full_name)
-        .offset(skip)
-        .limit(limit)
     )
+
+    # If the caller is not allowed to view all, restrict to their own enrollment
+    if not view_all:
+        stmt = stmt.where(UserClass.user_id == current_user.user_id)
+
+    stmt = stmt.order_by(User.full_name).offset(skip).limit(limit)
 
     rows = db.exec(stmt).all()
 
