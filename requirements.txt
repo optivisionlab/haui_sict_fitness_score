@@ -11,3 +11,6 @@ python-dotenv>=1.0.0
 pydantic-settings>=2.0.3
 bcrypt>=4.0.1
 alembic>=1.11.1
+redis>=4.6.0
+hiredis>=2.0.0
+sqlalchemy_utils
