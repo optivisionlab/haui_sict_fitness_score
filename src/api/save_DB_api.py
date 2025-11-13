@@ -9,7 +9,7 @@ import json
 from typing import List, Optional
 from src.depend.depend import BatchTrackRequest
 import uvicorn
-
+from src.config.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -19,10 +19,10 @@ from src.database.sql_model import PostgresHandler
 # ================== CONFIG ==================
 # Kết nối Redis
 redis_client = redis.Redis(
-    host='10.100.200.119',
-    port=6379,
+    host=REDIS_HOST,
+    port=REDIS_PORT,
     db=0,
-    password='optivisionlab',
+    password=REDIS_PASSWORD,
     decode_responses=True
 )
 
