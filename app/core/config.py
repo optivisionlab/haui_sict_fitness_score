@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import model_validator
 from functools import lru_cache
 from urllib.parse import quote_plus
 
@@ -14,15 +15,20 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str
     POSTGRES_PORT: str
     POSTGRES_DB: str
+    # Redis configuration
+    REDIS_HOST: str = "10.100.200.119"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_PASSWORD: str | None = None
+    REDIS_DECODE_RESPONSES: bool = True
+    # Redis server notify-keyspace-events config string. Example values:
+    # - "Eh"  : publish keyevent notifications for hash events (hset/hdel)
+    # - "KEA" : publish keyspace and keyevent notifications for all event types
+    # Default is conservative (hash keyevents + generic events may be added by env).
+    REDIS_NOTIFY_EVENTS: str = "KEA"
 
     @property
     def DATABASE_URL(self) -> str:
-        """Build a properly quoted SQLAlchemy URL for Postgres.
-
-        We quote the user and password using urllib.parse.quote_plus so
-        special characters (for example '@' in the password) are encoded
-        and won't break the URL parsing.
-        """
         user = quote_plus(self.POSTGRES_USER)
         password = quote_plus(self.POSTGRES_PASSWORD)
         return (
@@ -36,6 +42,25 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+
+    @model_validator(mode="before")
+    def _strip_empty_env_values(cls, values: dict) -> dict:
+        """Pre-processor: remove empty-string env values so defaults are used.
+
+        Pydantic will attempt to parse an empty string into numeric fields and raise.
+        Many editors or CI tools sometimes write lines like `FOO=` which produce an
+        empty-string value; dropping those entries here makes Settings fall back to
+        the field default instead of attempting to parse an empty string.
+        """
+        if not isinstance(values, dict):
+            return values
+        cleaned = {}
+        for k, v in values.items():
+            # drop empty strings (after stripping) so defaults apply
+            if isinstance(v, str) and v.strip() == "":
+                continue
+            cleaned[k] = v
+        return cleaned
 
 @lru_cache()
 def get_settings():
