@@ -5,6 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from app.core.config import settings
 from app.core.database import init_db, engine
+from app.core.database import configure_redis_notifications
+import asyncio
+from app.core.redis_dispatcher import run_background
 from app.api.endpoints import api_router
 
 
@@ -19,6 +22,10 @@ app = FastAPI(
     version=settings.VERSION,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
+
+# Background dispatcher handles global Redis -> per-user republish
+_redis_dispatcher_task: asyncio.Task | None = None
+_redis_dispatcher_stop: asyncio.Event | None = None
 
 
 # Request logging middleware (logs method, path, status and duration)
@@ -53,13 +60,31 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     # create DB tables if necessary
     try:
         init_db()
     except Exception:
         # don't crash startup on DB init problems here; surface later on real requests
         logger.exception("Database initialization failed at startup")
+
+    # Ensure Redis will emit keyspace/keyevent notifications required by our SSE
+    try:
+        configure_redis_notifications()
+    except Exception:
+        logger.exception("Failed to configure Redis keyspace notifications during startup")
+
+    # Start global Redis dispatcher as a background task. It listens for keyevents
+    # and republishes messages to per-user channels so SSE clients can subscribe
+    # to a small, dedicated channel.
+    try:
+        global _redis_dispatcher_task, _redis_dispatcher_stop
+        if _redis_dispatcher_task is None:
+            _redis_dispatcher_stop = asyncio.Event()
+            _redis_dispatcher_task = asyncio.create_task(run_background(_redis_dispatcher_stop))
+            logger.info("Started redis_dispatcher background task")
+    except Exception:
+        logger.exception("Failed to start redis dispatcher")
 
     # Log all registered routes for visibility
     try:
@@ -113,3 +138,22 @@ app.openapi = custom_openapi
 @app.get("/")
 def read_root():
     return {"status": "ok", "project": settings.PROJECT_NAME}
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    """Stop the redis dispatcher background task cleanly."""
+    global _redis_dispatcher_task, _redis_dispatcher_stop
+    try:
+        if _redis_dispatcher_stop is not None:
+            _redis_dispatcher_stop.set()
+        if _redis_dispatcher_task is not None:
+            # give it a short timeout to exit
+            await asyncio.wait_for(_redis_dispatcher_task, timeout=3.0)
+    except asyncio.TimeoutError:
+        try:
+            _redis_dispatcher_task.cancel()
+        except Exception:
+            pass
+    except Exception:
+        logger.exception("Error while shutting down redis dispatcher")
