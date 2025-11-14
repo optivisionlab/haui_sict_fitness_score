@@ -7,8 +7,41 @@ from sqlalchemy.exc import IntegrityError
 from app.models.result import Result
 from app.models.exams import Exam
 from app.models.user import User
-from app.schemas.exams import ResultCreate, ResultUpdate
+from app.schemas.results import ResultCreate, ResultUpdate
 
+
+DISTANCE = 3 #km
+
+def compute_avg_speed(start_time, end_time, lap: int = 1, distance_km: float = DISTANCE) -> Optional[float]:
+    """Compute average speed.
+
+    Formula: avg_speed = (distance_km * lap) / hours
+
+    Returns rounded float (2 decimals) or None when unavailable.
+    """
+    if not start_time or not end_time:
+        return None
+    try:
+        # support both datetime objects and ISO strings
+        if isinstance(start_time, str):
+            s = datetime.fromisoformat(start_time)
+        else:
+            s = start_time
+        if isinstance(end_time, str):
+            e = datetime.fromisoformat(end_time)
+        else:
+            e = end_time
+
+        secs = (e - s).total_seconds()
+        if secs <= 0:
+            return None
+        hours = secs / 3600.0
+        total_distance = distance_km * (lap or 1)
+        speed = total_distance / hours
+        return round(speed, 2)
+    except Exception:
+        return None
+    
 
 def get_result(db: Session, result_id: int) -> Optional[Result]:
     return db.get(Result, result_id)
@@ -96,7 +129,7 @@ def update_result(db: Session, result_id: int, result_in: ResultUpdate) -> Resul
     # If updating any of user_id, exam_id or step we must ensure the
     # uniqueness constraint (user_id, exam_id, step) is preserved.
     # Reject explicit nulls for non-nullable DB columns to avoid IntegrityError.
-    for required_field in ("user_id", "exam_id", "step"):
+    for required_field in ("user_id", "exam_id", "step", "lap"):
         if required_field in data and data[required_field] is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
