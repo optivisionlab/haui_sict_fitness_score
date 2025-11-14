@@ -6,7 +6,7 @@ from app.core.security import get_current_user
 from app.models.user import User, UserRole
 from app.models.classes import Class, UserClass
 from app.models.exams import ClassExam
-from app.schemas.exams import ResultCreate, ResultRead
+from app.schemas.results import ResultCreate, ResultRead
 from app.services import result_service
 
 router = APIRouter()

@@ -10,41 +10,12 @@ from app.models.exams import Exam, ClassExam
 from app.models.result import Result
 from app.schemas.classes import ClassCreate, ClassRead, ClassUpdate
 from app.schemas.exams import ExamCreate, ExamRead
-from app.services import exam_service
+from app.services.result_service import compute_avg_speed
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
-
-DISTANCE = 2
-
 from datetime import datetime
 
 
-def _compute_avg_speed(start_time, end_time, distance_km: float = DISTANCE) -> Optional[float]:
-    """Compute average speed (distance_km / hours) from start and end datetimes.
-
-    Returns rounded float (2 decimals) or None when unavailable.
-    """
-    if not start_time or not end_time:
-        return None
-    try:
-        # support both datetime objects and ISO strings
-        if isinstance(start_time, str):
-            s = datetime.fromisoformat(start_time)
-        else:
-            s = start_time
-        if isinstance(end_time, str):
-            e = datetime.fromisoformat(end_time)
-        else:
-            e = end_time
-
-        secs = (e - s).total_seconds()
-        if secs <= 0:
-            return None
-        hours = secs / 3600.0
-        speed = distance_km / hours
-        return round(speed, 2)
-    except Exception:
-        return None
 
 router = APIRouter()
 
@@ -315,9 +286,10 @@ def get_user_results_in_class(
             "result_id": getattr(res, "result_id", None),
             "exam_id": getattr(res, "exam_id", None),
             "step": getattr(res, "step", None),
+            "lap": getattr(res, "lap", None),
             "start_time": getattr(res, "start_time", None),
             "end_time": getattr(res, "end_time", None),
-            "avg_speed": _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None)),
+            "avg_speed": compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None), getattr(res, "lap", 1)),
             "created_at": getattr(res, "created_at", None),
             "updated_at": getattr(res, "updated_at", None),
             "exam": {
@@ -393,7 +365,9 @@ def get_user_exams_results_in_class(
         if eid is None:
             continue
 
-        speed = _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None))
+        # compute avg speed for this attempt using lap if present
+        lap_val = getattr(res, "lap", 1) or 1
+        speed = compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None), lap_val)
         speed_val = speed if speed is not None else -1.0
 
         cur = best_by_exam.get(eid)
@@ -431,9 +405,10 @@ def get_user_exams_results_in_class(
             "exam_description": getattr(exam, "description", None),
             "exam_date": getattr(ce, "exam_date", None),
             "step": getattr(res, "step", None),
+            "lap": getattr(res, "lap", None),
             "start_time": getattr(res, "start_time", None),
             "end_time": getattr(res, "end_time", None),
-            "avg_speed": _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None)),
+            "avg_speed": compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None), getattr(res, "lap", 1)),
             "created_at": getattr(res, "created_at", None),
         })
 
@@ -507,9 +482,10 @@ def get_user_exam_result_in_class(
             "class_id": getattr(cl, "class_id", None),
             "class_name": getattr(cl, "class_name", None),
             "step": getattr(res, "step", None),
+            "lap": getattr(res, "lap", None),
             "start_time": getattr(res, "start_time", None),
             "end_time": getattr(res, "end_time", None),
-            "avg_speed": _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None)),
+            "avg_speed": compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None), getattr(res, "lap", 1)),
             "created_at": getattr(res, "created_at", None),
         })
 
@@ -569,9 +545,10 @@ def get_class_exam_results(
             "full_name": getattr(us, "full_name", None),
             "exam_id": getattr(res, "exam_id", None),
             "step": getattr(res, "step", None),
+            "lap": getattr(res, "lap", None),
             "start_time": getattr(res, "start_time", None),
             "end_time": getattr(res, "end_time", None),
-            "avg_speed": _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None)),
+            "avg_speed": compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None), getattr(res, "lap", 1)),
             "created_at": getattr(res, "created_at", None),
         })
 
@@ -644,9 +621,10 @@ def get_class_exam_results_grouped_by_user(
                 "result_id": getattr(res, "result_id", None),
                 "exam_id": getattr(res, "exam_id", None),
                 "step": getattr(res, "step", None),
+                "lap": getattr(res, "lap", None),
                 "start_time": getattr(res, "start_time", None),
                 "end_time": getattr(res, "end_time", None),
-                "avg_speed": _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None)),
+                "avg_speed": compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None), getattr(res, "lap", 1)),
                 "created_at": getattr(res, "created_at", None),
             })
 
@@ -719,7 +697,7 @@ def get_class_exam_top_result_by_user(
         if res is None:
             continue
 
-        speed = _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None))
+        speed = compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None), getattr(res, "lap", 1))
         # treat missing speed as -1 so any valid speed beats it
         speed_val = speed if speed is not None else -1.0
 
@@ -750,9 +728,10 @@ def get_class_exam_top_result_by_user(
                     "result_id": getattr(top, "result_id", None),
                     "exam_id": getattr(top, "exam_id", None),
                     "step": getattr(top, "step", None),
+                    "lap": getattr(top, "lap", None),
                     "start_time": getattr(top, "start_time", None),
                     "end_time": getattr(top, "end_time", None),
-                    "avg_speed": _compute_avg_speed(getattr(top, "start_time", None), getattr(top, "end_time", None)),
+                    "avg_speed": compute_avg_speed(getattr(top, "start_time", None), getattr(top, "end_time", None), getattr(top, "lap", 1)),
                     "created_at": getattr(top, "created_at", None),
                 }
             })
@@ -839,9 +818,10 @@ def get_selected_exams_results_by_user(
                 "exam_title": getattr(ex, "title", None),
                 "exam_date": getattr(ce, "exam_date", None),
                 "step": getattr(res, "step", None),
+                "lap": getattr(res, "lap", None),
                 "start_time": getattr(res, "start_time", None),
                 "end_time": getattr(res, "end_time", None),
-                "avg_speed": _compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None)),
+                "avg_speed": compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None), getattr(res, "lap", 1)),
                 "created_at": getattr(res, "created_at", None),
             })
 
