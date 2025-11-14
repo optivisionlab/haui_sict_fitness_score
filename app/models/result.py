@@ -11,8 +11,11 @@ class ResultBase(SQLModel):
     exam_id: int = Field(
         sa_column=Column(ForeignKey("exams.exam_id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
     )
+
     # step is non-nullable in DB and must be provided/assigned by service; default to 1
     step: int = Field(default=1, sa_column=Column(Integer, nullable=False))
+    # lap: number of laps (non-nullable integer, default 1)
+    lap: int = Field(default=1, sa_column=Column(Integer, nullable=False))
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 
