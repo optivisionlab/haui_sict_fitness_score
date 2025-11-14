@@ -1,6 +1,7 @@
 from .users import UserCreate, UserRead, UserUpdate, UserLogin, Token, TokenData
 from .classes import ClassCreate, ClassRead, ClassUpdate
-from .exams import ExamCreate, ExamRead, ExamUpdate, ResultCreate, ResultRead, ResultUpdate
+from .exams import ExamCreate, ExamRead, ExamUpdate
+from .results import ResultCreate, ResultRead, ResultUpdate
 
 __all__ = [
     "UserCreate", "UserRead", "UserUpdate", "UserLogin", "Token", "TokenData",
