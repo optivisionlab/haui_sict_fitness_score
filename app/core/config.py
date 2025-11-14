@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings
-from pydantic import model_validator
 from functools import lru_cache
 from urllib.parse import quote_plus
 
@@ -42,29 +41,9 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
-
-    @model_validator(mode="before")
-    def _strip_empty_env_values(cls, values: dict) -> dict:
-        """Pre-processor: remove empty-string env values so defaults are used.
-
-        Pydantic will attempt to parse an empty string into numeric fields and raise.
-        Many editors or CI tools sometimes write lines like `FOO=` which produce an
-        empty-string value; dropping those entries here makes Settings fall back to
-        the field default instead of attempting to parse an empty string.
-        """
-        if not isinstance(values, dict):
-            return values
-        cleaned = {}
-        for k, v in values.items():
-            # drop empty strings (after stripping) so defaults apply
-            if isinstance(v, str) and v.strip() == "":
-                continue
-            cleaned[k] = v
-        return cleaned
-
+        
 @lru_cache()
 def get_settings():
-    print(Settings())
     return Settings()
 
 settings = get_settings()
