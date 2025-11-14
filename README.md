@@ -3,10 +3,10 @@
 Hướng dẫn nhanh để thiết lập và chạy project "Fitness Score API" (FastAPI).
 
 ## Yêu cầu
-- Python 3.8+ (khuyến nghị 3.10+)
+- Python 3.10+
 - git
-- Kết nối PostgreSQL sẵn có (host/port/user/password/db)
-
+- Kết nối PostgreSQL
+- Kết nối Redis
 ## 1) Clone repository
 
 Mở terminal và chạy:
@@ -21,7 +21,7 @@ cd haui_sict_fitness_score
 Trên Linux/macOS:
 
 ```bash
-python3 -m venv .venv
+python3.10 -m venv .venv
 source .venv/bin/activate
 ```
 
