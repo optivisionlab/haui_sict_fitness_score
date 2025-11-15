@@ -949,3 +949,47 @@ def add_exam_to_class(
     return JSONResponse(status_code=status.HTTP_201_CREATED, content={"message": "Exam added successfully"})
 
 
+@router.get("/{class_id}/exams")
+def get_exams_for_class(
+    class_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Any:
+    """Return all exams linked to a class including the exam_date stored on the link (class_exam).
+
+    Access: admin, class teacher, or any enrolled student.
+    Returns JSON: {"count": int, "items": [ {exam_id, title, description, exam_date}, ... ] }
+    """
+    db_class = db.get(Class, class_id)
+    if not db_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    # Permission: admin, teacher of class, or enrolled student
+    if not (
+        current_user.user_role == UserRole.admin
+        or db_class.teacher_id == current_user.user_id
+        or db.exec(select(UserClass).where((UserClass.class_id == class_id) & (UserClass.user_id == current_user.user_id))).first()
+    ):
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    # Query exams linked to this class and include the exam_date from ClassExam
+    q = (
+        select(Exam, ClassExam)
+        .join(ClassExam, Exam.exam_id == ClassExam.exam_id)
+        .where(ClassExam.class_id == class_id)
+        .order_by(ClassExam.exam_date)
+    )
+
+    rows = db.exec(q).all()
+    items = []
+    for exam, ce in rows:
+        items.append({
+            "exam_id": getattr(exam, "exam_id", None),
+            "title": getattr(exam, "title", None),
+            "description": getattr(exam, "description", None),
+            "exam_date": getattr(ce, "exam_date", None),
+        })
+
+    return {"count": len(items), "items": items}
+
+
