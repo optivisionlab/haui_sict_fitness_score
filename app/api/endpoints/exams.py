@@ -1,5 +1,5 @@
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlmodel import Session, select
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -21,6 +21,7 @@ from app.services import exam_service, result_service
 from datetime import datetime
 import httpx
 from app.services.result_service import compute_avg_speed
+from pydantic import BaseModel, Field
 
 
 
@@ -285,53 +286,69 @@ def delete_result(
 
 
 
-@router.post("/exam/{exam_id}/user/{user_id}/{action}")
-async def handle_exam_action(exam_id: int, user_id: int, action: str):
-    """
-    action: 'start' hoặc 'end'
-    This endpoint proxies a local API call and forwards the data to an external service.
-    """
-    if action not in ["start", "end"]:
-        raise HTTPException(status_code=400, detail="Hành động không hợp lệ (chỉ cho phép: start hoặc end)")
+class BatchUserPayload(BaseModel):
+	# The external API expects string IDs in the example payload; accept them as strings
+	user_id: str = Field(..., description="User identifier as string")
+	exam_id: str = Field(..., description="Exam identifier as string")
+	step: int = Field(..., ge=1, description="Step number (positive integer)")
+	start_time: Optional[str] = Field(None, description="ISO datetime string for start action")
+	end_time: Optional[str] = Field(None, description="ISO datetime string for end action")
 
-    # Step 1: fetch data from the local/internal API
-    local_api_url = f"https://127.0.0.1:3000/exam/{exam_id}/user/{user_id}/result-time"
 
-    try:
-        async with httpx.AsyncClient(verify=False) as client:
-            response = await client.get(local_api_url)
-            response.raise_for_status()
-            data = response.json()
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi khi gọi API nội bộ: {e}")
+@router.post("/{exam_id}/user/{user_id}/{step}/{action}")
+async def handle_exam_action(
+	exam_id: int,
+	user_id: int,
+	step: int,
+	action: str,
+	payload: BatchUserPayload = Body(..., description="Payload containing user_id, exam_id and either start_time or end_time depending on action"),
+):
+	"""
+	action: 'start' hoặc 'end'
+	This endpoint forwards the provided payload to an external service. It no longer
+	calls any local API — the caller must include the necessary fields in the request body.
+	"""
+	if action not in ["start", "end"]:
+		raise HTTPException(status_code=400, detail="Hành động không hợp lệ (chỉ cho phép: start hoặc end)")
 
-    # Step 2: build payload
-    payload = {
-        "user_id": data.get("user_id"),
-        "exam_id": data.get("exam_id"),
-    }
+	# NOTE: request body is authoritative per new contract. We'll use payload values directly.
+	# Validate that path params are present (they are required by route) but do not override body.
+	# Pydantic already validated step >= 1 and required fields; still check action value.
 
-    # Attach start_time or end_time depending on action
-    time_key = f"{action}_time"
-    if time_key not in data:
-        raise HTTPException(status_code=400, detail=f"Thiếu {time_key} trong dữ liệu nội bộ")
-    payload[time_key] = data[time_key]
+	# Ensure required action-specific time exists and build user_record
+	if action == "start" and not payload.start_time:
+		raise HTTPException(status_code=400, detail="Thiếu start_time trong payload")
+	if action == "end" and not payload.end_time:
+		raise HTTPException(status_code=400, detail="Thiếu end_time trong payload")
 
-    # Step 3: forward to external API
-    external_api_url = "http://10.100.200.119:8001/default"
+	user_record = {
+		"user_id": str(payload.user_id),
+		"exam_id": str(payload.exam_id),
+		"step": int(payload.step),
+	}
+	if payload.start_time:
+		user_record["start_time"] = payload.start_time
+	if payload.end_time:
+		user_record["end_time"] = payload.end_time
 
-    try:
-        async with httpx.AsyncClient() as client:
-            send_response = await client.post(external_api_url, json=payload)
-            send_response.raise_for_status()
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi khi gửi dữ liệu ra API bên ngoài: {e}")
+	batch_payload = {"users": [user_record]}
 
-    return {
-        "message": f"Đã xử lý hành động '{action}' thành công!",
-        "sent_data": payload,
-        "external_response": send_response.json(),
-    }
+	# forward to external API (batch format)
+	external_api_url = "http://10.100.200.119:8001/track_batch"
+
+	try:
+		async with httpx.AsyncClient() as client:
+			send_response = await client.post(external_api_url, json=batch_payload)
+			send_response.raise_for_status()
+			external_json = send_response.json()
+	except httpx.HTTPError as e:
+		raise HTTPException(status_code=500, detail=f"Lỗi khi gửi dữ liệu ra API bên ngoài: {e}")
+
+	return {
+		"message": f"Đã xử lý hành động '{action}' thành công!",
+		"sent_data": batch_payload,
+		"external_response": external_json,
+	}
 
 @router.get("/{exam_id}/user/{user_id}/results")
 def get_user_result_history(
