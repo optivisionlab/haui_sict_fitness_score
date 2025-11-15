@@ -1,7 +1,8 @@
-from sqlmodel import SQLModel, Field, create_engine, Session, select
+from sqlmodel import SQLModel, Field, create_engine, Session, select, UniqueConstraint
 from datetime import datetime
 from loguru import logger
-
+from sqlalchemy import case, MetaData, Table
+from sqlalchemy.dialects.postgresql import insert
 
 
 # --- Định nghĩa model ORM ---
@@ -10,10 +11,12 @@ class Results(SQLModel, table=True):
     user_id: str
     exam_id: str | None = None
     step: int
+    lap: int
     start_time: datetime
     end_time: datetime
-    created_at: datetime
-    updated_at: datetime
+    __table_args__ = (
+            UniqueConstraint("user_id", "exam_id", "step", name="uq_user_exam_step"),
+        )
 
 
 
@@ -26,38 +29,35 @@ class PostgresHandler:
         SQLModel.metadata.create_all(self.engine)
 
 
-    def insert_lap(self, user_id, lap_number, start_time, end_time, exam_id, created_at, updated_at, result_id):
-        with Session(self.engine) as session:
-            lap = Results(
-                user_id=user_id,
-                exam_id=exam_id,
-                lap_number=lap_number,
-                start_time=start_time,
-                end_time=end_time,
-                created_at=created_at,
-                updated_at=updated_at,
-                result_id=result_id
-            )
-            session.add(lap)
-            session.commit()
+    def insert_or_update_lap(self, user_id, exam_id, step, lap_number, start_time, end_time=None):
+        meta = MetaData()
+        results_table = Table("results", meta, autoload_with=self.engine)
 
+        stmt = insert(results_table).values(
+            user_id=user_id,
+            exam_id=exam_id,
+            step=step,
+            lap=lap_number,
+            start_time=start_time,
+            end_time=end_time
+        )
 
-    def get_last_lap(self, user_id: str):
-        with Session(self.engine) as session:
-            statement = select(Results).where(Results.user_id == user_id).order_by(Results.lap_number.desc())
-            result = session.exec(statement).first()
-            return result
+        update_values = {
+                "lap": lap_number,
+            }
 
-    def update_velocity(self, lap_id: int, new_velocity: float):
-        with Session(self.engine) as session:
-            lap = session.get(Results, lap_id)
-            if lap:
-                lap.velocity = new_velocity
-                session.add(lap)
-                session.commit()
-                logger.info(f"📝 Cập nhật velocity={new_velocity} cho lap_id={lap_id}")
-            else:
-                logger.warning(f"⚠️ Không tìm thấy lap_id={lap_id}")
+            # chỉ update end_time nếu được truyền vào
+        if end_time is not None:
+            update_values["end_time"] = end_time
+
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["user_id", "exam_id", "step"],
+            set_=update_values,
+        )
+
+        with self.engine.begin() as conn:
+            conn.execute(stmt)
+
 
     def delete_lap(self, lap_id: int):
         with Session(self.engine) as session:

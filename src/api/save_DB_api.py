@@ -44,23 +44,25 @@ app = FastAPI()
 async def track_batch(req: BatchTrackRequest):
     results = []
     for u in req.users:
-        user_key = f"user:{u.user_id}:data"
+        start_user_key = f"user:{u.user_id}:data"
         try:
             if u.end_time:
                 # End tracking
-                redis_client.delete(user_key)
+                redis_client.expire(start_user_key, 300)
+                redis_client.hset(start_user_key, "state", "ended")
                 results.append({"user_id": u.user_id, "status": "ended"})
                 continue
 
             if u.exam_id and u.start_time:
                 # Start tracking
                 now = u.start_time.isoformat() if u.start_time else datetime.now().isoformat()
-                redis_client.hset(user_key, mapping={
+                redis_client.hset(start_user_key, mapping={
                     "state": "active",
                     "exam_id": u.exam_id,
-                    "session_start_time": now,
+                    "start_time": now,
                     "lap_number": 0,
                     "flag_1": 0, "flag_2": 0, "flag_3": 0, "flag_4": 0,
+                    "last_cam": -1
                 })
                 results.append({"user_id": u.user_id, "status": "started"})
                 continue
