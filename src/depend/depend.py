@@ -10,6 +10,7 @@ mongo_db = MongoDBManager()
 class UserTrack(BaseModel):
     user_id: str
     exam_id: Optional[str] = None
+    step: Optional[int] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 
