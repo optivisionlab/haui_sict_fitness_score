@@ -14,7 +14,8 @@ from app.services.result_service import compute_avg_speed
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
-
+from loguru import logger
+from sqlalchemy.sql import and_
 
 
 router = APIRouter()
@@ -278,28 +279,36 @@ def get_user_results_in_class(
     )
 
     rows = db.exec(q).all()
-
+    logger.info(f"rows: {rows}")
+    logger.info("row") 
     # rows will be list of tuples (Exam, Result, ClassExam)
     results = []
     for exam, res, ce in rows:
-        results.append({
-            "result_id": getattr(res, "result_id", None),
-            "exam_id": getattr(res, "exam_id", None),
-            "step": getattr(res, "step", None),
-            "lap": getattr(res, "lap", None),
-            "start_time": getattr(res, "start_time", None),
-            "end_time": getattr(res, "end_time", None),
-            "avg_speed": compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None), getattr(res, "lap", 1)),
-            "created_at": getattr(res, "created_at", None),
-            "updated_at": getattr(res, "updated_at", None),
-            "exam": {
-                "exam_id": getattr(exam, "exam_id", None),
-                "title": getattr(exam, "title", None),
-                "description": getattr(exam, "description", None),
+        if res:
+            results.append({
+                "result_id": getattr(res, "result_id", None),
+                "exam_id": getattr(res, "exam_id", None),
+                "step": getattr(res, "step", None),
+                "lap": getattr(res, "lap", None),
+                "start_time": getattr(res, "start_time", None),
+                "end_time": getattr(res, "end_time", None),
+                "avg_speed": compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None), getattr(res, "lap", 1)),
+                "created_at": getattr(res, "created_at", None),
+            })
+        else:
+            results.append({
+                "result_id": None,
+                "exam_id": getattr(ce, "exam_id", None),
+                "exam_title": getattr(exam, "title", None),
+                "exam_description": getattr(exam, "description", None),
                 "exam_date": getattr(ce, "exam_date", None),
-                }
-            }
-        )
+                "step": None,
+                "lap": None,
+                "start_time": None,
+                "end_time": None,
+                "avg_speed": None,
+                "created_at": None,
+            })
 
     user_info = {
         "user_id": user.user_id,
@@ -312,7 +321,6 @@ def get_user_results_in_class(
 
     return {"user": user_info, "results": results}
 
-
 @router.get("/{class_id}/user/{user_id}/exams/results/top")
 def get_user_exams_results_in_class(
     class_id: int,
@@ -322,16 +330,17 @@ def get_user_exams_results_in_class(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Any:
-    """Return a user's results for exams in the given class (exam-level view).
 
-    Access: admin, class teacher, or the user themself.
-    Returns a list of exam+result entries with exam metadata and avg_speed.
+    """Return the user's best results for each exam in a class (exam-level).
+    Access: admin, class teacher, or that same user.
     """
+
+    # --- Validate class ---
     db_class = db.get(Class, class_id)
     if not db_class:
         raise HTTPException(status_code=404, detail="Class not found")
 
-    # Permission check: admin, teacher of class, or the user themself
+    # --- Permission check ---
     if not (
         current_user.user_role == UserRole.admin
         or db_class.teacher_id == current_user.user_id
@@ -339,88 +348,124 @@ def get_user_exams_results_in_class(
     ):
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
+    # --- Validate user ---
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Query: exams linked to the class and results for the user
+    # --- Query: get all exams in this class + their results (if any) for this user ---
     q = (
-        select(Exam, Result, ClassExam)
-        .join(ClassExam, Exam.exam_id == ClassExam.exam_id)
-        .join(Result, Result.exam_id == Exam.exam_id)
-        .where(ClassExam.class_id == class_id, Result.user_id == user_id)
-        .order_by(Result.created_at.desc())
-        .offset(skip)
-        .limit(limit)
+    select(Exam, Result, ClassExam)
+    .join(ClassExam, Exam.exam_id == ClassExam.exam_id)
+    .outerjoin(
+        Result,
+        and_(
+            Result.exam_id == Exam.exam_id,
+            Result.user_id == user_id
+        )
     )
+    .where(ClassExam.class_id == class_id)
+    .order_by(Result.created_at.desc().nullslast())
+    .offset(skip)
+    .limit(limit)
+)
 
     rows = db.exec(q).all()
 
-    # For each exam choose the result attempt with highest avg_speed (tie-breaker: latest created_at)
-    best_by_exam: dict[int, dict] = {}
+    # --- Pick best result per exam ---
+    best_by_exam = {}
+
     for exam, res, ce in rows:
-        if res is None:
-            continue
-        eid = getattr(exam, "exam_id", None)
-        if eid is None:
-            continue
 
-        # compute avg speed for this attempt using lap if present
-        lap_val = getattr(res, "lap", 1) or 1
-        speed = compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None), lap_val)
-        speed_val = speed if speed is not None else -1.0
+        exam_id = exam.exam_id
 
-        cur = best_by_exam.get(eid)
+        # Compute speed if result exists
+        if res:
+            lap_val = res.lap or 1
+            speed_val = compute_avg_speed(res.start_time, res.end_time, lap_val)
+            speed_val = speed_val if speed_val is not None else -1.0
+        else:
+            speed_val = -1.0
+
+        cur = best_by_exam.get(exam_id)
+
         if cur is None:
-            best_by_exam[eid] = {
+            best_by_exam[exam_id] = {
                 "exam": exam,
                 "class_exam": ce,
                 "result": res,
                 "speed": speed_val,
             }
         else:
-            # compare speeds
+            # Compare speed
             if speed_val > cur["speed"]:
-                best_by_exam[eid] = {"exam": exam, "class_exam": ce, "result": res, "speed": speed_val}
-            elif speed_val == cur["speed"]:
-                # tie-breaker: choose later created_at
+                best_by_exam[exam_id] = {
+                    "exam": exam,
+                    "class_exam": ce,
+                    "result": res,
+                    "speed": speed_val,
+                }
+            elif speed_val == cur["speed"] and res:
+                # Tie-breaker: newest created_at
                 prev = cur["result"]
-                try:
-                    prev_ct = getattr(prev, "created_at", None)
-                    cur_ct = getattr(res, "created_at", None)
-                    if prev_ct is None or (cur_ct is not None and cur_ct > prev_ct):
-                        best_by_exam[eid] = {"exam": exam, "class_exam": ce, "result": res, "speed": speed_val}
-                except Exception:
-                    pass
+                prev_ct = getattr(prev, "created_at", None)
+                cur_ct = getattr(res, "created_at", None)
 
+                if prev_ct is None or (cur_ct and cur_ct > prev_ct):
+                    best_by_exam[exam_id] = {
+                        "exam": exam,
+                        "class_exam": ce,
+                        "result": res,
+                        "speed": speed_val,
+                    }
+
+    # --- Build output ---
     out = []
-    for eid, info in best_by_exam.items():
+    for exam_id, info in best_by_exam.items():
         exam = info["exam"]
-        ce = info.get("class_exam")
-        res = info.get("result")
-        out.append({
-            "result_id": getattr(res, "result_id", None),
-            "exam_id": getattr(res, "exam_id", None),
-            "exam_title": getattr(exam, "title", None),
-            "exam_description": getattr(exam, "description", None),
-            "exam_date": getattr(ce, "exam_date", None),
-            "step": getattr(res, "step", None),
-            "lap": getattr(res, "lap", None),
-            "start_time": getattr(res, "start_time", None),
-            "end_time": getattr(res, "end_time", None),
-            "avg_speed": compute_avg_speed(getattr(res, "start_time", None), getattr(res, "end_time", None), getattr(res, "lap", 1)),
-            "created_at": getattr(res, "created_at", None),
-        })
+        ce = info["class_exam"]
+        res = info["result"]
 
-    return {"user": {
-        "user_id": user.user_id,
-        "user_name": user.user_name,
-        "full_name": user.full_name,
-        "email": user.email,
-        "phone_number": user.phone_number,
-        "user_code": user.user_code,
-    }, "results": out}
+        if res:
+            out.append({
+                "result_id": res.result_id,
+                "exam_id": ce.exam_id,
+                "exam_title": exam.title,
+                "exam_description": exam.description,
+                "exam_date": ce.exam_date,
+                "step": res.step,
+                "lap": res.lap,
+                "start_time": res.start_time,
+                "end_time": res.end_time,
+                "avg_speed": compute_avg_speed(res.start_time, res.end_time, res.lap),
+                "created_at": res.created_at,
+            })
+        else:
+            out.append({
+                "result_id": None,
+                "exam_id": ce.exam_id,
+                "exam_title": exam.title,
+                "exam_description": exam.description,
+                "exam_date": ce.exam_date,
+                "step": None,
+                "lap": None,
+                "start_time": None,
+                "end_time": None,
+                "avg_speed": None,
+                "created_at": None,
+            })
 
+    return {
+        "user": {
+            "user_id": user.user_id,
+            "user_name": user.user_name,
+            "full_name": user.full_name,
+            "email": user.email,
+            "phone_number": user.phone_number,
+            "user_code": user.user_code,
+        },
+        "results": out
+    }
 
 @router.get("/{class_id}/user/{user_id}/exam/{exam_id}/results")
 def get_user_exam_result_in_class(
