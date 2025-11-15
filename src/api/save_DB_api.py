@@ -13,7 +13,7 @@ from src.config.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from src.database.sql_model import PostgresHandler
+
 # from src.config.config import POSTGRE_USER, POSTGRE_PASSWORD, POSTGRE_HOST, POSTGRE_PORT, POSTGRE_DB
 
 # ================== CONFIG ==================
