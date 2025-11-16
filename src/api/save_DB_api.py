@@ -14,8 +14,9 @@ from src.config.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.database.sql_model import PostgresHandler
 
-
 from src.config.config import POSTGRE_USER, POSTGRE_PASSWORD, POSTGRE_HOST, POSTGRE_PORT, POSTGRE_DB
+from loguru import logger
+
 
 # ================== CONFIG ==================
 # Kết nối Redis
@@ -53,31 +54,31 @@ app = FastAPI()
 @app.post("/track_batch")
 async def track_batch(req: BatchTrackRequest):
     results = []
+    logger.info(f"Received batch tracking request for {len(req.users)} users.")
     for u in req.users:
         start_user_key = f"user:{u.user_id}:data"
         try:
             if u.end_time:
                 # End tracking
-                stored = redis_client.hgetall(start_user_key)
-                if not stored:
+                data = redis_client.hgetall(start_user_key)
+                if not data:
                     results.append({"user_id": u.user_id, "status": "not_found"})
                     continue
 
                 # Decode Redis bytes → string
-                data = {k.decode(): v.decode() for k, v in stored.items()}
-
-                exam_id    = data.get("exam_id")
-                step       = data.get("step")
-                lap        = data.get("lap")
+                redis_client.hset(start_user_key, "state", "ended")
+                logger.info(f"Data from Redis for user {u.user_id}: {data}")
+                exam_id = int(data.get("exam_id"))
+                step = int(data.get("step"))
+                lap = int(data.get("lap_number"))
                 start_time = data.get("start_time")
-                end_time   = u.end_time   # duy nhất lấy từ request
+                end_time = u.end_time   # duy nhất lấy từ request
 
                 # Update trạng thái
-                redis_client.hset(start_user_key, "state", "ended")
-
+                logger.info(f"User {u.user_id} ended tracking: exam_id={exam_id}, step={step}, lap={lap}, start_time={start_time}, end_time={end_time}")
                 # Ghi DB
                 pg_handler.insert_or_update_lap(
-                    user_id=u.user_id,
+                    user_id=int(u.user_id),
                     exam_id=exam_id,
                     step=step,
                     lap_number=lap,
@@ -93,7 +94,6 @@ async def track_batch(req: BatchTrackRequest):
 
             if u.exam_id and u.start_time:
                 # Start tracking
-                now = u.start_time.isoformat() if u.start_time else datetime.now().isoformat()
                 redis_client.hset(start_user_key, mapping={
                     "state": "active",
                     "exam_id": u.exam_id,
