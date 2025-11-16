@@ -70,7 +70,7 @@ async def track_batch(req: BatchTrackRequest):
                 logger.info(f"Data from Redis for user {u.user_id}: {data}")
                 exam_id = int(data.get("exam_id"))
                 step = int(data.get("step"))
-                lap = int(data.get("lap_number"))
+                lap = int(data.get("lap"))
                 start_time = data.get("start_time")
                 end_time = u.end_time   # duy nhất lấy từ request
 
