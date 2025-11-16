@@ -1,6 +1,6 @@
 WORKDIR /app
 
-RUN pip install redis && pip install fastapi uvicorn
+RUN pip install redis fastapi uvicorn pyyaml pydantic sqlalchemy sqlmodels loguru datetime
 
 COPY src/ ./src/
 

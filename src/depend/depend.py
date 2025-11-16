@@ -1,6 +1,6 @@
 # Load model file
 # from src.database.mongo import MongoDBManager
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -9,10 +9,10 @@ from pydantic import BaseModel
 
 class UserTrack(BaseModel):
     user_id: str
-    exam_id: Optional[str] = None
-    step: Optional[int] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    exam_id: Optional[Any] = None
+    step: Optional[Any] = None
+    start_time: Optional[Any] = None
+    end_time: Optional[Any] = None
 
 class BatchTrackRequest(BaseModel):
     users: List[UserTrack]
