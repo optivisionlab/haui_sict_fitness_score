@@ -12,6 +12,8 @@ from src.config.depend import *
 from fastapi.responses import JSONResponse
 from src.database.qdrant import QdrantVectorStore
 from src.models.search_input_params import StudentTrackingInput
+from src.app.embedding.facenet_embedding import get_embedding
+
 
 qdrant_db = QdrantVectorStore()
 router = APIRouter()
@@ -97,3 +99,24 @@ async def search_face(
     return JSONResponse(content={'status_code' : 200, 'status': "insert oke", "data": result_data}, status_code= status.HTTP_200_OK)
     # else:
     #     return JSONResponse(content={'status_code' : 422, 'status': "Search failt", "data": None}, status_code= status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+@router.post("/faces/emb")
+async def face_emb(
+    images: UploadFile = File(None),
+    image_urls: HttpUrl = Form(None),
+):
+    if images:
+        pil_images = load_image_from_upload(images)
+
+    elif image_urls:
+        pil_images = load_image_from_url(str(image_urls))
+
+    if not pil_images:
+        return {"error": "No valid image input"}
+    
+    emb_list = get_embedding(images=[pil_images], verbose=True)
+    for emb in emb_list:
+        logger.debug("embedidng shape: {}", emb.shape if emb is not None else None)
+        
+    return JSONResponse(content={'status_code' : 200, 'status': "insert oke"}, status_code= status.HTTP_200_OK)
+    

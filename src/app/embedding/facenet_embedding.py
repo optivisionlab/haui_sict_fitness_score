@@ -4,6 +4,7 @@ import torch.nn as nn
 from torchvision.transforms import transforms
 from PIL import Image
 from src.config.depend import resnet_embedding, mtcnn, to_tensor_transform
+from src.config.configs import *
 from typing import Union, List
 import numpy as np
 from loguru import logger
@@ -45,7 +46,7 @@ def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False):
         return [None for _ in range(len(images))]
 
     face_images = torch.stack([
-        to_tensor_transform(Image.fromarray(face)) if isinstance(face, np.ndarray) else to_tensor_transform(face)
+        to_tensor_transform(Image.fromarray(face)).to(DEVICE) if isinstance(face, np.ndarray) else to_tensor_transform(face)
         for face in all_faces
     ])
     all_embeddings = resnet_embedding(face_images)
@@ -60,8 +61,8 @@ def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False):
     return result
 
 if __name__ == "__main__":
-    img1 = Image.open('/u01/quanlm/fitness_tracking/haui_sict_fitness_score/Screenshot 2025-06-12 100448.png')
-    img2 = Image.open('/u01/quanlm/fitness_tracking/haui_sict_fitness_score/Screenshot 2025-06-12 103845.png')
+    img1 = Image.open('../0_9dba134c-4470-496a-9494-1a3b913af951.jpg')
+    img2 = Image.open('../0_9dba134c-4470-496a-9494-1a3b913af951.jpg')
     emb_list = get_embedding(images=[img1, img2], verbose=True)
     for emb in emb_list:
         logger.debug("embedidng shape: {}", emb.shape if emb is not None else None)

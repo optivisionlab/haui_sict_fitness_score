@@ -5,10 +5,10 @@ QDRANT_URL: !ENV ${QDRANT_URL}
 MONGDB_URI : !ENV ${MONGDB_URI} 
 MONGDB_DB : !ENV ${MONGDB_DB}
 
-DEVICE : !ENV ${DEVICE}
+DEVICE: &dev !ENV ${DEVICE}
 
 VECTOR_SIZE: 512
 
 MTCNN_CONFIG:
   image_size: 512
-  device: 'cpu'
+  device: *dev
