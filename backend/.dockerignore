@@ -25,3 +25,9 @@ dist/
 
 # Local env files
 .env
+
+.md
+
+# Dockerfile 
+Dockerfile
+
