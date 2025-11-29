@@ -6,30 +6,81 @@ from loguru import logger
 from ultralytics import YOLO
 from confluent_kafka.admin import AdminClient, NewTopic
 
-from src.tracking.detect import SimpleTracker
-from src.engine.score import GlobalEvaluator
+from src.tracking.detect import SimpleTracker, APIHandler
+from src.engine.score import GlobalEvaluator, SetUpEvaluate
 from src.kafka.kafka_produce import KafkaFrameProducer
 from src.kafka.kafka_consumers import KafkaFrameConsumer
-from src.config.config import KAFKA_SERVERS
+from src.config.config import KAFKA_SERVERS, MONGO_LAPS_COLLECTION
+import json
+from src.engine.engine import draw_target
+import queue
+import gradio as gr
+import threading
+import pandas as pd
+from pymongo import MongoClient
+from src.database.mongo import MongoDBManager
+import redis
+from src.database.sql_model import PostgresHandler
+from urllib.parse import quote_plus
+from datetime import datetime
+
 
 # ================== CONFIG ==================
 MODEL_PATH = "/u01/quanlm/fitness_tracking/haui_sict_fitness_score/yolo11n.pt"
-CAM_IDS = [1, 2, 3, 4]
+CAM_IDS = [1, 2, 3, 4]   # camera id
 TOPIC_TEMPLATE = "camera-{cid}"
-model = YOLO(MODEL_PATH)
-evaluator = GlobalEvaluator(id_run_process=CAM_IDS)
+
+# Kết nối Redis
+redis_client = redis.Redis(
+    host='10.100.200.119',
+    port=6379,
+    db=0,  # mặc định
+    password='optivisionlab',
+    decode_responses=True  # để trả về string thay vì bytes
+)
+
+try:
+    redis_client.ping()
+    print("✅ Kết nối Redis thành công!")
+except redis.ConnectionError as e:
+    print("❌ Kết nối Redis thất bại:", e)
+
+# Kết nối PostgreSQL
+user = "labelstudio"
+password = "Admin@221b"
+host = "10.100.200.119"
+port = 5555
+database = "fitness_db"
+
+encoded_password = quote_plus(password)
+# URL kết nối PostgreSQL
+DB_URL = f"postgresql+psycopg2://{user}:{encoded_password}@{host}:{port}/{database}"
+pg_handler = PostgresHandler(DB_URL)
+
 
 producer_conf = {
-    'bootstrap.servers': KAFKA_SERVERS,
-    'compression.type': 'lz4',
-    'linger.ms': 10,
-    'batch.num.messages': 100000,
-    'message.max.bytes': 10000000,
+    "bootstrap.servers": "10.100.200.119:9098",   # hoặc list broker
+    "acks": "1",                             # nhanh hơn "all"
+    "message.timeout.ms": 60000,             # timeout gửi 60s
+    "delivery.timeout.ms": 120000,           # timeout delivery 120s
+    "socket.timeout.ms": 60000,
+    "request.timeout.ms": 30000,
+    "retries": 5,
+    "max.in.flight.requests.per.connection": 5,
+    "batch.num.messages": 1000,
+    "linger.ms": 10,
+    "compression.type": "lz4",               # giảm size gửi
+    "message.max.bytes": 10485760,            # 10MB (nếu frame lớn)
+    "queue.buffering.max.messages": 200000,
+    "queue.buffering.max.kbytes": 51200,   # 500MB
 }
 
 consumer_conf = {"bootstrap.servers": KAFKA_SERVERS}
 
+# tạo queue cho gradio
 
+# Giả sử bạn có danh sách các camera id
+# Tạo 1 hàng đợi (queue) cho mỗi camera
 # ================== KAFKA UTILS ==================
 def create_topics(cam_ids):
     admin = AdminClient({"bootstrap.servers": KAFKA_SERVERS})
@@ -46,30 +97,43 @@ def create_topics(cam_ids):
             logger.warning(f"⚠️ Topic {t} may already exist: {e}")
 
 
+lap_evaluator = GlobalEvaluator(id_run_process=CAM_IDS, redis_client=redis_client, pg_handler=pg_handler)
+
+
+
 # ================== PRODUCER (Tracker Process) ==================
 def tracker_producer_worker(cid: int, video_path: str):
+    model = YOLO(MODEL_PATH)
     logger.info(f"[Producer-{cid}] start with video={video_path}")
 
     topic = TOPIC_TEMPLATE.format(cid=cid)
-    producer = KafkaFrameProducer(producer_conf, topic_template=topic, jpeg_quality=70)
+    producer = KafkaFrameProducer(producer_conf, topic_template=topic, jpeg_quality=60, drop_on_full=True, max_backoff_sec=5.0)
 
-    tracker = SimpleTracker(model, cam_id=cid)
+    tracker = SimpleTracker(detection_model=model, cam_id=cid)
 
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_interval = 1.0 / fps
     frame_index = 0
-
+    stop_frame = int(fps)
+    # === Tạo VideoWriter để ghi file output ===
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # hoặc 'XVID'
+    out_path = f"output_cam{cid}.mp4"
+    out = cv2.VideoWriter(out_path, fourcc, fps, (w, h))
     try:
-        batch_size = 8
+        batch_size = 1
         frames_batch = []
-
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
-            frames_batch.append((frame_index, frame))
             frame_index += 1
+            if frame_index % stop_frame != 0:
+                # xử lý frame
+                continue
+            frames_batch.append((frame_index, frame))
 
             # detect theo batch
             if len(frames_batch) >= batch_size:
@@ -77,58 +141,86 @@ def tracker_producer_worker(cid: int, video_path: str):
                 results = tracker.detect_batch(list(imgs))
 
                 for idx, (ids, boxes, frame) in zip(idxs, results):
+                    copy_frame = frame.copy()
+
+                    if ids:
+                        for uid, box in zip(ids, boxes):
+                            copy_frame = draw_target(copy_frame, uid, box, name=f"Person", color=(0, 255, 0), thickness=2)
+                    
+                    out.write(copy_frame)  # Ghi frame vào file video
+
                     if ids:  # có người
+                        headers=[
+                            ("timestamp", str(datetime.now().strftime('%Y/%m/%d/%H/%M/%S')).encode()),
+                            ("frame_id", str(idx).encode()),
+                            ("person_ids", json.dumps(ids).encode()),          # [1,2,3] -> b'[1, 2, 3]'
+                            ("bboxes", json.dumps(boxes).encode())             # [[x1,y1,x2,y2], ...]
+                        ]
                         sent = producer.send_frame(
                             cid,
                             frame,
+                            headers=headers
                         )
+                        time.sleep(0.01)  # tránh gửi quá nhanh
                         if not sent:
-                            logger.warning(f"[Producer-{cid}] failed to send frame {idx}")
+                            logger.exception(f"[Producer-{cid}] failed to send frame {idx}")
                         else:
                             logger.info(f"[Producer-{cid}] sent frame {idx} with {len(ids)} persons")
-
-                frames_batch = []
-
+                        #   copy frame gốc
+                frames_batch.clear()
             time.sleep(frame_interval)
 
     finally:
         cap.release()
+        out.release()
+        producer.flush(5)
         logger.info(f"[Producer-{cid}] finished")
 
-frame_dict = {}
+
 # ================== CONSUMER (1 per camera) ==================
 def consumer_worker(cid: int):
     topic = TOPIC_TEMPLATE.format(cid=cid)
+    setup_eval = SetUpEvaluate(id_run_process=CAM_IDS, redis_client=redis_client)
     consumer = KafkaFrameConsumer(consumer_conf, topic, group_id=f"group-{topic}")
+    api = APIHandler(evaluator=setup_eval, lap_update=lap_evaluator)
 
     def handle_frame(msg):
         try:
-            headers = dict(msg.headers() or [])
             nparr = np.frombuffer(msg.value(), np.uint8)
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             logger.info(frame.shape)
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            hdrs = dict(msg.headers() or [])
+            # headers lưu dạng bytes, cần decode + json.loads
+            person_ids = json.loads(hdrs.get("person_ids", b"[]").decode())
+            bboxes = json.loads(hdrs.get("bboxes", b"[]").decode())
+            frame_id = int(hdrs.get("frame_id", b"-1").decode())
+            time_stamp = hdrs.get("timestamp", b"").decode()
+            logger.info(f"person_ids: {person_ids}, bboxes: {bboxes}, frame_id: {frame_id}")
+            api.process(cid, frame, bboxes, person_ids, timestamp=time_stamp)
             # 👉 ở đây bạn có thể hiển thị frame, push UI, ghi DB, v.v.
-            frame_dict[cid] = frame
         except Exception as e:
-            logger.error(f"[Consumer-{cid}] error: {e}")
+            logger.exception(f"[Consumer-{cid}] error: {e}")
 
     consumer.start(handle_frame)
 
 
 # ================== MAIN ==================
+
+# main với truyền source test
 def main():
     create_topics(CAM_IDS)
 
     video_sources = {
-        1: "/u01/quanlm/fitness_tracking/haui_sict_fitness_score/assets/test/Chaylanmot.mp4",
-        2: "/u01/quanlm/fitness_tracking/haui_sict_fitness_score/assets/test/H1.mp4",
-        3: "/u01/quanlm/fitness_tracking/haui_sict_fitness_score/assets/test/lan1.mp4",
-        4: "/u01/quanlm/fitness_tracking/haui_sict_fitness_score/assets/test/Quay Lần 1.MOV",
+        1: r"D:\NCKH_Cham_diem_the_duc\assets\test\27_9\cam1.mp4",
+        2: r"D:\NCKH_Cham_diem_the_duc\assets\test\27_9\cam2.mp4",
+        3: r"D:\NCKH_Cham_diem_the_duc\assets\test\27_9\cam3.mp4",
+        4: r"D:\NCKH_Cham_diem_the_duc\assets\test\27_9\cam4.mp4",
     }
 
     ctx = mp.get_context("spawn")
+    progress = ctx.Manager().dict({cid: 0 for cid in CAM_IDS})
     processes = []
-
     # start producers
     for cid in CAM_IDS:
         p = ctx.Process(target=tracker_producer_worker, args=(cid, video_sources[cid]), daemon=True)
@@ -142,8 +234,13 @@ def main():
         processes.append(p)
 
     # join all
-    for p in processes:
-        p.join()
+    try:
+        for p in processes:
+            p.join()
+    except KeyboardInterrupt:
+        logger.info("🛑 Stopping all processes...")
+        for p in processes:
+            p.terminate()
 
 
 if __name__ == "__main__":

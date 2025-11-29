@@ -3,6 +3,7 @@
 from typing import List, Optional, Any
 from datetime import datetime
 from pydantic import BaseModel
+from src.database.minio_client import MinioClient
 
 
 # mongo_db = MongoDBManager()
@@ -16,3 +17,5 @@ class UserTrack(BaseModel):
 
 class BatchTrackRequest(BaseModel):
     users: List[UserTrack]
+
+minio_client = MinioClient()

@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 import time
 from src.database.sql_model import PostgresHandler
+from src.depend.depend import minio_client
 
 
 class SetUpEvaluate:
@@ -21,14 +22,15 @@ class SetUpEvaluate:
         self.id_run_process = [str(c) for c in id_run_process]
         self.redis_client = redis_client
 
-    def set_flag_redis(self, user_id, cam_id):
+    def set_flag_redis(self, user_id, cam_id, copy_frame=None, timestamp=None):
         """
         Ghi flag camera nếu user đang active.
         """
         user_id = str(user_id)
         cam_id = str(cam_id)
+        timestamp=timestamp
         key_user = f"user:{user_id}:data"
-
+        logger.debug('key_user: ', key_user)
         # Nếu key chưa tồn tại hoặc không active → bỏ qua
         if not self.redis_client.exists(key_user):
             return
@@ -37,11 +39,15 @@ class SetUpEvaluate:
 
         # Ghi flag
         last_cam = self.redis_client.hget(key_user, "last_cam")
-        if last_cam == cam_id:
+        if str(last_cam) == cam_id:
             return
-
+        
+        logger.error(f"User {user_id} - set flag cam {cam_id}")
         self.redis_client.hset(key_user, f"flag_{cam_id}", 1)
         self.redis_client.hset(key_user, "last_cam", cam_id)
+        self.redis_client.hset(key_user, f"last_time", timestamp) 
+        img_url = minio_client.push_data(image=copy_frame, destination_file=f"{timestamp}/{user_id}.jpg")
+        self.redis_client.hset(key_user, f"img_url", img_url) 
 
 
     def check_lap_1_user(self, user_id):
@@ -61,14 +67,18 @@ class SetUpEvaluate:
         
         state = self.redis_client.hget(key_user, "state")
 
-        if state == "active":
+        if str(state) == "active":
         # Lấy flags
+            logger.error(f"Checking lap for user {user_id}")
             flags = {c: int(self.redis_client.hget(key_user, f"flag_{c}")) for c in self.id_run_process}
 
             if all(flags.values()):
                 # Tăng lap_number
-                lap_number = int(self.redis_client.hget(key_user, "lap_number") or 0) + 1
-                self.redis_client.hset(key_user, "lap_number", lap_number)
+                lap_number = int(self.redis_client.hget(key_user, "lap") or 0) + 1
+                self.redis_client.hset(key_user, "lap", lap_number)
+                for c in self.id_run_process:
+                    self.redis_client.hset(key_user, f"flag_{c}", 0)
+                logger.debug(f"User {user_id} hoàn thành vòng {lap_number} → reset flags")
 
 
 class GlobalEvaluator:

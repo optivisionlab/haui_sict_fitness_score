@@ -51,12 +51,19 @@ class SimpleTracker:
     
 
 class APIHandler:
-    def __init__(self, evaluator, collection_name=QDRANT_COLLECTION):
+    def __init__(self, evaluator, lap_update, collection_name=QDRANT_COLLECTION):
         self.evaluator = evaluator
+        self.lap_update = lap_update
         self.collection_name = collection_name
         self.id_to_name = {}
 
-    def process(self, cam_id, frame, xyxy_boxes, ids):
+    def __draw_detections__(self, frame, detections):
+        for detection in detections:
+            user_id, box = detection
+            draw_target(frame, user_id, box, name="", color=(0, 255, 0), thickness=2)
+        return frame
+
+    def process(self, cam_id, frame, xyxy_boxes, ids, timestamp=None):
         copy_frame = frame.copy()
 
         valid_ids, valid_boxes = [], []
@@ -96,11 +103,15 @@ class APIHandler:
                 if pair and pair[0] is not None:
                     user_id, name = pair
                     # draw_target(copy_frame, user_id, box, name=name, color=(0, 255, 0), thickness=2)
-                    detections.append(name)
+                    detections.append([user_id, box])
 
             if detections:
-                for user_id in detections:
-                    self.evaluator.set_flag_redis(user_id, cam_id)
+                for detection in detections:
+                    user_id, box = detection
+                    logger.debug(f'user_id: {user_id}, cam_id: {cam_id}')
+                    draw_frame = self.__draw_detections__(copy_frame, detections)
+                    self.evaluator.set_flag_redis(user_id, cam_id, draw_frame, timestamp=timestamp)
+                    self.evaluator.check_lap_1_user(user_id)
 
         except Exception as e:
             logger.exception(f"Lỗi khi gửi API: {e}")
