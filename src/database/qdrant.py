@@ -101,7 +101,7 @@ class QdrantVectorStore:
                 pass
             # Prepare documents for insertion
             points = []
-            embeddings = get_embedding(images, verbose = True)
+            embeddings,_ = get_embedding(images, verbose = True)
 
             for data, emb_in_img in zip(metadata, embeddings):
                 if emb_in_img is not None:
@@ -124,12 +124,12 @@ class QdrantVectorStore:
     def search(self, query: Union[Image.Image, List[Image.Image]], collection_name : str = "", k: int = 5, get_embedding: Callable = get_embedding, threshold = None):
 
         
-        query_embeddings = get_embedding(query)
+        query_embeddings, boxes = get_embedding(query)
         query_embeddings = [emb.detach().numpy()[0] if emb is not None else None for emb in query_embeddings]
 
         all_results = []
 
-        for emb in query_embeddings:
+        for emb, box in zip(query_embeddings, boxes):
             if emb is not None:
                 results = self.client.query_points(
                     collection_name=collection_name,
@@ -138,7 +138,7 @@ class QdrantVectorStore:
                     score_threshold=threshold
                 )
                 logger.debug(results)
-                all_results.append(results.points)
+                all_results.append([results.points, box])
             else:
                 all_results.append([])
         return all_results
@@ -162,12 +162,13 @@ class QdrantVectorStore:
             # Search for similar vectors
             results = self.search(query, collection_name = collection_name, k = k, threshold = threshold)
             processed_results = []
-            for scored_point in results:
+            for scored_point, box in results:
                 if scored_point:
                     for point in scored_point:
                         processed_results.append({
                             "metadata": point.payload,
-                            "score": point.score
+                            "score": point.score,
+                            "bbox" : box[0].tolist()
                         })
                 else:
                     processed_results.append({

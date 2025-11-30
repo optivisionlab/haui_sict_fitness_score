@@ -1,6 +1,7 @@
 import uvicorn
 from fastapi import FastAPI, Request
 from src.api.sub_api import search, mongo_search
+from src.config.configs import DEVICE
 import torch
 import gc
 
@@ -16,9 +17,9 @@ async def cleanup_after_request(request: Request, call_next):
         response = await call_next(request)
         return response
     finally:
-        import torch
-        torch.cuda.empty_cache()
-        torch.cuda.ipc_collect()
+        if "cuda" in DEVICE:
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
         gc.collect()
         print("GPU memory cleaned")
 
