@@ -32,7 +32,16 @@ async def _dispatch_loop(stop_event: asyncio.Event, pattern: str = "__keyevent@0
 
             # msg example: {'type': 'pmessage', 'pattern': '__keyevent@0__:*', 'channel': '__keyevent@0__:hset', 'data': 'user:Cuong:data'}
             key = msg.get("data")
+            if isinstance(key, bytes):
+                try:
+                    key = key.decode()
+                except Exception:
+                    key = None
             if not key or not isinstance(key, str):
+                continue
+
+            # Only propagate core user payload keys (ignore lap locks, etc.)
+            if not key.endswith(":data"):
                 continue
 
             # try to parse user from key (pattern: user:<user>:...)

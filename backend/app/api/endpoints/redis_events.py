@@ -152,6 +152,9 @@ async def _async_redis_sse_generator(request: Request, *, pattern: Optional[str]
                 if subscribe_pattern:
                     key = message.get("data")
                     if key:
+                        # Only forward user hash records (ignore auxiliary keys such as lap locks)
+                        if not str(key).endswith(":data"):
+                            continue
                         try:
                             ktype = await redis_client.type(key)
                         except Exception as e:
