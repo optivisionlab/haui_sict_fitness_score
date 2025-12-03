@@ -71,7 +71,10 @@ export default function ScoreDetail({
               const info = calcRunInfo(item.start_time, item.end_time);
 
               return (
-                <TableRow key={item.result_id} className="hover:bg-gray-50">
+                <TableRow
+                  key={item.result_id ?? `${item.exam_id}-${index}`}
+                  className="hover:bg-gray-50"
+                >
                   <TableCell className="text-center">{index + 1}</TableCell>
 
                   <TableCell>{item.exam_title}</TableCell>
@@ -146,13 +149,13 @@ export default function ScoreDetail({
                           </p>
 
                           <div className="text-center mt-4">
-                            <Image
+                            {/* <Image
                               src={running}
                               alt="run"
                               width={150}
                               height={150}
                               className="mx-auto"
-                            />
+                            /> */}
                           </div>
                         </div>
 
