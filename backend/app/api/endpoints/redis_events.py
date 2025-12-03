@@ -67,11 +67,16 @@ async def _get_user_display_name(user_id: str) -> Optional[str]:
 
 logger = logging.getLogger(__name__)
 
-async def _save_checkin_to_db(user_id: str, camera_id: Optional[str], flag_name: str, timestamp: str):
-    """
-    Try to persist a checkin into DB. Adjust imports / model fields to match your project.
-    This function is best-effort: if DB helpers/models aren't present it will log and continue.
-    """
+async def _save_checkin_to_db(
+    user_id: str,
+    camera_id: Optional[str],
+    flag_name: str,
+    timestamp: str,
+    image_url: Optional[str] = None,
+    lap: Optional[str] = None,
+    avg_speed: Optional[str] = None,
+):
+    """Persist a check-in record with optional telemetry and media reference."""
     try:
         # Use synchronous SQLModel Session via thread executor because project uses sync engine
         from sqlmodel import Session
@@ -94,6 +99,9 @@ async def _save_checkin_to_db(user_id: str, camera_id: Optional[str], flag_name:
 
         def _sync_save():
             with Session(engine) as session:
+                if uid is None or cam_id is None:
+                    return
+
                 # ensure camera exists (create minimal record if not)
                 try:
                     from app.models import Camera
@@ -108,11 +116,29 @@ async def _save_checkin_to_db(user_id: str, camera_id: Optional[str], flag_name:
                         session.add(cam)
                         session.commit()
 
+                # best-effort numeric conversions for optional telemetry fields
+                lap_val = None
+                try:
+                    if lap is not None:
+                        lap_val = int(lap)
+                except Exception:
+                    lap_val = None
+
+                avg_speed_val = None
+                try:
+                    if avg_speed is not None:
+                        avg_speed_val = float(avg_speed)
+                except Exception:
+                    avg_speed_val = None
+
                 record = CameraUserClass(
                     user_id=uid,
                     camera_id=cam_id,
+                    lap=lap_val if lap_val is not None else 1,
+                    avg_speed=avg_speed_val,
                     flag=flag_name if hasattr(CameraUserClass, 'flag') else None,
                     checkin_time=checkin_dt,
+                    image_url=image_url,
                 )
                 session.add(record)
                 session.commit()
@@ -139,7 +165,7 @@ async def _async_redis_sse_generator(request: Request, *, pattern: Optional[str]
             channel_name = "__global_redis_events__"
         await pubsub.subscribe(channel_name)
 
-    # keep last-known flag states per key so we can detect 0->1 transitions
+    # keep last-known flag states per key so we can detect transitions
     prev_flags = {}
 
     try:
@@ -151,6 +177,11 @@ async def _async_redis_sse_generator(request: Request, *, pattern: Optional[str]
             if message:
                 if subscribe_pattern:
                     key = message.get("data")
+                    if isinstance(key, bytes):
+                        try:
+                            key = key.decode()
+                        except Exception:
+                            key = None
                     if key:
                         # Only forward user hash records (ignore auxiliary keys such as lap locks)
                         if not str(key).endswith(":data"):
@@ -190,11 +221,9 @@ async def _async_redis_sse_generator(request: Request, *, pattern: Optional[str]
 
                         # detect flag changes only for hashes
                         if ktype == "hash" and isinstance(value, dict):
-                            # find flag fields, e.g. 'flag_1', 'flag1', etc.
                             flag_fields = [f for f in value.keys() if f.startswith("flag")]
                             prev = prev_flags.get(key, {})
                             user_id = None
-                            camera_id = None
                             # try parse user id from key like "user:13:data"
                             try:
                                 parts = key.split(":")
@@ -202,17 +231,16 @@ async def _async_redis_sse_generator(request: Request, *, pattern: Optional[str]
                                     user_id = parts[1]
                             except Exception:
                                 pass
-                            # try get camera id from known fields
                             camera_id = value.get("last_cam") or value.get("cam_id") or value.get("camera_id")
 
                             for f in flag_fields:
-                                old = str(prev.get(f, "0"))
-                                new = str(value.get(f, "0"))
-                                # detect 0 -> 1 transition
+                                old = str(prev.get(f, ""))
+                                new = str(value.get(f, ""))
+                                if old == "1" and new == "1":
+                                    continue
                                 if old != "1" and new == "1":
                                     ts = value.get("start_time") or datetime.utcnow().isoformat()
 
-                                    # try to get display name for personalization
                                     display_name = None
                                     if user_id:
                                         display_name = await _get_user_display_name(user_id)
@@ -220,39 +248,36 @@ async def _async_redis_sse_generator(request: Request, *, pattern: Optional[str]
                                     disp = display_name or (f"Người dùng {user_id}" if user_id else "Người dùng")
                                     message = f"Xin chào {disp}, bạn đã checkin thành công tại camera {camera_id} lúc {ts}."
 
-                                    evt = {
-                                        "type": "checkin",
-                                        "user_id": user_id,
-                                        "camera": camera_id,
-                                        "flag": f,
-                                        "timestamp": ts,
-                                        "key": key,
-                                        "message": message,
-                                        "meta": {"display_name": disp},
-                                    }
+                                    evt = {"message": message}
 
-                                    # publish personalized notification to user's channel
                                     try:
                                         if user_id:
-                                            await redis_client.publish(f"user:{user_id}:channel", json.dumps(evt, ensure_ascii=False))
+                                            await redis_client.publish(
+                                                f"user:{user_id}:channel",
+                                                json.dumps({"type": "checkin", "message": message}, ensure_ascii=False),
+                                            )
                                     except Exception:
                                         logger.exception("Failed to publish checkin event for user %s", user_id)
 
-                                    # persist to DB (best-effort)
                                     try:
-                                        asyncio.create_task(_save_checkin_to_db(user_id or "", camera_id, f, ts))
+                                        asyncio.create_task(
+                                            _save_checkin_to_db(
+                                                user_id or "",
+                                                camera_id,
+                                                f,
+                                                ts,
+                                                image_url=value.get("img_url") or value.get("image_url"),
+                                                lap=value.get("lap"),
+                                                avg_speed=value.get("avg_speed"),
+                                            )
+                                        )
                                     except Exception:
                                         logger.exception("Failed to schedule DB save task")
 
-                                    # also forward event to SSE clients
                                     yield f"event: checkin\ndata: {json.dumps(evt, ensure_ascii=False)}\n\n"
 
-                            # update prev_flags snapshot
-                            prev_flags[key] = {f: str(value.get(f, "0")) for f in flag_fields}
-
-                        # also forward the full payload as previously
-                        payload = {"key": key, "type": ktype, "value": value}
-                        yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                            if flag_fields:
+                                prev_flags[key] = {f: str(value.get(f, "")) for f in flag_fields}
                 else:
                     # channel-mode: message['data'] is already the payload string
                     data = message.get("data")
@@ -262,8 +287,33 @@ async def _async_redis_sse_generator(request: Request, *, pattern: Optional[str]
                         except Exception:
                             data = None
                     if data:
-                        # forward raw payload as-is (but wrap as SSE data field)
-                        yield f"data: {data}\n\n"
+                        try:
+                            payload_obj = json.loads(data)
+                        except Exception:
+                            payload_obj = None
+
+                        if not payload_obj or not isinstance(payload_obj, dict):
+                            continue
+
+                        key_val = payload_obj.get("key")
+                        if key_val and not str(key_val).endswith(":data"):
+                            continue
+
+                        evt_type = payload_obj.get("type")
+                        message_text = payload_obj.get("message")
+                        if not message_text:
+                            continue
+
+                        serialized = json.dumps({"message": message_text}, ensure_ascii=False)
+
+                        if evt_type == "checkin":
+                            yield f"event: checkin\ndata: {serialized}\n\n"
+                            continue
+
+                        if evt_type != "flag_update":
+                            continue
+
+                        yield f"event: flag_update\ndata: {serialized}\n\n"
 
             # cooperative sleep so other tasks can run
             await asyncio.sleep(0.01)
