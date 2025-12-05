@@ -36,7 +36,7 @@ export default function TestDetailPage() {
       if (rows.length < 1) {
         setStep(1);
       } else {
-        setStep(rows[rows.length - 1].step + 1);
+        setStep(rows[0].step + 1);
       }
 
       setExamInfo(rows[0] ?? null);
@@ -96,37 +96,36 @@ export default function TestDetailPage() {
 
     const url = `${process.env.NEXT_PUBLIC_API_URL}/redis/events/user/${user_id}`;
 
-    // const getData = async () => {
-    //   const data = await get(`/redis/events/user/${user_id}`);
-    //   return data.data;
-    // };
-
-    // console.log(getData);
-
     const es = new EventSource(url);
 
     es.onopen = () => console.log("SSE connected");
 
-    es.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      console.log("Realtime update:", data);
-      setExamInfo((prev: any) => ({
-        ...prev,
-        ...data.value,
-      }));
+    es.addEventListener("checkin", (event) => {
+      console.log("Receive CHECKIN event:", event.data);
 
-      // for (let i : [1,2,3,4]) {
-      //         if (data.value?.flag_1) {
-      //   toast.info(`Redis cập nhật: flag_1 = ${data.value?.flag_1}`);
-      // }
-      // }
+      const payload = JSON.parse(event.data);
 
-      [1, 2, 3, 4].map((item) => {
-        let flag: string = "flag_" + item;
-        toast.info(`Redis cập nhật: flag_${item} = ${data.value?.[flag]}`);
-        console.log(data.value?.[flag]);
-      });
-    };
+      // Trường hợp Redis chỉ gửi message
+      if (payload.message) {
+        toast.info(payload.message);
+      }
+
+      // Nếu server có gửi value kèm theo
+      if (payload.value) {
+        setExamInfo((prev: any) => ({
+          ...prev,
+          ...payload.value,
+        }));
+
+        [1, 2, 3, 4].forEach((i) => {
+          const flag = payload.value[`flag_${i}`];
+          if (flag !== undefined) {
+            toast.info(`UPDATE flag_${i}: ${flag}`);
+          }
+        });
+      }
+    });
+
     es.onerror = () => {
       console.log("SSE error or closed");
       es.close();
