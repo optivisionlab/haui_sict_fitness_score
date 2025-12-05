@@ -18,9 +18,10 @@ class SetUpEvaluate:
     Chỉ chịu trách nhiệm ghi flag camera vào Redis.
     """
 
-    def __init__(self, id_run_process, redis_client=None):
+    def __init__(self, id_run_process, redis_client=None, pg_handler=None):
         self.id_run_process = [str(c) for c in id_run_process]
         self.redis_client = redis_client
+        self.pg_handler = pg_handler
 
     def set_flag_redis(self, user_id, cam_id, copy_frame=None, timestamp=None):
         """
@@ -48,6 +49,18 @@ class SetUpEvaluate:
         self.redis_client.hset(key_user, f"last_time", timestamp) 
         img_url = minio_client.push_data(image=copy_frame, destination_file=f"{timestamp}/{user_id}.jpg")
         self.redis_client.hset(key_user, f"img_url", img_url) 
+        self.pg_handler.insert_redis(
+            user_id=user_id,
+            exam_id=self.redis_client.hget(key_user, "exam_id"),
+            step=int(self.redis_client.hget(key_user, "step") or 0),
+            lap=int(self.redis_client.hget(key_user, "lap") or 0),
+            start_time=self.redis_client.hget(key_user, "start_time"),
+            flag1=int(self.redis_client.hget(key_user, "flag_1") or 0),
+            flag2=int(self.redis_client.hget(key_user, "flag_2") or 0),
+            flag3=int(self.redis_client.hget(key_user, "flag_3") or 0),
+            flag4=int(self.redis_client.hget(key_user, "flag_4") or 0),
+            url=img_url
+        )
 
 
     def check_lap_1_user(self, user_id):

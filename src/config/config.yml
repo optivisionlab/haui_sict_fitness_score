@@ -17,3 +17,15 @@ INPUT_MODE:
     camera_id: 0  # Default camera ID for webcam input
   video:
     video_path: 'path_to_your_video.mp4'  # Default path for video
+
+MINIO:
+  MINIO_ENPOINT: "10.100.200.119:9000"
+  MINIO_ACCESS_KEY: 'admin'
+  MINIO_SECRET_KEY: 'password123'
+  MINIO_BUCKET_NAME: 'fitscore'
+
+REDIS:
+  REDIS_HOST: '10.100.200.119'
+  REDIS_PORT: 6379
+  REDIS_DB: 0
+  REDIS_PASSWORD: optivisionlab

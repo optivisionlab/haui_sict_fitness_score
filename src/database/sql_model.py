@@ -3,7 +3,7 @@ from datetime import datetime
 from loguru import logger
 from sqlalchemy import case, MetaData, Table
 from sqlalchemy.dialects.postgresql import insert
-
+from urllib.parse import quote_plus
 
 # --- Định nghĩa model ORM ---
 class Results(SQLModel, table=True):
@@ -19,6 +19,19 @@ class Results(SQLModel, table=True):
         )
 
 
+class RedisResults(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: str
+    exam_id: str | None = None
+    step: int
+    lap: int
+    flag1: int | None = None
+    flag2: int | None = None
+    flag3: int | None = None
+    flag4: int | None = None
+    start_time: datetime
+    url: str | None = None
+
 
 # --- Handler ---
 class PostgresHandler:
@@ -27,6 +40,33 @@ class PostgresHandler:
         
         # Tạo bảng nếu chưa có
         SQLModel.metadata.create_all(self.engine)
+
+
+    def insert_redis(
+        self, user_id, exam_id, step, lap, start_time,
+        flag1=0, flag2=None, flag3=None, flag4=None,
+        url=None, end_time=None
+    ):
+        meta = MetaData()
+        results_table = Table("redisresults", meta, autoload_with=self.engine)
+
+        insert_values = {
+            "user_id": user_id,
+            "exam_id": exam_id,
+            "step": step,
+            "lap": lap,
+            "start_time": start_time,
+            "flag1": flag1,
+            "flag2": flag2,
+            "flag3": flag3,
+            "flag4": flag4,
+            "url": url,
+        }
+
+        stmt = insert(results_table).values(insert_values)
+
+        with self.engine.begin() as conn:
+            conn.execute(stmt)
 
 
     def insert_or_update_lap(self, user_id, exam_id, step, lap_number, start_time, end_time=None):

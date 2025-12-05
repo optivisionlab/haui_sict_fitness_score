@@ -6,7 +6,7 @@ from loguru import logger
 from ultralytics import YOLO
 from confluent_kafka.admin import AdminClient, NewTopic
 
-from src.tracking.detect import SimpleTracker, APIHandler
+from src.engine.detect import SimpleTracker, APIHandler
 from src.engine.score import GlobalEvaluator, SetUpEvaluate
 from src.kafka.kafka_produce import KafkaFrameProducer
 from src.kafka.kafka_consumers import KafkaFrameConsumer
@@ -180,7 +180,7 @@ def tracker_producer_worker(cid: int, video_path: str):
 # ================== CONSUMER (1 per camera) ==================
 def consumer_worker(cid: int):
     topic = TOPIC_TEMPLATE.format(cid=cid)
-    setup_eval = SetUpEvaluate(id_run_process=CAM_IDS, redis_client=redis_client)
+    setup_eval = SetUpEvaluate(id_run_process=CAM_IDS, redis_client=redis_client, pg_handler=pg_handler)
     consumer = KafkaFrameConsumer(consumer_conf, topic, group_id=f"group-{topic}")
     api = APIHandler(evaluator=setup_eval, lap_update=lap_evaluator)
 

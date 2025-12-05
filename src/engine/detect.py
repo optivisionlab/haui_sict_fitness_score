@@ -2,7 +2,7 @@ import random
 from collections import defaultdict
 
 # Giả sử đã import sẵn
-from src.search.curl_api_search import send_tracking_to_api
+from src.engine.curl_api_search import send_tracking_to_api
 from ultralytics import YOLO
 from loguru import logger
 from src.engine.engine import draw_target, line_begin_curl_api_search

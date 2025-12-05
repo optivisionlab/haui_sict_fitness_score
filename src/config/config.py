@@ -43,6 +43,11 @@ MINIO_ACCESS_KEY = config.get('MINIO', {}).get('MINIO_ACCESS_KEY', 'abcd')
 MINIO_SECRET_KEY = config.get('MINIO', {}).get('MINIO_SECRET_KEY', 'abcd')
 MINIO_BUCKET_NAME = config.get('MINIO', {}).get('MINIO_BUCKET_NAME', 'abcd')
 
+REDIS_HOST = config.get('REDIS', {}).get('REDIS_HOST', 'xxx')
+REDIS_PORT = config.get('REDIS', {}).get('REDIS_PORT', 6379)
+REDIS_DB = config.get('REDIS', {}).get('REDIS_DB', 0)
+REDIS_PASSWORD = config.get('REDIS', {}).get('REDIS_PASSWORD', 'xxxx')
+
 
 
 
