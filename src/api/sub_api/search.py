@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, status
+from fastapi import APIRouter, UploadFile, File, Form, status, BackgroundTasks
 from typing import List, Optional, Dict
 from PIL import Image
 import requests
@@ -7,16 +7,27 @@ from pydantic import HttpUrl, BaseModel
 from loguru import logger
 import json
 from collections import defaultdict
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
+from urllib.parse import quote_plus
+import asyncio
+import redis
+from json import dumps
 
 from src.config.depend import *
 from fastapi.responses import JSONResponse
 from src.database.qdrant import QdrantVectorStore
 from src.models.search_input_params import StudentTrackingInput
 from src.app.embedding.facenet_embedding import get_embedding
-
+from src.app.query_process import stream_redisresults
 
 qdrant_db = QdrantVectorStore()
 router = APIRouter()
+
+stop_flag = True   
+is_running = False 
+
+
 
 def load_image_from_url(url: str) -> Image.Image:
     response = requests.get(url)
@@ -119,4 +130,67 @@ async def face_emb(
         logger.debug("embedidng shape: {}", emb.shape if emb is not None else None)
         
     return JSONResponse(content={'status_code' : 200, 'status': "insert oke"}, status_code= status.HTTP_200_OK)
-    
+
+async def background_job(sleeptime : int = 3):
+    global stop_flag, is_running
+
+    if not stop_flag:
+        is_running = False
+        return
+
+    logger.info("Bắt đầu tiến trình đọc dữ liệu...")
+    r = redis.Redis(
+        host='10.100.200.119',
+        port=6379,
+        db=0,  # mặc định
+        password='optivisionlab',
+        decode_responses=True  # để trả về string thay vì bytes
+    )
+    DATABASE_URL = f"postgresql://labelstudio:{quote_plus('Admin@221b')}@10.100.200.119:5555/fitness_db"
+    engine = create_engine(DATABASE_URL)
+
+    with Session(engine) as session:
+        for row in stream_redisresults(session):
+            student_infor = row
+            KEY = student_infor.user_id
+            new_data = row.to_dict()
+            logger.info('new_data: {}', new_data)
+            new_data.pop('id')
+            if not stop_flag:
+                logger.info("STOP FLAG = FALSE → DỪNG TIẾN TRÌNH.")
+                r.delete(KEY)
+                break
+            
+            await asyncio.sleep(sleeptime)
+            raw = r.hgetall(name = KEY)
+            if raw:
+                old_data = raw
+            else:
+                old_data = {}
+            old_data.update(new_data)
+            r.hset(KEY, mapping= old_data)
+
+            
+    logger.info("Tiến trình đã kết thúc.")
+    is_running = False
+
+
+@router.post("/start")
+async def start_job(background_tasks: BackgroundTasks, sleeptime: int = 3):
+    global stop_flag, is_running
+
+    # Nếu job đang chạy, không cho chạy tiếp
+    if is_running:
+        return {"message": "Job is already running"}
+
+    stop_flag = True
+    is_running = True
+    background_tasks.add_task(background_job, sleeptime)
+    return {"message": "Job started"}
+
+
+@router.post("/stop")
+async def stop_job():
+    global stop_flag
+    stop_flag = False
+    return {"message": "Stop flag set to FALSE. Job will stop immediately."}
