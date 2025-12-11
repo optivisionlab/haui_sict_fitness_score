@@ -81,14 +81,13 @@ def list_classes(
         # If filtering by student_id, join the user_class table
         if student_id is not None:
             q = q.join(UserClass, Class.class_id == UserClass.class_id).where(UserClass.user_id == student_id)
+            # Apply course_type filter if provided (from user_class)
+            if course_type:
+                q = q.where(UserClass.course_type == course_type)
 
         # Apply teacher filter if provided
         if teacher_id is not None:
             q = q.where(Class.teacher_id == teacher_id)
-
-        # Apply course_type filter if provided
-        if course_type:
-            q = q.where(Class.course_type == course_type)
 
         classes = db.exec(q.offset(skip).limit(limit)).all()
         return classes
@@ -96,8 +95,6 @@ def list_classes(
     # Teacher: classes they teach, optional course_type filter
     if current_user.user_role == UserRole.teacher:
         q = select(Class).where(Class.teacher_id == current_user.user_id)
-        if course_type:
-            q = q.where(Class.course_type == course_type)
         classes = db.exec(q.offset(skip).limit(limit)).all()
         return classes
 
@@ -108,7 +105,7 @@ def list_classes(
         .where(UserClass.user_id == current_user.user_id)
     )
     if course_type:
-        q = q.where(Class.course_type == course_type)
+        q = q.where(UserClass.course_type == course_type)
     classes = db.exec(q.offset(skip).limit(limit)).all()
     return classes
 
@@ -252,18 +249,26 @@ def get_user_results_in_class(
 ) -> Any:
     """
     Return a user's results for exams in the given class, including basic user info.
-    Access: admin, class teacher, or the user themself.
+    Access: admin, class teacher, or any enrolled student in the class.
     """
     db_class = db.get(Class, class_id)
     if not db_class:
         raise HTTPException(status_code=404, detail="Class not found")
 
-    # Permission check: admin, teacher of class, or the user themself
-    if not (
-        current_user.user_role == UserRole.admin
-        or db_class.teacher_id == current_user.user_id
-        or current_user.user_id == user_id
-    ):
+    # Permission check: admin, teacher of class, or enrolled student in the class
+    if current_user.user_role == UserRole.admin or db_class.teacher_id == current_user.user_id:
+        # Admin and teacher can view any user's results
+        pass
+    elif current_user.user_role == UserRole.student:
+        # Student must be enrolled in the class to view results
+        enrolled = db.exec(
+            select(UserClass).where(
+                (UserClass.class_id == class_id) & (UserClass.user_id == current_user.user_id)
+            )
+        ).first()
+        if not enrolled:
+            raise HTTPException(status_code=403, detail="Not enough permissions")
+    else:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
     user = db.get(User, user_id)
@@ -271,22 +276,26 @@ def get_user_results_in_class(
         raise HTTPException(status_code=404, detail="User not found")
 
     # Optimized query:
-    # - select Exam and Result in a single joined query
+    # - select Exam and Result in a single joined query via outer join
     # - filter by class via the join table `class_exam` and by user_id
     # - support pagination (skip/limit) and order by most recent results
     q = (
         select(Exam, Result, ClassExam)
         .join(ClassExam, Exam.exam_id == ClassExam.exam_id)
-        .join(Result, Result.exam_id == Exam.exam_id)
-        .where(ClassExam.class_id == class_id, Result.user_id == user_id)
-        .order_by(Result.created_at.desc())
+        .outerjoin(
+            Result,
+            and_(
+                Result.exam_id == Exam.exam_id,
+                Result.user_id == user_id
+            )
+        )
+        .where(ClassExam.class_id == class_id)
+        .order_by(Result.created_at.desc().nullslast())
         .offset(skip)
         .limit(limit)
     )
 
     rows = db.exec(q).all()
-    logger.info(f"rows: {rows}")
-    logger.info("row") 
     # rows will be list of tuples (Exam, Result, ClassExam)
     results = []
     for exam, res, ce in rows:
@@ -294,6 +303,9 @@ def get_user_results_in_class(
             results.append({
                 "result_id": getattr(res, "result_id", None),
                 "exam_id": getattr(res, "exam_id", None),
+                "exam_title": getattr(exam, "title", None),
+                "exam_description": getattr(exam, "description", None),
+                "exam_date": getattr(ce, "exam_date", None),
                 "step": getattr(res, "step", None),
                 "lap": getattr(res, "lap", None),
                 "start_time": getattr(res, "start_time", None),
@@ -304,7 +316,7 @@ def get_user_results_in_class(
         else:
             results.append({
                 "result_id": None,
-                "exam_id": getattr(ce, "exam_id", None),
+                "exam_id": getattr(exam, "exam_id", None),
                 "exam_title": getattr(exam, "title", None),
                 "exam_description": getattr(exam, "description", None),
                 "exam_date": getattr(ce, "exam_date", None),
@@ -337,7 +349,7 @@ def get_user_exams_results_in_class(
     db: Session = Depends(get_db)
 ) -> Any:
 
-    """Return the user's best results for each exam in a class (exam-level).
+    """Return the user's best results for each exam in a class (exam-level), grouped by class.
     Access: admin, class teacher, or that same user.
     """
 
@@ -360,9 +372,12 @@ def get_user_exams_results_in_class(
         raise HTTPException(status_code=404, detail="User not found")
 
     # --- Query: get all exams in this class + their results (if any) for this user ---
+    # Only include exams from the class where user has course_type = 'running'
     q = (
-    select(Exam, Result, ClassExam)
+    select(Exam, Result, ClassExam, Class, UserClass)
     .join(ClassExam, Exam.exam_id == ClassExam.exam_id)
+    .join(Class, ClassExam.class_id == Class.class_id)
+    .join(UserClass, Class.class_id == UserClass.class_id)
     .outerjoin(
         Result,
         and_(
@@ -370,7 +385,11 @@ def get_user_exams_results_in_class(
             Result.user_id == user_id
         )
     )
-    .where(ClassExam.class_id == class_id)
+    .where(
+        ClassExam.class_id == class_id,
+        UserClass.user_id == user_id,
+        UserClass.course_type == "running"
+    )
     .order_by(Result.created_at.desc().nullslast())
     .offset(skip)
     .limit(limit)
@@ -381,7 +400,7 @@ def get_user_exams_results_in_class(
     # --- Pick best result per exam ---
     best_by_exam = {}
 
-    for exam, res, ce in rows:
+    for exam, res, ce, cls, uc in rows:
 
         exam_id = exam.exam_id
 
@@ -399,6 +418,8 @@ def get_user_exams_results_in_class(
             best_by_exam[exam_id] = {
                 "exam": exam,
                 "class_exam": ce,
+                "class": cls,
+                "user_class": uc,
                 "result": res,
                 "speed": speed_val,
             }
@@ -408,6 +429,8 @@ def get_user_exams_results_in_class(
                 best_by_exam[exam_id] = {
                     "exam": exam,
                     "class_exam": ce,
+                    "class": cls,
+                    "user_class": uc,
                     "result": res,
                     "speed": speed_val,
                 }
@@ -421,19 +444,26 @@ def get_user_exams_results_in_class(
                     best_by_exam[exam_id] = {
                         "exam": exam,
                         "class_exam": ce,
+                        "class": cls,
+                        "user_class": uc,
                         "result": res,
                         "speed": speed_val,
                     }
 
-    # --- Build output ---
-    out = []
+    # --- Group by class ---
+    grouped_by_class = {}
     for exam_id, info in best_by_exam.items():
         exam = info["exam"]
         ce = info["class_exam"]
+        cls = info["class"]
         res = info["result"]
+        class_id_val = cls.class_id
+
+        if class_id_val not in grouped_by_class:
+            grouped_by_class[class_id_val] = []
 
         if res:
-            out.append({
+            grouped_by_class[class_id_val].append({
                 "result_id": res.result_id,
                 "exam_id": ce.exam_id,
                 "exam_title": exam.title,
@@ -447,7 +477,7 @@ def get_user_exams_results_in_class(
                 "created_at": res.created_at,
             })
         else:
-            out.append({
+            grouped_by_class[class_id_val].append({
                 "result_id": None,
                 "exam_id": ce.exam_id,
                 "exam_title": exam.title,
@@ -470,7 +500,7 @@ def get_user_exams_results_in_class(
             "phone_number": user.phone_number,
             "user_code": user.user_code,
         },
-        "results": out
+        "results": grouped_by_class.get(class_id, [])
     }
 
 @router.get("/{class_id}/user/{user_id}/exam/{exam_id}/results")
@@ -619,7 +649,7 @@ def get_class_exam_results_grouped_by_user(
 
     For each user enrolled in the class, return user info and a list of
     results for the specified exam (may be empty if user hasn't submitted).
-    Access: admin or the class teacher.
+    Access: admin, class teacher, or any enrolled student in the class.
     """
     # Validate class and exam
     db_class = db.get(Class, class_id)
@@ -635,8 +665,20 @@ def get_class_exam_results_grouped_by_user(
     if not linked:
         raise HTTPException(status_code=404, detail="Exam is not linked to this class")
 
-    # Permission: only admin or the class teacher
-    if not (current_user.user_role == UserRole.admin or db_class.teacher_id == current_user.user_id):
+    # Permission: admin, teacher, or enrolled student
+    if current_user.user_role == UserRole.admin or db_class.teacher_id == current_user.user_id:
+        # Admin and teacher can view all
+        pass
+    elif current_user.user_role == UserRole.student:
+        # Student must be enrolled in the class
+        enrolled = db.exec(
+            select(UserClass).where(
+                (UserClass.class_id == class_id) & (UserClass.user_id == current_user.user_id)
+            )
+        ).first()
+        if not enrolled:
+            raise HTTPException(status_code=403, detail="Not enough permissions")
+    else:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
     # Query users enrolled in class left-joined with results for the exam
@@ -801,23 +843,24 @@ def get_selected_exams_results_by_user(
     """Return results for exams with ids [1,2,3] for all users in the class.
 
     For each enrolled user return user info and a list of results for the
-    selected exams (may be empty). Access: admin or the class teacher.
+    selected exams (may be empty). Access: admin, class teacher, or any enrolled student.
     """
     # Validate class
     db_class = db.get(Class, class_id)
     if not db_class:
         raise HTTPException(status_code=404, detail="Class not found")
 
-    # Permission: admin or the class teacher can view all users' results.
-    # A regular enrolled user may call this endpoint but will only receive their own data.
-    view_all = False
+    # Permission: admin, teacher, or enrolled student can view all users' results in the class.
     if current_user.user_role == UserRole.admin or db_class.teacher_id == current_user.user_id:
-        view_all = True
-    else:
-        # ensure the caller is enrolled in the class before allowing access to their own data
+        # Admin and teacher can view all
+        pass
+    elif current_user.user_role == UserRole.student:
+        # Student must be enrolled in the class
         enrolled = db.exec(select(UserClass).where((UserClass.class_id == class_id) & (UserClass.user_id == current_user.user_id))).first()
         if not enrolled:
             raise HTTPException(status_code=403, detail="Not enough permissions")
+    else:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
 
     # Fixed set of exam IDs requested by the user story
     requested_exam_ids = [1, 2, 3]
@@ -837,13 +880,10 @@ def get_selected_exams_results_by_user(
         .outerjoin(Exam, Result.exam_id == Exam.exam_id)
         .outerjoin(ClassExam, (ClassExam.exam_id == Exam.exam_id) & (ClassExam.class_id == class_id))
         .where(UserClass.class_id == class_id)
+        .order_by(User.full_name)
+        .offset(skip)
+        .limit(limit)
     )
-
-    # If the caller is not allowed to view all, restrict to their own enrollment
-    if not view_all:
-        stmt = stmt.where(UserClass.user_id == current_user.user_id)
-
-    stmt = stmt.order_by(User.full_name).offset(skip).limit(limit)
 
     rows = db.exec(stmt).all()
 
@@ -1078,9 +1118,18 @@ async def handle_exam_action(
     if action == "end" and not payload.end_time:
         raise HTTPException(status_code=400, detail="Thiếu end_time trong payload")
 
+    # Validate class exists and exam is linked to this class
+    db_class = db.get(Class, class_id)
+    if not db_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+    linked = db.exec(select(ClassExam).where((ClassExam.class_id == class_id) & (ClassExam.exam_id == exam_id))).first()
+    if not linked:
+        raise HTTPException(status_code=404, detail="Exam is not linked to the provided class_id")
+
     user_record = {
         "user_id": str(payload.user_id),
         "exam_id": str(payload.exam_id),
+        "class_id": class_id,
         "step": int(payload.step),
     }
     if payload.start_time:
@@ -1089,14 +1138,6 @@ async def handle_exam_action(
         user_record["end_time"] = payload.end_time
 
     batch_payload = {"users": [user_record]}
-
-    # Validate class exists and exam is linked to this class
-    db_class = db.get(Class, class_id)
-    if not db_class:
-        raise HTTPException(status_code=404, detail="Class not found")
-    linked = db.exec(select(ClassExam).where((ClassExam.class_id == class_id) & (ClassExam.exam_id == exam_id))).first()
-    if not linked:
-        raise HTTPException(status_code=404, detail="Exam is not linked to the provided class_id")
 
     # forward to external API (batch format)
     external_api_url = "http://10.100.200.119:8001/track_batch"
