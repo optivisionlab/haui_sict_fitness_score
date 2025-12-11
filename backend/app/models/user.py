@@ -21,6 +21,11 @@ class UserStatus(str, Enum):
     inactive = "inactive"
     banned = "banned"
 
+class CourseType(str, Enum):
+    running = "running"
+    swimming = "swimming"
+    cycling = "cycling"
+
 
 class UserClass(SQLModel, table=True):
     __tablename__ = "user_class"
@@ -31,6 +36,7 @@ class UserClass(SQLModel, table=True):
     class_id: int = Field(
         sa_column=Column(ForeignKey("classes.class_id", ondelete="CASCADE", onupdate="CASCADE"), primary_key=True)
     )
+    course_type: CourseType = Field(default=CourseType.running)
 
 
 class UserBase(SQLModel):

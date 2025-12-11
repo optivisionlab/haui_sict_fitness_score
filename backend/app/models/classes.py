@@ -12,12 +12,6 @@ if TYPE_CHECKING:
     from app.models.camera import CameraUserClass
 
 
-class CourseType(str, Enum):
-    running = "running"
-    swimming = "swimming"
-    cycling = "cycling"
-
-
 class ClassStatus(str, Enum):
     active = "active"
     completed = "completed"
@@ -26,7 +20,6 @@ class ClassStatus(str, Enum):
 
 class ClassBase(SQLModel):
     class_name: str = Field(max_length=255)
-    course_type: CourseType = Field(default=CourseType.running)
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     description: Optional[str] = None

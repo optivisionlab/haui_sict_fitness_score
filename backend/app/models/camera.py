@@ -7,6 +7,7 @@ from enum import Enum
 if TYPE_CHECKING:
     from app.models.user import User, UserClass
     from app.models.classes import Class
+    from app.models.exams import Exam
 
 
 class CameraStatus(str, Enum):
@@ -33,6 +34,9 @@ class CameraUserClass(SQLModel, table=True):
     class_id: Optional[int] = Field(
         sa_column=Column(ForeignKey("classes.class_id", ondelete="SET NULL", onupdate="CASCADE"))
     )
+    exam_id: Optional[int] = Field(
+        sa_column=Column(ForeignKey("exams.exam_id", ondelete="SET NULL", onupdate="CASCADE"))
+    )
     time_id: int = Field(default=datetime.utcnow().timestamp())
 
     lap: int = Field(default=1)
@@ -45,6 +49,7 @@ class CameraUserClass(SQLModel, table=True):
     camera: "Camera" = Relationship(back_populates="camera_user_classes")
     user: "User" = Relationship(back_populates="camera_user_classes")
     class_: Optional["Class"] = Relationship(back_populates="camera_user_classes")
+    exam: Optional["Exam"] = Relationship()
 
 class CameraBase(SQLModel):
     camera_name: str = Field(max_length=255)
