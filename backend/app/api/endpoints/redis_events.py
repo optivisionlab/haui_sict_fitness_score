@@ -5,13 +5,15 @@ import logging
 from datetime import datetime
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
-from app.core.database import get_async_redis
+from app.core.database import get_async_redis, engine
 from fastapi import Body
-
+from sqlmodel import Session, select
+from app.models.user import User
+from app.models.camera import CameraUserClass
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
-
 
 
 @router.get("/events/user/{user_id}")
@@ -40,13 +42,45 @@ async def notify_user(user_id: str, payload: dict = Body(...)):
         return {"status": "error"}
 
 
+@router.get("/checkin-images/class/{class_id}/exam/{exam_id}/user/{user_id}")
+async def get_checkin_images(class_id: int, exam_id: int, user_id: int):
+    """Get checkin images for a specific user in a class and exam.
+    
+    Returns list of checkin records with camera_id, checkin_time, and image_url.
+    """
+    try:
+        def _sync_fetch():
+            with Session(engine) as session:
+                stmt = (
+                    select(CameraUserClass)
+                    .where(
+                        CameraUserClass.user_id == user_id,
+                        CameraUserClass.class_id == class_id,
+                        CameraUserClass.exam_id == exam_id
+                    )
+                    .order_by(CameraUserClass.checkin_time.desc())
+                )
+                results = session.exec(stmt).all()
+                
+                return [
+                    {
+                        "camera_id": record.camera_id,
+                        "checkin_time": record.checkin_time.isoformat() if record.checkin_time else None,
+                        "image_url": record.image_url
+                    }
+                    for record in results
+                ]
+
+        records = await asyncio.to_thread(_sync_fetch)
+        return {"count": len(records), "images": records}
+    except Exception as exc:
+        logger.exception("Failed to fetch checkin images: %s", exc)
+        return {"error": str(exc)}, 500
+
+
 async def _get_user_display_name(user_id: str) -> Optional[str]:
     """Fetch user's full name or username synchronously via threadpool."""
     try:
-        from sqlmodel import Session, select
-        from app.core.database import engine
-        from app.models.user import User
-
         uid = int(user_id) if user_id and str(user_id).isdigit() else None
         if uid is None:
             return None
@@ -65,8 +99,6 @@ async def _get_user_display_name(user_id: str) -> Optional[str]:
         logger.exception("Failed to fetch user display name for %s", user_id)
         return None
 
-logger = logging.getLogger(__name__)
-
 async def _save_checkin_to_db(
     user_id: str,
     camera_id: Optional[str],
@@ -75,17 +107,15 @@ async def _save_checkin_to_db(
     image_url: Optional[str] = None,
     lap: Optional[str] = None,
     avg_speed: Optional[str] = None,
+    exam_id: Optional[str] = None,
+    class_id: Optional[str] = None,
 ):
     """Persist a check-in record with optional telemetry and media reference."""
     try:
-        # Use synchronous SQLModel Session via thread executor because project uses sync engine
-        from sqlmodel import Session
-        from app.core.database import engine
-        from app.models import CameraUserClass
-
-        # normalize values
         uid = int(user_id) if user_id and str(user_id).isdigit() else None
         cam_id = int(camera_id) if camera_id and str(camera_id).isdigit() else None
+        ex_id = int(exam_id) if exam_id and str(exam_id).isdigit() else None
+        cls_id = int(class_id) if class_id and str(class_id).isdigit() else None
 
         # convert timestamp string to datetime if possible
         checkin_dt = None
@@ -134,9 +164,11 @@ async def _save_checkin_to_db(
                 record = CameraUserClass(
                     user_id=uid,
                     camera_id=cam_id,
+                    class_id=cls_id,
+                    exam_id=ex_id,
                     lap=lap_val if lap_val is not None else 1,
                     avg_speed=avg_speed_val,
-                    flag=flag_name if hasattr(CameraUserClass, 'flag') else None,
+                    flag=flag_name,
                     checkin_time=checkin_dt,
                     image_url=image_url,
                 )
@@ -240,13 +272,34 @@ async def _async_redis_sse_generator(request: Request, *, pattern: Optional[str]
                                     continue
                                 if old != "1" and new == "1":
                                     ts = value.get("start_time") or datetime.utcnow().isoformat()
-
+                                    
                                     display_name = None
                                     if user_id:
                                         display_name = await _get_user_display_name(user_id)
 
                                     disp = display_name or (f"Người dùng {user_id}" if user_id else "Người dùng")
-                                    message = f"Xin chào {disp}, bạn đã checkin thành công tại camera {camera_id} lúc {ts}."
+
+                                    lap_raw = (
+                                        value.get("lap")
+                                        or value.get("lap_count")
+                                        or value.get("laps")
+                                    )
+                                    lap_numeric = None
+                                    if lap_raw is not None:
+                                        try:
+                                            lap_numeric = int(float(str(lap_raw)))
+                                        except Exception:
+                                            lap_numeric = None
+
+                                    base_message = (
+                                        f"Xin chào {disp}, bạn đã checkin thành công tại camera {camera_id} lúc {ts}."
+                                    )
+                                    lap_suffix = (
+                                        f" Số vòng đã hoàn thành: {lap_numeric}."
+                                        if lap_numeric is not None
+                                        else ""
+                                    )
+                                    message = f"{base_message}{lap_suffix}"
 
                                     evt = {"message": message}
 
@@ -254,7 +307,10 @@ async def _async_redis_sse_generator(request: Request, *, pattern: Optional[str]
                                         if user_id:
                                             await redis_client.publish(
                                                 f"user:{user_id}:channel",
-                                                json.dumps({"type": "checkin", "message": message}, ensure_ascii=False),
+                                                json.dumps(
+                                                    {"type": "checkin", "message": message},
+                                                    ensure_ascii=False,
+                                                ),
                                             )
                                     except Exception:
                                         logger.exception("Failed to publish checkin event for user %s", user_id)
@@ -269,6 +325,8 @@ async def _async_redis_sse_generator(request: Request, *, pattern: Optional[str]
                                                 image_url=value.get("img_url") or value.get("image_url"),
                                                 lap=value.get("lap"),
                                                 avg_speed=value.get("avg_speed"),
+                                                exam_id=value.get("exam_id"),
+                                                class_id=value.get("class_id"),
                                             )
                                         )
                                     except Exception:
