@@ -6,7 +6,7 @@ from urllib.parse import quote_plus
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Fitness Score API"
     VERSION: str = "1.0.0"
-    API_V1_STR: str = "/api/v1"
+    API_V1_STR: str = ""
     
     # Database configuration (the new values)
     POSTGRES_USER: str

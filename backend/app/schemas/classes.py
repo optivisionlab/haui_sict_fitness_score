@@ -1,12 +1,11 @@
 from datetime import datetime, date
 from typing import Optional
 from pydantic import BaseModel
-from app.models.classes import CourseType, ClassStatus
+from app.models.classes import ClassStatus
 
 
 class ClassCreate(BaseModel):
     class_name: str
-    course_type: CourseType = CourseType.running
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     description: Optional[str] = None
@@ -17,7 +16,6 @@ class ClassCreate(BaseModel):
 class ClassRead(BaseModel):
     class_id: int
     class_name: str
-    course_type: CourseType
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     description: Optional[str] = None
@@ -32,7 +30,6 @@ class ClassRead(BaseModel):
 
 class ClassUpdate(BaseModel):
     class_name: Optional[str] = None
-    course_type: Optional[CourseType] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     description: Optional[str] = None
