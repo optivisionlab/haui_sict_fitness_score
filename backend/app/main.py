@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    openapi_url="/openapi.json" if not settings.API_V1_STR else f"{settings.API_V1_STR}/openapi.json",
 )
 
 # Background dispatcher handles global Redis -> per-user republish
@@ -163,5 +163,5 @@ async def on_shutdown():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=2305, reload=True)
     
