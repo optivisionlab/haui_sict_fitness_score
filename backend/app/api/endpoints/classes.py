@@ -8,6 +8,7 @@ from app.models.user import User, UserRole, UserStatus
 from app.models.classes import Class, UserClass
 from app.models.exams import Exam, ClassExam
 from app.models.result import Result
+from app.models.camera import CameraUserClass
 from app.schemas.classes import ClassCreate, ClassRead, ClassUpdate
 from app.schemas.exams import ExamCreate, ExamRead
 from app.services.result_service import compute_avg_speed
@@ -1281,6 +1282,68 @@ def get_user_latest_result(
     }
 
     return out
+
+
+@router.get("/{class_id}/exam/{exam_id}/user/{user_id}/checkin-images")
+def get_user_checkin_images(
+    class_id: int,
+    exam_id: int,
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Any:
+    """Return check-in images for a specific user within a class and exam.
+
+    Access: admin, class teacher, or the same user.
+    Response: {"count": int, "images": [{"camera_id", "checkin_time", "image_url"}, ...]}
+    """
+    # Validate class exists
+    db_class = db.get(Class, class_id)
+    if not db_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    # Validate exam exists and is linked to class
+    exam = db.get(Exam, exam_id)
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    linked = db.exec(
+        select(ClassExam).where(
+            (ClassExam.class_id == class_id) & (ClassExam.exam_id == exam_id)
+        )
+    ).first()
+    if not linked:
+        raise HTTPException(status_code=400, detail="Exam is not linked to the class")
+
+    # Permission: admin, teacher of class, or the user themself
+    if not (
+        current_user.user_role == UserRole.admin
+        or db_class.teacher_id == current_user.user_id
+        or current_user.user_id == user_id
+    ):
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    # Fetch check-in image records
+    stmt = (
+        select(CameraUserClass)
+        .where(
+            (CameraUserClass.user_id == user_id)
+            & (CameraUserClass.class_id == class_id)
+            & (CameraUserClass.exam_id == exam_id)
+        )
+        .order_by(CameraUserClass.checkin_time.desc())
+    )
+    rows = db.exec(stmt).all()
+
+    images = [
+        {
+            "camera_id": r.camera_id,
+            "checkin_time": r.checkin_time.isoformat() if getattr(r, "checkin_time", None) else None,
+            "image_url": r.image_url,
+        }
+        for r in rows
+    ]
+
+    return {"count": len(images), "images": images}
 
 
 

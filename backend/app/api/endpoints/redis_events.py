@@ -42,42 +42,6 @@ async def notify_user(user_id: str, payload: dict = Body(...)):
         return {"status": "error"}
 
 
-@router.get("/checkin-images/class/{class_id}/exam/{exam_id}/user/{user_id}")
-async def get_checkin_images(class_id: int, exam_id: int, user_id: int):
-    """Get checkin images for a specific user in a class and exam.
-    
-    Returns list of checkin records with camera_id, checkin_time, and image_url.
-    """
-    try:
-        def _sync_fetch():
-            with Session(engine) as session:
-                stmt = (
-                    select(CameraUserClass)
-                    .where(
-                        CameraUserClass.user_id == user_id,
-                        CameraUserClass.class_id == class_id,
-                        CameraUserClass.exam_id == exam_id
-                    )
-                    .order_by(CameraUserClass.checkin_time.desc())
-                )
-                results = session.exec(stmt).all()
-                
-                return [
-                    {
-                        "camera_id": record.camera_id,
-                        "checkin_time": record.checkin_time.isoformat() if record.checkin_time else None,
-                        "image_url": record.image_url
-                    }
-                    for record in results
-                ]
-
-        records = await asyncio.to_thread(_sync_fetch)
-        return {"count": len(records), "images": records}
-    except Exception as exc:
-        logger.exception("Failed to fetch checkin images: %s", exc)
-        return {"error": str(exc)}, 500
-
-
 async def _get_user_display_name(user_id: str) -> Optional[str]:
     """Fetch user's full name or username synchronously via threadpool."""
     try:
