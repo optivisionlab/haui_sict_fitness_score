@@ -14,18 +14,19 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str
     POSTGRES_PORT: str
     POSTGRES_DB: str
+
     # Redis configuration
-    REDIS_HOST: str = "10.100.200.119"
-    REDIS_PORT: int = 6379
-    REDIS_DB: int = 0
+    REDIS_HOST: str 
+    REDIS_PORT: int
+    REDIS_DB: int
     REDIS_PASSWORD: str | None = None
     REDIS_DECODE_RESPONSES: bool = True
-    # Redis server notify-keyspace-events config string. Example values:
-    # - "Eh"  : publish keyevent notifications for hash events (hset/hdel)
-    # - "KEA" : publish keyspace and keyevent notifications for all event types
-    # Default is conservative (hash keyevents + generic events may be added by env).
     REDIS_NOTIFY_EVENTS: str = "KEA"
 
+
+    MINIO_ENDPOINT: str 
+    MINIO_ACCESS_KEY: str   
+    MINIO_SECRET_KEY: str 
     @property
     def DATABASE_URL(self) -> str:
         user = quote_plus(self.POSTGRES_USER)
