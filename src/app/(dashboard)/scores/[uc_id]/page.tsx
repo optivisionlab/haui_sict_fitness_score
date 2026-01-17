@@ -19,7 +19,6 @@ export default function WatchScores() {
   const [scoreData, setScoreData] = useState([]);
   const [chartData, setChartData] = useState([]);
 
-  // fetch lấy danh sách bảng điểm theo lớp
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -45,7 +44,6 @@ export default function WatchScores() {
 
     loadData();
   }, []);
-
   return (
     <div className="p-4 flex flex-col lg:flex-row gap-5 mt-[50px]">
       <div className="w-full lg:w-3/5 border border-gray-300 rounded-2xl p-4 bg-white order-2 lg:order-1">

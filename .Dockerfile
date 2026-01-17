@@ -22,7 +22,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 # Copy only necessary artifacts from builder
-COPY --from=builder /app/package.json ./
+COPY --from= /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
@@ -30,4 +30,4 @@ COPY --from=builder /app/public ./public
 EXPOSE 3000
 
 # Use npm start (next start) to run the production server
-CMD ["npm", "run", "start"]
+CMD ["npm", "run", "start"]builder

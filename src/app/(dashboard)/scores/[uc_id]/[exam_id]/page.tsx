@@ -6,7 +6,6 @@ import { useApi } from "@/hooks/useApi";
 import { toast } from "sonner";
 import HistoryList from "@/components/history/ListHistory";
 import ExamInfoCard from "@/components/run_action/ExamInfoCard";
-import { da } from "zod/v4/locales";
 
 export default function TestDetailPage() {
   const { get, post } = useApi();
@@ -27,21 +26,18 @@ export default function TestDetailPage() {
   const fetchData = async () => {
     try {
       const res = await get(
-        `/class/${class_id}/exam/${exam_id}/user/${user_id}/results`
+        `/class/${class_id}/user/${user_id}/exam/${exam_id}/results`
       );
-      console.log(res);
-      const rows = res.results ?? [];
+      const rows = res.rows ?? [];
 
       // console.log(rows[rows.length - 1].step + 1);
       if (rows.length < 1) {
         setStep(1);
       } else {
-        setStep(rows[0].step + 1);
+        setStep(rows[rows.length - 1].step + 1);
       }
 
-      setExamInfo(rows[0] ?? null);
-
-      // Lưu lịch sử
+      setExamInfo(rows[rows.length - 1] ?? null);
       setHistory(rows);
     } catch (err) {
       toast.error("Không thể tải dữ liệu bài kiểm tra");
@@ -73,66 +69,18 @@ export default function TestDetailPage() {
 
     console.log(`/exam/${exam_id}/user/${user_id}/${step}/start`);
     try {
-      await post(
-        `/class/${class_id}/exam/${exam_id}/user/${user_id}/${step}/start`,
-        {
-          user_id: user_id.toString(),
-          exam_id: exam_id?.toString(),
-          step: step,
-          start_time: timestamp.toString(), // gửi microsecond chính xác
-        }
-      );
+      await post(`/exam/${exam_id}/user/${user_id}/${step}/start`, {
+        user_id: user_id.toString(),
+        exam_id: exam_id?.toString(),
+        step: step,
+        start_time: timestamp.toString(), // gửi microsecond chính xác
+      });
 
       toast.success("Đã bắt đầu kiểm tra");
     } catch (error) {
       toast.error("Không thể gửi thời gian bắt đầu");
     }
   };
-
-  // Cập nhật quá trình kiểm tra qua các cam
-  // Lắng nghe realtime từ Redis qua WebSocket
-  useEffect(() => {
-    if (!user_id || !isRunning) return;
-
-    const url = `${process.env.NEXT_PUBLIC_API_URL}/redis/events/user/${user_id}`;
-
-    const es = new EventSource(url);
-
-    es.onopen = () => console.log("SSE connected");
-
-    es.addEventListener("checkin", (event) => {
-      console.log("Receive CHECKIN event:", event.data);
-
-      const payload = JSON.parse(event.data);
-
-      // Trường hợp Redis chỉ gửi message
-      if (payload.message) {
-        toast.info(payload.message);
-      }
-
-      // Nếu server có gửi value kèm theo
-      if (payload.value) {
-        setExamInfo((prev: any) => ({
-          ...prev,
-          ...payload.value,
-        }));
-
-        [1, 2, 3, 4].forEach((i) => {
-          const flag = payload.value[`flag_${i}`];
-          if (flag !== undefined) {
-            toast.info(`UPDATE flag_${i}: ${flag}`);
-          }
-        });
-      }
-    });
-
-    es.onerror = () => {
-      console.log("SSE error or closed");
-      es.close();
-    };
-
-    return () => es.close();
-  }, [user_id, isRunning]);
 
   // Hàm kết thúc kiểm tra
   const handleFinish = async (endTime: number, elapsed: number) => {
@@ -142,15 +90,12 @@ export default function TestDetailPage() {
     const timestamp_end = toMicroISOString(new Date(endTime));
 
     try {
-      await post(
-        `/class/${class_id}/exam/${exam_id}/user/${user_id}/${step}/end`,
-        {
-          user_id: user_id.toString(),
-          exam_id: exam_id?.toString(),
-          step: step,
-          end_time: timestamp_end.toString(), // gửi microsecond chính xác
-        }
-      );
+      await post(`/exam/${exam_id}/user/${user_id}/${step}/end`, {
+        user_id: user_id.toString(),
+        exam_id: exam_id?.toString(),
+        step: step,
+        end_time: timestamp_end.toString(), // gửi microsecond chính xác
+      });
 
       toast.success("Chúc mừng bạn đã hoàn thành bài kiểm tra");
     } catch (error) {

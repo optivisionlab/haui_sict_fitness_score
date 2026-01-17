@@ -15,9 +15,6 @@ export default function HistoryList({ history }: any) {
             <p className="text-gray-500 mt-2">
               Trạng thái: {item.avg_speed ? "Đã chấm" : "Chưa chấm"}
             </p>
-            <p className="text-gray-500 mt-2">
-              Số vòng đã chạy: {item.lap ?? "-"}
-            </p>
             <p className="text-gray-500 text-sm mt-1">
               Điểm: {item.avg_speed ?? "-"}
             </p>
