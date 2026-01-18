@@ -24,9 +24,6 @@ SQLAlchemy==2.0.44
 sqlmodel==0.0.27
 starlette==0.48.0
 sympy==1.13.3
-torch==2.8.0+cu129
-torchaudio==2.8.0+cu129
-torchvision==0.23.0+cu129
 tqdm==4.67.1
 ultralytics==8.3.203
 ultralytics-thop==2.0.17
