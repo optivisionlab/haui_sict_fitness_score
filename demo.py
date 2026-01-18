@@ -14,11 +14,11 @@ from src.config.config import KAFKA_SERVERS, MONGO_LAPS_COLLECTION
 import json
 from src.engine.engine import draw_target
 import queue
-import gradio as gr
+# import gradio as gr
 import threading
 import pandas as pd
-from pymongo import MongoClient
-from src.database.mongo import MongoDBManager
+# from pymongo import MongoClient
+# from src.database.mongo import MongoDBManager
 import redis
 from src.database.sql_model import PostgresHandler
 from urllib.parse import quote_plus
@@ -26,8 +26,10 @@ from datetime import datetime
 
 
 # ================== CONFIG ==================
-MODEL_PATH = "/u01/quanlm/fitness_tracking/haui_sict_fitness_score/yolo11n.pt"
+MODEL_PATH = "weights\yolo11n.pt"
 CAM_IDS = [1, 2, 3, 4]   # camera id
+# CAM_IDS = [1]   # camera id
+
 TOPIC_TEMPLATE = "camera-{cid}"
 
 # Kết nối Redis
@@ -102,7 +104,7 @@ lap_evaluator = GlobalEvaluator(id_run_process=CAM_IDS, redis_client=redis_clien
 
 
 # ================== PRODUCER (Tracker Process) ==================
-def tracker_producer_worker(cid: int, video_path: str):
+def tracker_producer_worker(cid: int, video_path: str, mode='rtsp'):
     model = YOLO(MODEL_PATH)
     logger.info(f"[Producer-{cid}] start with video={video_path}")
 
@@ -110,8 +112,10 @@ def tracker_producer_worker(cid: int, video_path: str):
     producer = KafkaFrameProducer(producer_conf, topic_template=topic, jpeg_quality=60, drop_on_full=True, max_backoff_sec=5.0)
 
     tracker = SimpleTracker(detection_model=model, cam_id=cid)
-
-    cap = cv2.VideoCapture(video_path)
+    if mode == 'rtsp':
+        cap = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
+    else:
+        cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -180,7 +184,7 @@ def tracker_producer_worker(cid: int, video_path: str):
 # ================== CONSUMER (1 per camera) ==================
 def consumer_worker(cid: int):
     topic = TOPIC_TEMPLATE.format(cid=cid)
-    setup_eval = SetUpEvaluate(id_run_process=CAM_IDS, redis_client=redis_client, pg_handler=pg_handler)
+    setup_eval = SetUpEvaluate(id_run_process=CAM_IDS, redis_client=redis_client, pg_handler=pg_handler, test_mode=True)
     consumer = KafkaFrameConsumer(consumer_conf, topic, group_id=f"group-{topic}")
     api = APIHandler(evaluator=setup_eval, lap_update=lap_evaluator)
 
@@ -212,10 +216,10 @@ def main():
     create_topics(CAM_IDS)
 
     video_sources = {
-        1: r"D:\NCKH_Cham_diem_the_duc\assets\test\27_9\cam1.mp4",
-        2: r"D:\NCKH_Cham_diem_the_duc\assets\test\27_9\cam2.mp4",
-        3: r"D:\NCKH_Cham_diem_the_duc\assets\test\27_9\cam3.mp4",
-        4: r"D:\NCKH_Cham_diem_the_duc\assets\test\27_9\cam4.mp4",
+        1: r"D:\NCKH_Cham_diem_the_duc\assets\test\6_12\1231.mp4",
+        2: r"D:\NCKH_Cham_diem_the_duc\assets\test\6_12\IMG_1550.MOV",
+        3: r"D:\NCKH_Cham_diem_the_duc\assets\test\6_12\IMG_0503.MOV",
+        4: r"D:\NCKH_Cham_diem_the_duc\assets\test\6_12\VID_20251206_105125.mp4",
     }
 
     ctx = mp.get_context("spawn")

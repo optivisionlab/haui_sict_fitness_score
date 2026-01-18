@@ -33,7 +33,7 @@ class SimpleTracker:
                 x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
                 xyxy_boxes.append([x1, y1, x2, y2])
                 ids.append(random.randint(1, 100))
-        logger.info(f"Detected {len(ids)} persons in camera {self.cam_id}")
+        # logger.info(f"Detected {len(ids)} persons in camera {self.cam_id}")
         return ids, xyxy_boxes, frame
 
 
@@ -57,10 +57,9 @@ class APIHandler:
         self.collection_name = collection_name
         self.id_to_name = {}
 
-    def __draw_detections__(self, frame, detections):
-        for detection in detections:
-            user_id, box = detection
-            draw_target(frame, user_id, box, name="", color=(0, 255, 0), thickness=2)
+    def __draw_detections__(self, frame, detection):
+        user_id, box = detection
+        draw_target(frame, user_id, box, name="", color=(0, 255, 0), thickness=2)
         return frame
 
     def process(self, cam_id, frame, xyxy_boxes, ids, timestamp=None):
@@ -104,13 +103,14 @@ class APIHandler:
                     user_id, name = pair
                     # draw_target(copy_frame, user_id, box, name=name, color=(0, 255, 0), thickness=2)
                     detections.append([user_id, box])
-
             if detections:
+                logger.info(f"API detections: {detections}")
                 for detection in detections:
+                    logger.info(f"detection: {detection}")
                     user_id, box = detection
-                    logger.debug(f'user_id: {user_id}, cam_id: {cam_id}')
-                    draw_frame = self.__draw_detections__(copy_frame, detections)
+                    draw_frame = self.__draw_detections__(copy_frame.copy(), detection)
                     self.evaluator.set_flag_redis(user_id, cam_id, draw_frame, timestamp=timestamp)
+                    logger.info(f"API sent for user {user_id} at cam {cam_id}")
                     self.evaluator.check_lap_1_user(user_id)
 
         except Exception as e:

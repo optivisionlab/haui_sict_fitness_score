@@ -42,7 +42,7 @@ class PostgresHandler:
         SQLModel.metadata.create_all(self.engine)
 
 
-    def insert_redis(
+    def insert_postgre(
         self, user_id, exam_id, step, lap, start_time,
         flag1=0, flag2=None, flag3=None, flag4=None,
         url=None, end_time=None
