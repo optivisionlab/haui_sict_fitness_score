@@ -26,7 +26,7 @@ export default function TestDetailPage() {
   const fetchData = async () => {
     try {
       const res = await get(
-        `/class/${class_id}/user/${user_id}/exam/${exam_id}/results`
+        `/class/${class_id}/user/${user_id}/exam/${exam_id}/results`,
       );
       const rows = res.rows ?? [];
 
@@ -34,7 +34,7 @@ export default function TestDetailPage() {
       if (rows.length < 1) {
         setStep(1);
       } else {
-        setStep(rows[rows.length - 1].step + 1);
+        setStep(rows[0].step + 1);
       }
 
       setExamInfo(rows[rows.length - 1] ?? null);
@@ -81,6 +81,51 @@ export default function TestDetailPage() {
       toast.error("Không thể gửi thời gian bắt đầu");
     }
   };
+
+  // Cập nhật quá trình kiểm tra qua các cam
+  // Lắng nghe realtime từ Redis qua WebSocket
+  useEffect(() => {
+    if (!user_id || !isRunning) return;
+
+    const url = `${process.env.NEXT_PUBLIC_API_URL}/redis/events/user/${user_id}`;
+
+    const es = new EventSource(url);
+
+    es.onopen = () => console.log("SSE connected");
+
+    es.addEventListener("checkin", (event) => {
+      console.log("Receive CHECKIN event:", event.data);
+
+      const payload = JSON.parse(event.data);
+
+      // Trường hợp Redis chỉ gửi message
+      if (payload.message) {
+        toast.info(payload.message);
+      }
+
+      // Nếu server có gửi value kèm theo
+      if (payload.value) {
+        setExamInfo((prev: any) => ({
+          ...prev,
+          ...payload.value,
+        }));
+
+        [1, 2, 3, 4].forEach((i) => {
+          const flag = payload.value[`flag_${i}`];
+          if (flag !== undefined) {
+            toast.info(`UPDATE flag_${i}: ${flag}`);
+          }
+        });
+      }
+    });
+
+    es.onerror = () => {
+      console.log("SSE error or closed");
+      es.close();
+    };
+
+    return () => es.close();
+  }, [user_id, isRunning]);
 
   // Hàm kết thúc kiểm tra
   const handleFinish = async (endTime: number, elapsed: number) => {

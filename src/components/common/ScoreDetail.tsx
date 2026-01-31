@@ -21,7 +21,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import Image from "next/image";
-import running from "@/image/training (2).png";
+// import running from "@/image/training (2).png";
 import Link from "next/link";
 import { ScoreResult } from "@/types/scoreApiType";
 import { calcRunInfo } from "@/lib/calcRunTime";
@@ -147,7 +147,7 @@ export default function ScoreDetail({
 
                           <div className="text-center mt-4">
                             <Image
-                              src={running}
+                              src={""}
                               alt="run"
                               width={150}
                               height={150}
