@@ -7,12 +7,13 @@ import { useRouter } from "next/navigation";
 import { LoginForm } from "@/components/form/login-form";
 import { toast } from "sonner";
 import { loginUserThunk } from "@/features/auth/authThunks";
+import AnimatedRectangles from "./AnimatedRectangles";
 
 export default function LoginPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { loading, error, user, access_token } = useAppSelector(
-    (state) => state.auth
+    (state) => state.auth,
   );
 
   const handleSubmit = async (data: { username: string; password: string }) => {
@@ -46,12 +47,8 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="bg-muted relative hidden lg:block">
-        <img
-          src="/placeholder.svg"
-          alt="Login background"
-          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
-        />
+      <div className="bg-muted relative hidden lg:block lg:">
+        <AnimatedRectangles />
       </div>
     </div>
   );
