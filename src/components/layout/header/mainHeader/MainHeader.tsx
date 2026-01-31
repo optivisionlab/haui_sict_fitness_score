@@ -15,6 +15,7 @@ import { logoutThunk } from "@/features/auth/authThunks";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 const MainHeader = () => {
   const [user, setUser] = useState<any>(null);
@@ -47,8 +48,20 @@ const MainHeader = () => {
       style={{ height: "var(--navHeight)" }}
     >
       {/* Logo */}
-      <Link href="/" className="font-bold text-xl text-gray-800">
-        LOGO
+      <Link href="/home" className="flex items-center gap-2 group select-none">
+        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-gray-200 transition">
+          <Image
+            src="/logoHautoMLNotext.png"
+            alt="AutoML Logo"
+            width={28}
+            height={28}
+            className="object-contain"
+          />
+        </div>
+
+        <span className="text-lg font-bold tracking-wide text-gray-800 group-hover:text-black transition">
+          SICT
+        </span>
       </Link>
 
       <div className="flex items-center gap-4">
@@ -61,7 +74,7 @@ const MainHeader = () => {
               <Avatar className="cursor-pointer">
                 <AvatarImage src={user.avatar_url || ""} />
                 <AvatarFallback>
-                  {user.username?.[0]?.toUpperCase() || "?"}
+                  {user.username?.[0]?.toUpperCase() || "C"}
                 </AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
@@ -72,9 +85,11 @@ const MainHeader = () => {
             >
               <DropdownMenuLabel className="flex gap-x-3 items-center">
                 <Avatar>
-                  <AvatarImage src={user.avatar_url || ""} />
+                  <AvatarImage
+                    src={user.avatar_url || "/front-end/public/anhtest/2.jpg"}
+                  />
                   <AvatarFallback>
-                    {user.username?.[0]?.toUpperCase() || "?"}
+                    {user.username?.[0]?.toUpperCase() || "C"}
                   </AvatarFallback>
                 </Avatar>
                 <div>

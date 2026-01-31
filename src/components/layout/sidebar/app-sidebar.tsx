@@ -68,7 +68,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       { title: "Quản lý người dùng", url: "/admin/users", icon: Calendar },
       { title: "Quản lý lớp học", url: "/admin/classes", icon: Calendar },
       { title: "Quản lý chấm điểm", url: "/admin/scores", icon: Search },
-      { title: "Quản lý khiếu nại", url: "/admin/complaints", icon: Settings },
+      { title: "Demo dự án", url: "/admin/demo", icon: Settings },
       { title: "Quản lý thông báo", url: "/admin/notifications", icon: Bell },
     ],
     teacher: [
