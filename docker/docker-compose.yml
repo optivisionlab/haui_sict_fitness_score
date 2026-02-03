@@ -93,11 +93,20 @@ services:
     volumes:
       - ./video:/video
     command: >
-      -stream_loop -1
-      -re
-      -i /video/videoplayback.mp4
-      -an
-      -vf fps=30,scale=640:360
-      -c:v libx264 -preset ultrafast -tune zerolatency
-      -pix_fmt yuv420p
+      -stream_loop -1 
+      -re 
+      -fflags nobuffer 
+      -flags low_delay 
+      -i /video/IMG_0503.MOV
+      -an 
+      -vf scale=640:360 
+      -c:v libx264 
+      -preset ultrafast 
+      -tune zerolatency 
+      -pix_fmt yuv420p 
+      -g 30 
+      -keyint_min 30 
+      -sc_threshold 0 
+      -rtsp_transport udp 
       -f rtsp rtsp://mediamtx:8554/cam1
+
