@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { UserCard } from "@/components/demo/UserCard";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 /* TYPES */
 export interface CheckinEvent {
@@ -160,20 +160,20 @@ export default function RealtimePage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* CAMERA GRID */}
         <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* {[1, 2, 3, 4].map((cam) => (
-            <CameraBox key={cam} camId={cam} data={cams[cam]} />
-          ))} */}
           {[1, 2, 3, 4].map((cam) => (
+            <CameraBox key={cam} camId={cam} data={cams[cam]} />
+          ))}
+          {/* {[1, 2, 3, 4].map((cam) => (
             <CameraBox
               key={cam}
               camId={cam}
               data={cams[cam] ?? fakeCams[cam]} // ← ưu tiên realtime, fallback fake
             />
-          ))}
+          ))} */}
         </div>
 
         {/* USER LIST */}
-        <div className="bg-white rounded-2xl shadow p-4 flex flex-col">
+        <div className="bg-white rounded-2xl shadow p-4 flex flex-col max-h-[70vh]">
           <h2 className="font-semibold mb-3 flex items-center gap-2">
             👥 User Activity
             <span className="text-xs text-gray-400">({users.length})</span>
@@ -184,13 +184,13 @@ export default function RealtimePage() {
               <p className="text-gray-500 text-sm">Chưa có user nào</p>
             )}
 
-            {/* {users.map((u, index) => (
-              <UserCard key={index} user={u} />
-            ))} */}
-
-            {(users.length ? users : fakeUsers).map((u, index) => (
+            {users.map((u, index) => (
               <UserCard key={index} user={u} />
             ))}
+
+            {/* {(users.length ? users : fakeUsers).map((u, index) => (
+              <UserCard key={index} user={u} />
+            ))} */}
           </div>
         </div>
       </div>
@@ -200,47 +200,6 @@ export default function RealtimePage() {
 
 /* COMPONENTS */
 
-// function CameraBox({
-//   camId,
-//   data,
-// }: {
-//   camId: number;
-//   data: CheckinEvent | null;
-// }) {
-//   return (
-//     <div className="bg-black rounded-xl overflow-hidden aspect-video relative flex items-center justify-center">
-//       {data?.img_url ? (
-//         <Image
-//           // src={`${data.img_url}&t=${Date.now()}`}
-//           src={`${data.img_url}`}
-//           alt={`${data.img_url}`}
-//           width={640}
-//           height={360}
-//           className="w-full h-full object-contain"
-//         />
-//       ) : (
-//         // <div className="w-full h-full p-10 object-contain text-[#fff] text-sm break-all overflow-auto">
-//         //   <a href={data.img_url} target="_blank" rel="noopener noreferrer">
-//         //     {data.img_url}
-//         //   </a>
-//         // </div>
-//         <span className="text-white">Đang chờ...</span>
-//       )}
-
-//       {/* Overlay */}
-//       <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-//         CAM {camId}
-//       </div>
-
-//       {data && (
-//         <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-//           User #{data.user_id}
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
 function CameraBox({
   camId,
   data,
@@ -249,19 +208,23 @@ function CameraBox({
   data: CheckinEvent | null;
 }) {
   return (
-    <div className="rounded-xl overflow-hidden aspect-video relative">
+    <div className="bg-black rounded-xl overflow-hidden aspect-video relative flex items-center justify-center">
       {data?.img_url ? (
         <Image
-          src={data.img_url}
-          alt={`Camera ${camId}`}
-          fill
-          className="object-cover" // 🔥 QUAN TRỌNG
-          sizes="(max-width: 768px) 100vw, 50vw"
+          // src={`${data.img_url}&t=${Date.now()}`}
+          src={`${data.img_url}`}
+          alt={`${data.img_url}`}
+          width={640}
+          height={360}
+          className="w-full h-full object-contain"
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gray-800">
-          <span className="text-white">Đang chờ...</span>
-        </div>
+        // <div className="w-full h-full p-10 object-contain text-[#fff] text-sm break-all overflow-auto">
+        //   <a href={data.img_url} target="_blank" rel="noopener noreferrer">
+        //     {data.img_url}
+        //   </a>
+        // </div>
+        <span className="text-white">Đang chờ...</span>
       )}
 
       {/* Overlay */}
@@ -277,3 +240,40 @@ function CameraBox({
     </div>
   );
 }
+
+// function CameraBox({
+//   camId,
+//   data,
+// }: {
+//   camId: number;
+//   data: CheckinEvent | null;
+// }) {
+//   return (
+//     <div className="rounded-xl overflow-hidden aspect-video relative">
+//       {data?.img_url ? (
+//         <Image
+//           src={data.img_url}
+//           alt={`Camera ${camId}`}
+//           fill
+//           className="object-cover" // QUAN TRỌNG
+//           sizes="(max-width: 768px) 100vw, 50vw"
+//         />
+//       ) : (
+//         <div className="w-full h-full flex items-center justify-center bg-gray-800">
+//           <span className="text-white">Đang chờ...</span>
+//         </div>
+//       )}
+
+//       {/* Overlay */}
+//       <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+//         CAM {camId}
+//       </div>
+
+//       {data && (
+//         <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+//           User #{data.user_id}
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
