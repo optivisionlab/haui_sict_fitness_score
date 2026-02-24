@@ -10,6 +10,8 @@ from fastapi import Body
 from sqlmodel import Session, select
 from app.models.user import User
 from app.models.camera import CameraUserClass
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,7 +20,6 @@ router = APIRouter()
 
 @router.get("/events/user/{user_id}")
 async def user_events(request: Request, user_id: str):
-    return
     """SSE endpoint that streams notifications for a specific user."""
     return StreamingResponse(
         _async_redis_sse_generator(request, user=user_id),
@@ -28,7 +29,6 @@ async def user_events(request: Request, user_id: str):
 
 @router.post("/notify/user/{user_id}")
 async def notify_user(user_id: str, payload: dict = Body(...)):
-    return {"status": "sent"}
     """Publish a custom notification to a user's Redis channel.
 
      Body example: {"message": "Hello", "type": "custom"}
@@ -45,7 +45,6 @@ async def notify_user(user_id: str, payload: dict = Body(...)):
 
 
 async def _get_user_display_name(user_id: str) -> Optional[str]:
-    pass
     """Fetch user's full name or username synchronously via threadpool."""
     try:
         uid = int(user_id) if user_id and str(user_id).isdigit() else None
@@ -77,7 +76,6 @@ async def _save_checkin_to_db(
     exam_id: Optional[str] = None,
     class_id: Optional[str] = None,
 ):
-    return
     """Persist a check-in record with optional telemetry and media reference."""
     try:
         uid = int(user_id) if user_id and str(user_id).isdigit() else None
@@ -150,7 +148,6 @@ async def _save_checkin_to_db(
 
 
 async def _async_redis_sse_generator(request: Request, *, pattern: Optional[str] = None, user: Optional[str] = None) -> AsyncGenerator[str, None]:
-    return
     """Async generator that listens for either keyevent patterns or per-user channels. """
     redis_client = get_async_redis()
     pubsub = redis_client.pubsub()
