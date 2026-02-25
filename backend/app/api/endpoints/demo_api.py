@@ -6,6 +6,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from app.core.database import get_async_redis
 import hashlib
+import time 
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -31,7 +33,7 @@ async def _async_global_sse_generator(request: Request) -> AsyncGenerator[str, N
             if await request.is_disconnected():
                 logger.info("Client disconnected")
                 break
-
+            start_time = time.time()
             # 2. Nhận tin nhắn từ Redis
             message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
 
@@ -62,12 +64,6 @@ async def _async_global_sse_generator(request: Request) -> AsyncGenerator[str, N
                             key = k.decode() if isinstance(k, bytes) else k
                             value = v.decode() if isinstance(v, bytes) else v
                             decoded_temp[key] = value
-
-                    # =======================================================
-                    # PHẦN SỬA LỖI: Đưa logic này VÀO TRONG khối 'if'
-                    # =======================================================
-                    
-                    # A. Payload đầy đủ để gửi cho Client (Có URL thay đổi)
                     response_payload = {
                         "user_id": user_id,
                         "start_time": decoded_temp.get("start_time"),
@@ -77,31 +73,27 @@ async def _async_global_sse_generator(request: Request) -> AsyncGenerator[str, N
                         "step": decoded_temp.get("step"),
                         "lap": decoded_temp.get("lap")
                     }
-
-                    # B. Payload dùng để SO SÁNH (BỎ img_url đi)
                     compare_payload = {
                         "user_id": user_id,
-                        # "img_url": ... -> QUAN TRỌNG: Không đưa img_url vào đây
                         "last_time": decoded_temp.get("last_time"),
                         "last_cam": decoded_temp.get("last_cam"),
                         "step": decoded_temp.get("step"),
                         "lap": decoded_temp.get("lap")
                     }
 
-                    # C. Tạo Hash (Fingerprint)
                     compare_str = json.dumps(compare_payload, sort_keys=True)
                     current_hash = hashlib.md5(compare_str.encode()).hexdigest()
 
-                    # D. Kiểm tra trùng lặp
                     if last_sent_hash.get(user_id) == current_hash:
-                        # Dữ liệu nghiệp vụ không đổi -> Bỏ qua, không gửi
                         continue
-                    
-                    # E. Nếu có thay đổi -> Cập nhật hash và gửi
+                    end_time = time.time()
+                    total_time = end_time - start_time
+                    with open("ghichu.txt", "w") as f:
+                        f.write(f"{total_time}\n")
+    
                     last_sent_hash[user_id] = current_hash
                     yield f"data: {json.dumps(response_payload)}\n\n"
 
-            # Nghỉ nhẹ để tránh ngốn CPU
             await asyncio.sleep(0.01)
 
     except Exception as e:
