@@ -6,30 +6,11 @@ services:
     container_name: backend_cont
     env_file:
       - ./backend/.env
-    volumes:
-      - ./backend/.env:/backend/.env
     networks:
       - app-network
     ports:
-      - "8000:8000"
+      - "2305:8000"
     entrypoint: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-  frontend:
-    depends_on:
-      - backend
-    image: frontend_image:v0.0.1
-    build:
-      context: ./frontend
-    container_name: frontend_cont
-    environment:
-      NEXT_PUBLIC_API_URL: "http://backend_cont:8000/api/v1"
-    networks:
-      - app-network
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend/.next:/app/.next
-    entrypoint: ["npm", "run", "dev"]
 
 networks:
   app-network:
