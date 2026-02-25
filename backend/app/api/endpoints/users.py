@@ -47,7 +47,6 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)) -> Any:
             detail="The user with this username already exists."
         )
     
-    # Dùng hash_password (có SHA-256 trước bcrypt)
     # Create user with hashed password (do not mutate incoming Pydantic model)
     payload = user_in.dict(exclude={"password"})
     if email is not None:
