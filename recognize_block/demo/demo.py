@@ -7,7 +7,7 @@ from ultralytics import YOLO
 from confluent_kafka.admin import AdminClient, NewTopic
 
 from src.engine.detect import SimpleTracker, APIHandler
-from src.engine.score import GlobalEvaluator, SetUpEvaluate
+from src.engine.score import SetUpEvaluate
 from src.kafka.kafka_produce import KafkaFrameProducer
 from src.kafka.kafka_consumers import KafkaFrameConsumer
 from src.config.config import KAFKA_SERVERS, MONGO_LAPS_COLLECTION, TEST_MODE
@@ -204,7 +204,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
             # ===== DETECT 1s / frame =====
             if frame_count % frame_step == 0:
                 t0 = time.perf_counter()
-                results = tracker.detect_batch([frame])
+                results = tracker.detect_frame([frame])
                 detect_time = time.perf_counter() - t0
 
                 ids, boxes, _ = results[0]

@@ -1,118 +1,167 @@
+import time
 import random
-from collections import defaultdict
-
-# Giả sử đã import sẵn
-from src.engine.curl_api_search import send_tracking_to_api
-from ultralytics import YOLO
+from typing import Dict, List, Tuple
 from loguru import logger
-from src.engine.engine import draw_target, line_begin_curl_api_search
-import cv2
+
+from src.engine.curl_api_search import send_tracking_to_api
+from src.engine.engine import draw_target
 from src.config.config import LINE_BEGIN_SEARCH, QDRANT_COLLECTION
-import torch
-import asyncio
 
 
 class SimpleTracker:
+    """
+    No real tracking yet:
+    - Detect only (YOLO.predict / YOLO()).
+    - Generate TEMP random ids ONLY for mapping in face-search response.
+    """
+
     def __init__(self, detection_model, cam_id):
-        """
-        detection_model: YOLO model để detect người
-        cam_id: camera hiện tại
-        global_evaluator: đối tượng GlobalEvaluator (chung cho mọi tracker)
-        """
-        # ở đây KHÔNG load YOLO lại nữa, chỉ dùng model truyền vào
         self.detection_model = detection_model
         self.cam_id = cam_id
-        self.id_to_name = {}   # mapping API id -> name
+        self._rng = random.SystemRandom()
 
-
-    def _parse_result(self, frame, detection_result):
-        ids, xyxy_boxes = [], []
-        for box in detection_result.boxes:
-            cls = int(box.cls[0]) if box.cls is not None else -1
-            if cls == 0:  # person
-                x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
-                xyxy_boxes.append([x1, y1, x2, y2])
-                ids.append(random.randint(1, 100))
-        # logger.info(f"Detected {len(ids)} persons in camera {self.cam_id}")
-        return ids, xyxy_boxes, frame
-
+    def _gen_unique_ids(self, n: int) -> List[int]:
+        # random but guaranteed unique within one request
+        s = set()
+        while len(s) < n:
+            s.add(self._rng.randint(1, 2_147_483_647))  # 31-bit int
+        return list(s)
 
     def detect_frame(self, frame):
-        try:
-            result = self.detection_model(frame, conf=0.5, iou=0.5, verbose=False)[0]
-            return self._parse_result(frame, result)
-        finally:
-            torch.cuda.empty_cache()
+        # detect only (no track)
+        result = self.detection_model(frame, conf=0.65, iou=0.8, verbose=False)[0]
 
-    def detect_batch(self, frames):
-        with torch.inference_mode():
-            results = self.detection_model(frames, conf=0.6, iou=0.7, verbose=False, device=0)
-            return [self._parse_result(frame, res) for frame, res in zip(frames, results)]
+        boxes: List[List[int]] = []
+        if result is None or result.boxes is None:
+            return [], [], frame
+
+        for box in result.boxes:
+            cls = int(box.cls[0]) if box.cls is not None else -1
+            if cls != 0:  # only person
+                continue
+            x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+            boxes.append([x1, y1, x2, y2])
+
+        ids = self._gen_unique_ids(len(boxes))
+        return ids, boxes, frame
+
+
+    def detect_batch(self, frames: List):
+        results = self.detection_model(frames, conf=0.65, iou=0.8, verbose=False)
+
+        outs = []
+        for frame, res in zip(frames, results):
+            boxes: List[List[int]] = []
+            if res is not None and res.boxes is not None:
+                for box in res.boxes:
+                    cls = int(box.cls[0]) if box.cls is not None else -1
+                    if cls != 0:
+                        continue
+                    x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+                    boxes.append([x1, y1, x2, y2])
+
+            ids = self._gen_unique_ids(len(boxes))
+            outs.append((ids, boxes, frame))
+
+        return outs
     
-
+    
 class APIHandler:
-    def __init__(self, evaluator, lap_update, collection_name=QDRANT_COLLECTION):
+    def __init__(self, evaluator, collection_name=QDRANT_COLLECTION):
         self.evaluator = evaluator
-        self.lap_update = lap_update
         self.collection_name = collection_name
-        self.id_to_name = {}
+
+        # cooldown per user to prevent double count
+        self._user_cooldown_until: Dict[str, float] = {}
+        self.user_cooldown_seconds = 1.0
+
+        # per-cam gate to reduce API spam
+        self._cam_last_call_ts: Dict[str, float] = {}
+        self.cam_call_min_interval = 0.15  # seconds
+
+        # line band (hysteresis) around the line to approximate "crossing"
+        self.band_ratio = 0.06  # 6% of image height
 
     def __draw_detections__(self, frame, detection):
         user_id, box = detection
         draw_target(frame, user_id, box, name="", color=(0, 255, 0), thickness=2)
         return frame
 
-    def process(self, cam_id, frame, xyxy_boxes, ids, timestamp=None):
-        copy_frame = frame.copy()
+    def _center_y(self, box_xyxy: List[int]) -> float:
+        return (box_xyxy[1] + box_xyxy[3]) / 2.0
 
-        valid_ids, valid_boxes = [], []
-        for uid, box in zip(ids, xyxy_boxes):
-            if line_begin_curl_api_search((0, int(copy_frame.shape[0]*LINE_BEGIN_SEARCH)), box, mode='xyxy'):
-                valid_ids.append(uid)
+    def _in_line_band(self, cy: float, y_line: float, band: float) -> bool:
+        # only trigger when center is near the line (reduces false positive)
+        return (y_line - band) <= cy <= (y_line + band)
+
+    def process(self, cam_id, frame, xyxy_boxes, ids, timestamp=None):
+        now = float(timestamp) if timestamp is not None else time.time()
+        cam_id = str(cam_id)
+
+        # per-cam rate limit: avoid calling search too frequently in high FPS
+        last = self._cam_last_call_ts.get(cam_id, 0.0)
+        if now - last < self.cam_call_min_interval:
+            return
+
+        y_line = int(frame.shape[0] * LINE_BEGIN_SEARCH)
+        band = frame.shape[0] * self.band_ratio
+
+        # keep only boxes near the line band
+        valid_ids: List[int] = []
+        valid_boxes: List[List[int]] = []
+        for rid, box in zip(ids, xyxy_boxes):
+            cy = self._center_y(box)
+            if self._in_line_band(cy, y_line, band):
+                valid_ids.append(rid)
                 valid_boxes.append(box)
 
-        logger.info('valid_ids, valid_boxes: {}, {}'.format(valid_ids, valid_boxes))
         if not valid_ids:
             return
 
-        try:
-            response = asyncio.run(send_tracking_to_api(valid_ids, valid_boxes, copy_frame, collection_name=self.collection_name))
+        self._cam_last_call_ts[cam_id] = now
 
+        try:
+            response = send_tracking_to_api(
+                valid_ids,
+                valid_boxes,
+                frame,
+                collection_name=self.collection_name,
+                crop_mode="union",
+            )
+            if not response or response.status_code != 200:
+                return
+
+            api_data = response.json().get("data", [])
             map_local_to_user = {}
-            if response and response.status_code == 200:
-                api_data = response.json().get("data", [])
-                for entry in api_data:
-                    sent_local_id = entry.get("id")
-                    infor = entry.get("infor", {}) or {}
-                    metadata = infor.get("metadata", {}) if isinstance(infor, dict) else {}
-                    user_id = metadata.get("id") or metadata.get("user_id") or metadata.get("uid")
-                    name = metadata.get("name", "Person")
-                    if sent_local_id is not None:
-                        try:
-                            key = int(sent_local_id)
-                        except Exception:
-                            key = sent_local_id
-                        map_local_to_user[key] = (str(user_id) if user_id is not None else None, name)
-                        if user_id is not None:
-                            self.id_to_name[str(user_id)] = name
+            for entry in api_data:
+                sent_local_id = entry.get("id")
+                infor = entry.get("infor", {}) or {}
+                metadata = infor.get("metadata", {}) if isinstance(infor, dict) else {}
+                user_id = metadata.get("id") or metadata.get("user_id") or metadata.get("uid")
+                if sent_local_id is not None and user_id is not None:
+                    map_local_to_user[int(sent_local_id)] = str(user_id)
 
             detections = []
             for local_id, box in zip(valid_ids, valid_boxes):
-                pair = map_local_to_user.get(local_id)
-                if pair and pair[0] is not None:
-                    user_id, name = pair
-                    # draw_target(copy_frame, user_id, box, name=name, color=(0, 255, 0), thickness=2)
-                    detections.append([user_id, box])
-            if detections:
-                logger.info(f"API detections: {detections}")
-                for detection in detections:
-                    logger.info(f"detection: {detection}")
-                    user_id, box = detection
-                    draw_frame = self.__draw_detections__(copy_frame.copy(), detection)
-                    self.evaluator.set_flag_redis(user_id, cam_id, draw_frame, timestamp=timestamp)
-                    logger.info(f"API sent for user {user_id} at cam {cam_id}")
-                    self.evaluator.check_lap_1_user(user_id)
+                uid = map_local_to_user.get(int(local_id))
+                if uid:
+                    detections.append([uid, box])
+
+            for user_id, box in detections:
+                until = self._user_cooldown_until.get(user_id, 0.0)
+                if now < until:
+                    continue
+                self._user_cooldown_until[user_id] = now + self.user_cooldown_seconds
+
+                draw_frame = self.__draw_detections__(frame.copy(), [user_id, box])
+                ok = self.evaluator.set_flag_redis(user_id, cam_id, draw_frame, timestamp=timestamp)
+                if not ok:
+                    continue
+
+                lap_done = self.evaluator.check_lap_1_user(user_id)
+                if lap_done:
+                    # 1) log
+                    logger.info("✅ user {} completed a lap (cam={})", user_id, cam_id)
 
         except Exception as e:
-            logger.exception(f"Lỗi khi gửi API: {e}")
-
+            logger.exception(f"API search error: {e}")
