@@ -204,7 +204,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
             # ===== DETECT 1s / frame =====
             if frame_count % frame_step == 0:
                 t0 = time.perf_counter()
-                results = tracker.detect_frame([frame])
+                results = tracker.detect_frame(frame)
                 detect_time = time.perf_counter() - t0
 
                 ids, boxes, _ = results[0]
@@ -233,12 +233,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
                         )
 
                     headers = [
-                        (
-                            "timestamp",
-                            datetime.now()
-                            .strftime("%Y/%m/%d/%H/%M/%S")
-                            .encode(),
-                        ),
+                        ("timestamp", str(ts_ms).encode()),   # epoch milliseconds,
                         ("frame_id", str(frame_count).encode()),
                         ("person_ids", json.dumps(ids).encode()),
                         ("bboxes", json.dumps(boxes).encode()),
@@ -289,7 +284,6 @@ def consumer_worker(cid: int, start_barrier):
         try:
             nparr = np.frombuffer(msg.value(), np.uint8)
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
             hdrs = dict(msg.headers() or [])
 
@@ -302,9 +296,7 @@ def consumer_worker(cid: int, start_barrier):
             frame_id = int(
                 hdrs.get("frame_id", b"-1").decode()
             )
-            time_stamp = hdrs.get(
-                "timestamp", b""
-            ).decode()
+            timestamp = hdrs.get("timestamp", b"").decode()
 
             logger.info(
                 f"[Consumer-{cid}] frame={frame_id}, "
@@ -316,7 +308,7 @@ def consumer_worker(cid: int, start_barrier):
                 frame,
                 bboxes,
                 person_ids,
-                timestamp=time_stamp,
+                timestamp=timestamp,
             )
 
         except Exception:

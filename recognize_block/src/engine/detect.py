@@ -90,9 +90,19 @@ class APIHandler:
     def _center_y(self, box_xyxy: List[int]) -> float:
         return (box_xyxy[1] + box_xyxy[3]) / 2.0
 
-    def _in_line_band(self, cy: float, y_line: float, band: float) -> bool:
-        # only trigger when center is near the line (reduces false positive)
-        return (y_line - band) <= cy <= (y_line + band)
+    def _is_below_line(self, box, y_line: float, mode: str = "xyxy") -> bool:
+        """
+        Return True if bbox center is below the line (strictly below).
+        mode:
+        - "xyxy": box = [x1, y1, x2, y2]
+        - "xywh": box = [x_center, y_center, w, h]
+        """
+        if mode == "xyxy":
+            x1, y1, x2, y2 = box
+            y_center = (y1 + y2) / 2.0
+        else:
+            _, y_center, _, _ = box
+        return y_center > y_line
 
     def process(self, cam_id, frame, xyxy_boxes, ids, timestamp=None):
         now = float(timestamp) if timestamp is not None else time.time()
@@ -111,7 +121,7 @@ class APIHandler:
         valid_boxes: List[List[int]] = []
         for rid, box in zip(ids, xyxy_boxes):
             cy = self._center_y(box)
-            if self._in_line_band(cy, y_line, band):
+            if self._is_below_line(box, y_line, mode="xyxy"):
                 valid_ids.append(rid)
                 valid_boxes.append(box)
 
