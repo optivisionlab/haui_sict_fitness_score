@@ -104,7 +104,7 @@ class APIHandler:
             _, y_center, _, _ = box
         return y_center > y_line
 
-    def process(self, cam_id, frame, xyxy_boxes, ids, timestamp=None):
+    async def process(self, cam_id, frame, xyxy_boxes, ids, timestamp=None):
         now = float(timestamp) if timestamp is not None else time.time()
         logger.debug("Processing detections for cam_id={}, frame_time={}".format(cam_id, timestamp))
         cam_id = str(cam_id)
@@ -129,7 +129,7 @@ class APIHandler:
             return
 
         try:
-            response = send_tracking_to_api(
+            response = await send_tracking_to_api(
                 valid_ids,
                 valid_boxes,
                 frame,
@@ -160,6 +160,8 @@ class APIHandler:
                 until = self._user_cooldown_until.get(user_id, 0.0)
                 if now < until:
                     continue
+
+                draw_frame = None
                 if self.evaluator.cfg.upload_each_checkin:
                     draw_frame = self.__draw_detections__(frame.copy(), [user_id, box])
                 ok = self.evaluator.set_flag_redis(user_id, cam_id, draw_frame, timestamp=timestamp)
