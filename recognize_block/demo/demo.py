@@ -7,18 +7,13 @@ from ultralytics import YOLO
 from confluent_kafka.admin import AdminClient, NewTopic
 
 from src.engine.detect import SimpleTracker, APIHandler
-from src.engine.score import SetUpEvaluate
+from src.engine.score import EvalConfig, SetUpEvaluate
 from src.kafka.kafka_produce import KafkaFrameProducer
 from src.kafka.kafka_consumers import KafkaFrameConsumer
-from src.config.config import KAFKA_SERVERS, MONGO_LAPS_COLLECTION, TEST_MODE
+from src.config.config import KAFKA_SERVERS, TEST_MODE
 import json
 from src.engine.engine import draw_target
-import queue
-# import gradio as gr
-import threading
 import pandas as pd
-# from pymongo import MongoClient
-# from src.database.mongo import MongoDBManager
 import redis
 from src.database.sql_model import PostgresHandler
 from urllib.parse import quote_plus
@@ -82,7 +77,9 @@ producer_conf = {
     "compression.type": "lz4",  # giảm size gửi
     "message.max.bytes": 10485760,  # 10MB (nếu frame lớn)
     "queue.buffering.max.messages": 200000,
-    "queue.buffering.max.kbytes": 51200,  # 500MB
+    "queue.buffering.max.kbytes": 204800,  # 200MB
+    "message.timeout.ms": 60000,
+
 }
 
 consumer_conf = {"bootstrap.servers": KAFKA_SERVERS}
@@ -149,8 +146,8 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
         producer_conf,
         topic_template=topic,
         jpeg_quality=60,
-        drop_on_full=True,
-        max_backoff_sec=5.0,
+        drop_on_full=False,
+        max_backoff_sec=0.5,
     )
 
     if mode == "rtsp":
@@ -167,18 +164,18 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
     logger.info(f"[Producer-{cid}] Video FPS = {video_fps}")
 
     frame_interval = 1.0 / video_fps
-    sample_interval = 1.0
-    frame_step = int(video_fps * sample_interval)
+    TARGET_DETECT_FPS = 6
+    frame_step = max(1, int(round(video_fps / TARGET_DETECT_FPS)))
 
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    out = cv2.VideoWriter(
-        f"output_cam{cid}.mp4",
-        cv2.VideoWriter_fourcc(*"mp4v"),
-        video_fps,
-        (w, h),
-    )
+    # out = cv2.VideoWriter(
+    #     f"output_cam{cid}.mp4",
+    #     cv2.VideoWriter_fourcc(*"mp4v"),
+    #     video_fps,
+    #     (w, h),
+    # )
 
     frame_count = 0
     next_frame_time = time.time()
@@ -201,20 +198,18 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
 
             copy_frame = frame.copy()
 
-            # ===== DETECT 1s / frame =====
             if frame_count % frame_step == 0:
                 t0 = time.perf_counter()
-                results = tracker.detect_frame(frame)
+                ids, boxes, _  = tracker.detect_frame(frame)
                 detect_time = time.perf_counter() - t0
 
-                ids, boxes, _ = results[0]
 
-                log_detect_time(
-                    cam_id=cid,
-                    frame_id=frame_count,
-                    detect_time=detect_time,
-                    num_ids=len(ids),
-                )
+                # log_detect_time(
+                #     cam_id=cid,
+                #     frame_id=frame_count,
+                #     detect_time=detect_time,
+                #     num_ids=len(ids),
+                # )
 
                 logger.info(
                     f"[Producer-{cid}] frame={frame_count}, "
@@ -222,6 +217,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
                 )
 
                 if ids:
+                    ts_ms = int(time.time() * 1000)
                     for uid, box in zip(ids, boxes):
                         copy_frame = draw_target(
                             copy_frame,
@@ -242,7 +238,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
                     producer.send_frame(cid, frame, headers=headers)
 
             # ===== ALWAYS WRITE FULL VIDEO =====
-            out.write(copy_frame)
+            # out.write(copy_frame)
             frame_count += 1
 
     except Exception as e:
@@ -250,7 +246,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
 
     finally:
         cap.release()
-        out.release()
+        # out.release()
         producer.flush(5)
         logger.info(f"[Producer-{cid}] finished")
 
@@ -264,6 +260,7 @@ def consumer_worker(cid: int, start_barrier):
         redis_client=redis_client,
         pg_handler=pg_handler,
         test_mode=TEST_MODE,
+        config=EvalConfig(upload_each_checkin=True)
     )
 
     consumer = KafkaFrameConsumer(
@@ -323,10 +320,10 @@ def main():
     create_topics(CAM_IDS)
 
     video_sources = {
-        1: r"D:\NCKH_Cham_diem_the_duc\1231.mp4",
-        2: r"D:\NCKH_Cham_diem_the_duc\IMG_1550.MOV",
-        3: r"D:\NCKH_Cham_diem_the_duc\0126.mp4",
-        4: r"D:\NCKH_Cham_diem_the_duc\VID_20251206_105125.mp4",
+        1: r"D:\haui_sict_fitness_score\data_test\0207 (1).mp4",
+        2: r"D:\haui_sict_fitness_score\data_test\0207 (1)(1).mp4",
+        3: r"D:\haui_sict_fitness_score\data_test\0207 (1)(2).mp4",
+        4: r"D:\haui_sict_fitness_score\data_test\0207 (1)(3).mp4",
     }
 
     ctx = mp.get_context("spawn")
