@@ -1,53 +1,40 @@
-# Config file for the project
-# This file contains configuration settings for the application.
-
+import os
+from pathlib import Path
 import yaml
-with open('src/config/config.yml', 'r') as file:
-    config = yaml.safe_load(file)
+from dotenv import load_dotenv
 
-# YOLO tracking configuration
-BORTSORT_CONFIG = config.get('YOLO_TRACKING', {}).get('tracker_config', 'src/config/botsort.yaml')
-TRACKING_SHOW = config.get('YOLO_TRACKING', {}).get('show_tracking', True)
-TRACKING_STREAM = config.get('YOLO_TRACKING', {}).get('stream_tracking', True)
-SAVE_TRACKING = config.get('YOLO_TRACKING', {}).get('save_results', False)
-PERSIST_TRACKING = config.get('YOLO_TRACKING', {}).get('persist', True)
-TRACKING_CONF = config.get('YOLO_TRACKING', {}).get('conf', 0.25)
-TRACKING_IOU = config.get('YOLO_TRACKING', {}).get('iou', 0.25)
+BASE_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(BASE_DIR / ".env")
 
-# Camera settings
-CAMERA_INDEX = config.get('INPUT_MODE').get('camera').get('camera_index', 0)
-VIDEO_PATH = config.get('INPUT_MODE').get('video').get('video_path', 'abcd.mp4')
+CFG_YAML = BASE_DIR / "src" / "config" / "config.yml"
+with open(CFG_YAML, "r", encoding="utf-8") as f:
+    config = yaml.safe_load(f) or {}
 
-SEARCH_API_URL = config.get('SEARCH_CONFIG', {}).get('url', 'http://10.100.200.119:8000')
-LINE_BEGIN_SEARCH = config.get('SEARCH_CONFIG', {}).get('line_begin_search', float(1/2))
-MONGO_URI = config.get('DATABASE', {}).get('mongo_uri', 'mongodb://10.100.200.119:27017/')
-MONGO_DB = config.get('DATABASE', {}).get('database_name', 'test')
-MONGO_FLAGS_COLLECTION = config.get('DATABASE', {}).get('flag_collection_name', 'flags_db')
-MONGO_LAPS_COLLECTION = config.get('DATABASE', {}).get('lap_connection_name', 'laps_db')
+def env(name, default=None, cast=None):
+    v = os.getenv(name, default)
+    if cast and v is not None:
+        return cast(v)
+    return v
 
-QDRANT_COLLECTION = config.get('DATABASE', {}).get('qdrant_collection', 'user_face')
-KAFKA_SERVERS = config.get('KAFKA', {}).get('servers', '10.100.200.119:9098')
-REDIS_HOST = config.get('REDIS', {}).get('host', '10.100.200.119')
-REDIS_PORT = config.get('REDIS', {}).get('port', 6379)
-REDIS_PASSWORD = config.get('REDIS', {}).get('password', 'optivisionlab')
+SEARCH_API_URL = env("SEARCH_API_URL", config.get("SEARCH_CONFIG", {}).get("url", "http://127.0.0.1:8000"))
+KAFKA_SERVERS  = env("KAFKA_SERVERS",  config.get("KAFKA", {}).get("servers", "127.0.0.1:9092"))
+QDRANT_COLLECTION = env("QDRANT_COLLECTION", config.get("DATABASE", {}).get("qdrant_collection", "user_face"))
+LINE_BEGIN_SEARCH = float(env("LINE_BEGIN_SEARCH", config.get("SEARCH_CONFIG", {}).get("line_begin_search", 0.5)))
 
+REDIS_HOST = env("REDIS_HOST", config.get("REDIS", {}).get("REDIS_HOST", "127.0.0.1"))
+REDIS_PORT = int(env("REDIS_PORT", config.get("REDIS", {}).get("REDIS_PORT", 6379)))
+REDIS_DB   = int(env("REDIS_DB",   config.get("REDIS", {}).get("REDIS_DB", 0)))
+REDIS_PASSWORD = env("REDIS_PASSWORD", config.get("REDIS", {}).get("REDIS_PASSWORD", ""))
 
-POSTGRE_USER = config.get('POSTGRE', {}).get('user', 'labelstudio')
-POSTGRE_PASSWORD = config.get('POSTGRE', {}).get('password', 'user_face')
-POSTGRE_HOST = config.get('POSTGRE', {}).get('host', '10.100.200.119')
-POSTGRE_PORT = config.get('POSTGRE', {}).get('port', '6379')
-POSTGRE_DB = config.get('POSTGRE', {}).get('database', 'user_face')
+POSTGRE_USER = env("POSTGRE_USER", config.get("POSTGRE", {}).get("user", "postgres"))
+POSTGRE_PASSWORD = env("POSTGRE_PASSWORD", config.get("POSTGRE", {}).get("password", ""))
+POSTGRE_HOST = env("POSTGRE_HOST", config.get("POSTGRE", {}).get("host", "127.0.0.1"))
+POSTGRE_PORT = int(env("POSTGRE_PORT", config.get("POSTGRE", {}).get("port", 5432)))
+POSTGRE_DB   = env("POSTGRE_DB", config.get("POSTGRE", {}).get("database", "postgres"))
 
-MINIO_ENDPOINT = config.get('MINIO', {}).get('MINIO_ENPOINT', 'abcd')
-MINIO_ACCESS_KEY = config.get('MINIO', {}).get('MINIO_ACCESS_KEY', 'abcd')  
-MINIO_SECRET_KEY = config.get('MINIO', {}).get('MINIO_SECRET_KEY', 'abcd')
-MINIO_BUCKET_NAME = config.get('MINIO', {}).get('MINIO_BUCKET_NAME', 'abcd')
+MINIO_ENDPOINT = env("MINIO_ENDPOINT", config.get("MINIO", {}).get("MINIO_ENPOINT", "127.0.0.1:9000"))
+MINIO_ACCESS_KEY = env("MINIO_ACCESS_KEY", config.get("MINIO", {}).get("MINIO_ACCESS_KEY", ""))
+MINIO_SECRET_KEY = env("MINIO_SECRET_KEY", config.get("MINIO", {}).get("MINIO_SECRET_KEY", ""))
+MINIO_BUCKET_NAME = env("MINIO_BUCKET_NAME", config.get("MINIO", {}).get("MINIO_BUCKET_NAME", ""))
 
-REDIS_HOST = config.get('REDIS', {}).get('REDIS_HOST', 'xxx')
-REDIS_PORT = config.get('REDIS', {}).get('REDIS_PORT', 6379)
-REDIS_DB = config.get('REDIS', {}).get('REDIS_DB', 0)
-REDIS_PASSWORD = config.get('REDIS', {}).get('REDIS_PASSWORD', 'xxxx')
-
-
-
-
+TEST_MODE = env("TEST_MODE", config.get("TEST_MODE", "False")).lower() == "true"
