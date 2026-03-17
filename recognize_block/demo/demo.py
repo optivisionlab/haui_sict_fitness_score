@@ -18,6 +18,7 @@ import redis
 from src.database.sql_model import PostgresHandler
 from urllib.parse import quote_plus
 from datetime import datetime
+import asyncio
 
 
 # ================== CONFIG ==================
@@ -26,7 +27,8 @@ CAM_IDS = [1, 2, 3, 4]   # camera id
 # CAM_IDS = [1]   # camera id
 
 TOPIC_TEMPLATE = "camera-{cid}"
-
+START_BARRIER_TIMEOUT_SEC = 30
+UPLOAD_EACH_CHECKIN = False  # tắt upload proof trong hot path để ưu tiên realtime
 
 # ================== REDIS ==================
 redis_client = redis.Redis(
@@ -128,6 +130,15 @@ def log_detect_time(
     with open(logfile, "a", encoding="utf-8") as f:
         f.write(line)
 
+def _wait_start_barrier(cid: int, start_barrier, role: str):
+    logger.info(f"[{role}-{cid}] ready, waiting at barrier...")
+    try:
+        start_barrier.wait(timeout=START_BARRIER_TIMEOUT_SEC)
+    except Exception as e:
+        logger.exception(f"[{role}-{cid}] barrier wait failed: {e}")
+        raise
+    logger.info(f"[{role}-{cid}] released from barrier")
+
 
 # ================== PRODUCER (Tracker Process) ==================
 def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
@@ -136,8 +147,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
 
     tracker = SimpleTracker(detection_model=model, cam_id=cid)
 
-    logger.info(f"[Producer-{cid}] ready, waiting at barrier...")
-    start_barrier.wait()  # 🚦 đồng bộ START
+    _wait_start_barrier(cid, start_barrier, "Producer")
     logger.info(f"[Producer-{cid}] started")
 
     topic = TOPIC_TEMPLATE.format(cid=cid)
@@ -217,7 +227,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
                 )
 
                 if ids:
-                    ts_ms = int(time.time() * 1000)
+                    ts_s = int(time.time())
                     for uid, box in zip(ids, boxes):
                         copy_frame = draw_target(
                             copy_frame,
@@ -229,7 +239,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
                         )
 
                     headers = [
-                        ("timestamp", str(ts_ms).encode()),   # epoch milliseconds,
+                        ("timestamp", str(ts_s).encode()),   # epoch seconds,
                         ("frame_id", str(frame_count).encode()),
                         ("person_ids", json.dumps(ids).encode()),
                         ("bboxes", json.dumps(boxes).encode()),
@@ -252,7 +262,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
 
 
 # ================== CONSUMER (1 per camera) ==================
-def consumer_worker(cid: int, start_barrier):
+async def consumer_worker(cid: int, start_barrier):
     topic = TOPIC_TEMPLATE.format(cid=cid)
 
     setup_eval = SetUpEvaluate(
@@ -260,7 +270,7 @@ def consumer_worker(cid: int, start_barrier):
         redis_client=redis_client,
         pg_handler=pg_handler,
         test_mode=TEST_MODE,
-        config=EvalConfig(upload_each_checkin=True)
+        config=EvalConfig(upload_each_checkin=UPLOAD_EACH_CHECKIN)
     )
 
     consumer = KafkaFrameConsumer(
@@ -277,7 +287,7 @@ def consumer_worker(cid: int, start_barrier):
     start_barrier.wait()
     logger.info(f"[Consumer-{cid}] started")
 
-    def handle_frame(msg):
+    async def handle_frame(msg):
         try:
             nparr = np.frombuffer(msg.value(), np.uint8)
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -300,7 +310,7 @@ def consumer_worker(cid: int, start_barrier):
                 f"persons={len(person_ids)}"
             )
 
-            api.process(
+            await api.process(
                 cid,
                 frame,
                 bboxes,
@@ -311,7 +321,13 @@ def consumer_worker(cid: int, start_barrier):
         except Exception:
             logger.exception(f"[Consumer-{cid}] error")
 
-    consumer.start(handle_frame)
+    await consumer.start(handle_frame)
+
+
+# async consumer entry point for multiprocessing
+def consumer_worker_entry(cid: int, start_barrier):
+    _wait_start_barrier(cid, start_barrier, "Consumer")
+    asyncio.run(consumer_worker(cid, start_barrier))
 
 
 # ================== MAIN ==================
@@ -349,7 +365,7 @@ def main():
     # ===== start consumers =====
     for cid in CAM_IDS:
         p = ctx.Process(
-            target=consumer_worker,
+            target=consumer_worker_entry,
             args=(cid, start_barrier),
             daemon=False,
         )
