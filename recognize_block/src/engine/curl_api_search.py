@@ -17,46 +17,52 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from src.config.config import SEARCH_API_URL
+import httpx
+import asyncio
+from typing import Optional
 
 
-def _build_session() -> requests.Session:
-    s = requests.Session()
-    retry = Retry(
-        total=3,
-        connect=3,
-        read=3,
-        backoff_factor=0.2,
-        status_forcelist=(429, 500, 502, 503, 504),
-        allowed_methods=("POST", "PUT"),
-        raise_on_status=False,
-    )
-    adapter = HTTPAdapter(max_retries=retry, pool_connections=64, pool_maxsize=64)
-    s.mount("http://", adapter)
-    s.mount("https://", adapter)
-    return s
+_client: Optional[httpx.AsyncClient] = None
+_client_lock = asyncio.Lock()
 
 
-session = _build_session()
+async def get_async_client() -> httpx.AsyncClient:
+    global _client
+    if _client is not None:
+        return _client
+
+    async with _client_lock:
+        if _client is None:
+            timeout = httpx.Timeout(connect=2.0, read=8.0, write=8.0, pool=2.0)
+            limits = httpx.Limits(
+                max_connections=64,
+                max_keepalive_connections=32,
+                keepalive_expiry=30.0,
+            )
+            _client = httpx.AsyncClient(
+                timeout=timeout,
+                limits=limits,
+                headers={"accept": "application/json"},
+            )
+        return _client
 
 
-def curl_post(url, payload=None, files=None, headers=None, method="POST"):
-    if headers is None:
-        headers = {"accept": "application/json"}
+async def close_async_client():
+    global _client
+    if _client is not None:
+        await _client.aclose()
+        _client = None
 
+
+async def http_post_async(url, data=None, files=None):
+    client = await get_async_client()
     try:
-        response = session.request(
-            method,
-            url,
-            headers=headers,
-            data=payload,
-            files=files,
-            timeout=(2, 8),  # (connect, read)
-        )
+        response = await client.post(url, data=data, files=files)
         return response
-    except requests.RequestException as e:
+    except httpx.HTTPError as e:
         logger.error("HTTP error calling face-search: {}", e)
         return None
-
+    
 
 def _union_crop(frame: np.ndarray, boxes_xyxy: List[List[int]], pad_ratio: float = 0.25) -> Tuple[np.ndarray, List[List[int]]]:
     """Crop to union of boxes (with padding) to reduce upload size."""
@@ -75,7 +81,7 @@ def _union_crop(frame: np.ndarray, boxes_xyxy: List[List[int]], pad_ratio: float
     return cropped, adj
 
 
-def send_tracking_to_api(
+async def send_tracking_to_api(
     ids,
     xyxy_boxes,
     frame,
@@ -111,9 +117,8 @@ def send_tracking_to_api(
 
     files = [("images", ("frame.jpg", encoded_image.tobytes(), "image/jpeg"))]
 
-    return curl_post(
+    return http_post_async(
         url=f"{SEARCH_API_URL}/faces/search",
-        payload=payload,
+        data=payload,
         files=files,
-        method="POST",
     )
