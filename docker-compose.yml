@@ -1,0 +1,17 @@
+services:
+  backend:
+    image: backend_image:v0.0.1
+    build:
+      context: ./backend
+    container_name: backend_cont
+    env_file:
+      - ./backend/.env
+    networks:
+      - app-network
+    ports:
+      - "2305:8000"
+    entrypoint: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+networks:
+  app-network:
+    driver: bridge
