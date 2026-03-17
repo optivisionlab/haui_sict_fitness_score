@@ -262,7 +262,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
 
 
 # ================== CONSUMER (1 per camera) ==================
-async def consumer_worker(cid: int, start_barrier):
+async def consumer_worker(cid: int):
     topic = TOPIC_TEMPLATE.format(cid=cid)
 
     setup_eval = SetUpEvaluate(
@@ -283,8 +283,6 @@ async def consumer_worker(cid: int, start_barrier):
         evaluator=setup_eval,
     )
 
-    logger.info(f"[Consumer-{cid}] ready, waiting at barrier...")
-    start_barrier.wait()
     logger.info(f"[Consumer-{cid}] started")
 
     async def handle_frame(msg):
@@ -294,20 +292,13 @@ async def consumer_worker(cid: int, start_barrier):
 
             hdrs = dict(msg.headers() or [])
 
-            person_ids = json.loads(
-                hdrs.get("person_ids", b"[]").decode()
-            )
-            bboxes = json.loads(
-                hdrs.get("bboxes", b"[]").decode()
-            )
-            frame_id = int(
-                hdrs.get("frame_id", b"-1").decode()
-            )
+            person_ids = json.loads(hdrs.get("person_ids", b"[]").decode())
+            bboxes = json.loads(hdrs.get("bboxes", b"[]").decode())
+            frame_id = int(hdrs.get("frame_id", b"-1").decode())
             timestamp = hdrs.get("timestamp", b"").decode()
 
             logger.info(
-                f"[Consumer-{cid}] frame={frame_id}, "
-                f"persons={len(person_ids)}"
+                f"[Consumer-{cid}] frame={frame_id}, persons={len(person_ids)}"
             )
 
             await api.process(
@@ -324,10 +315,21 @@ async def consumer_worker(cid: int, start_barrier):
     await consumer.start(handle_frame)
 
 
+def consumer_worker_entry(cid: int, start_barrier):
+    try:
+        _wait_start_barrier(cid, start_barrier, "Consumer")
+        asyncio.run(consumer_worker(cid))
+    except Exception:
+        logger.exception(f"[Consumer-{cid}] crashed before start")
+
+
 # async consumer entry point for multiprocessing
 def consumer_worker_entry(cid: int, start_barrier):
-    _wait_start_barrier(cid, start_barrier, "Consumer")
-    asyncio.run(consumer_worker(cid, start_barrier))
+    try:
+        _wait_start_barrier(cid, start_barrier, "Consumer")
+        asyncio.run(consumer_worker(cid))
+    except Exception:
+        logger.exception(f"[Consumer-{cid}] crashed before start")
 
 
 # ================== MAIN ==================
