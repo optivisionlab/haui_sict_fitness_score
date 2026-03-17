@@ -74,6 +74,7 @@ class KafkaFrameProducer:
                 self.producer.poll(0)
                 return True
             except BufferError:
+                self.producer.poll(0.05)
                 if self.drop_on_full:
                     return False
                 else:

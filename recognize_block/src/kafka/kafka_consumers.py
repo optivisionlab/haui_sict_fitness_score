@@ -9,7 +9,7 @@ class KafkaFrameConsumer:
         self.consumer = Consumer({
             **consumer_conf,
             "group.id": group_id,
-            "auto.offset.reset": "earliest",
+            "auto.offset.reset": "latest",
         })
         self.running = False
 
@@ -25,6 +25,7 @@ class KafkaFrameConsumer:
                 if msg.error():
                     raise KafkaException(msg.error())
                 handle_message(msg)
+                self.consumer.commit(message=msg, asynchronous=True)
         finally:
             self.consumer.close()
 
