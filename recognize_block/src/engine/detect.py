@@ -77,7 +77,7 @@ class APIHandler:
 
         # per-cam gate to reduce API spam
         self._cam_last_call_ts: Dict[str, float] = {}
-        self.cam_call_min_interval = 0.15  # seconds
+        self.cam_call_min_interval = 0.03  # seconds
 
         # line band (hysteresis) around the line to approximate "crossing"
         self.band_ratio = 0.06  # 6% of image height
@@ -106,21 +106,21 @@ class APIHandler:
 
     def process(self, cam_id, frame, xyxy_boxes, ids, timestamp=None):
         now = float(timestamp) if timestamp is not None else time.time()
+        logger.debug("Processing detections for cam_id={}, frame_time={}".format(cam_id, timestamp))
         cam_id = str(cam_id)
 
         # per-cam rate limit: avoid calling search too frequently in high FPS
         last = self._cam_last_call_ts.get(cam_id, 0.0)
         if now - last < self.cam_call_min_interval:
+            logger.debug(f"Skipping API call for cam {cam_id} due to rate limit ({now - last:.2f}s since last call)")
             return
 
         y_line = int(frame.shape[0] * LINE_BEGIN_SEARCH)
-        band = frame.shape[0] * self.band_ratio
 
-        # keep only boxes near the line band
+        # keep only boxes in scoring zone (below line)
         valid_ids: List[int] = []
         valid_boxes: List[List[int]] = []
         for rid, box in zip(ids, xyxy_boxes):
-            cy = self._center_y(box)
             if self._is_below_line(box, y_line, mode="xyxy"):
                 valid_ids.append(rid)
                 valid_boxes.append(box)
@@ -128,18 +128,17 @@ class APIHandler:
         if not valid_ids:
             return
 
-        self._cam_last_call_ts[cam_id] = now
-
         try:
             response = send_tracking_to_api(
                 valid_ids,
                 valid_boxes,
                 frame,
                 collection_name=self.collection_name,
-                crop_mode="union",
+                crop_mode="none",
             )
             if not response or response.status_code != 200:
                 return
+            self._cam_last_call_ts[cam_id] = now
 
             api_data = response.json().get("data", [])
             map_local_to_user = {}
@@ -161,9 +160,8 @@ class APIHandler:
                 until = self._user_cooldown_until.get(user_id, 0.0)
                 if now < until:
                     continue
-                self._user_cooldown_until[user_id] = now + self.user_cooldown_seconds
-
-                draw_frame = self.__draw_detections__(frame.copy(), [user_id, box])
+                if self.evaluator.cfg.upload_each_checkin:
+                    draw_frame = self.__draw_detections__(frame.copy(), [user_id, box])
                 ok = self.evaluator.set_flag_redis(user_id, cam_id, draw_frame, timestamp=timestamp)
                 if not ok:
                     continue
@@ -172,6 +170,8 @@ class APIHandler:
                 if lap_done:
                     # 1) log
                     logger.info("✅ user {} completed a lap (cam={})", user_id, cam_id)
+                    # 2) set cooldown to prevent double count
+                    self._user_cooldown_until[user_id] = now + self.user_cooldown_seconds
 
         except Exception as e:
             logger.exception(f"API search error: {e}")
