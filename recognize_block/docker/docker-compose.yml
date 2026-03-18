@@ -1,0 +1,10 @@
+version: "3.9"
+
+services:
+  demo:
+    image: fit-haui:latest
+    container_name: demo-python
+    command: python demo.py
+    volumes:
+      - .:/app
+    working_dir: /app
