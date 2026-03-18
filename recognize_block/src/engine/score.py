@@ -22,7 +22,8 @@ def _decode(v):
 @dataclass
 class EvalConfig:
     upload_each_checkin: bool = False
-    checkin_cooldown_seconds: float = 0.5
+    # minimum interval (in milliseconds) between two valid check-ins of the same user
+    checkin_cooldown_ms: int = 500
     lap_lock_seconds: int = 2
 
 
@@ -68,10 +69,15 @@ class SetUpEvaluate:
     def set_flag_redis(self, user_id, cam_id, copy_frame=None, timestamp=None) -> bool:
         user_id = str(user_id)
         cam_id = str(cam_id)
-        ts = float(timestamp) if timestamp is not None else time.time()
+        # work in milliseconds for incoming timestamps; fall back to current time in ms
+        if timestamp is not None:
+            ts_ms = float(timestamp)
+        else:
+            ts_ms = time.time_ns() / 1_000_000.0
         key_user = f"user:{user_id}:data"
 
-        self._ensure_user_key_if_test(key_user, ts)
+        # ensure key exists (using ms-based timestamp)
+        self._ensure_user_key_if_test(key_user, ts_ms)
 
         if not self.test_mode:
             if not self.redis_client.exists(key_user):
@@ -85,23 +91,27 @@ class SetUpEvaluate:
         pipe.hget(key_user, "last_time")
         last_cam, last_time = pipe.execute()
         last_cam = str(_decode(last_cam) or "")
-        last_time = float(_decode(last_time) or 0)
+        last_time_ms = float(_decode(last_time) or 0)
 
         # Dedup: same cam repeated OR too close in time
         if last_cam == cam_id:
             return False
-        if ts - last_time < self.cfg.checkin_cooldown_seconds:
+        # reject if too close in time (all in milliseconds)
+        if ts_ms - last_time_ms < self.cfg.checkin_cooldown_ms:
             return False
 
         pipe = self.redis_client.pipeline()
         pipe.hset(key_user, f"flag_{cam_id}", 1)
         pipe.hset(key_user, "last_cam", cam_id)
-        pipe.hset(key_user, "last_time", ts)
+        pipe.hset(key_user, "last_time", ts_ms)
 
         # Optional (expensive): upload proof image
         if self.cfg.upload_each_checkin and copy_frame is not None:
             try:
-                img_url = minio_client.push_data(image=copy_frame, destination_file=f"{int(ts)}/{user_id}.jpg")
+                img_url = minio_client.push_data(
+                    image=copy_frame,
+                    destination_file=f"{int(ts_ms)}/{user_id}.jpg",
+                )
                 pipe.hset(key_user, "img_url", img_url)
             except Exception as e:
                 logger.warning("MinIO upload failed for user {}: {}", user_id, e)
