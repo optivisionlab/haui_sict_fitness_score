@@ -106,7 +106,7 @@ class APIHandler:
 
         # per-cam gate to reduce API spam (timestamps stored in milliseconds)
         self._cam_last_call_ts_ms: Dict[str, int] = {}
-        self.cam_call_min_interval_ms = 30  # milliseconds
+        self.cam_call_min_interval_ms = 3  # milliseconds
 
         # line band (hysteresis) around the line to approximate "crossing"
         self.band_ratio = 0.06  # 6% of image height

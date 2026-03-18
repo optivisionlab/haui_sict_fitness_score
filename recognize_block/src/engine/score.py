@@ -44,6 +44,35 @@ class SetUpEvaluate:
         self.pg_handler = pg_handler
         self.test_mode = test_mode
         self.cfg = config or EvalConfig()
+        self._lap_script = self.redis_client.register_script(
+            """
+            local key = KEYS[1]
+            if redis.call('EXISTS', key) == 0 then
+                return -2
+            end
+
+            if redis.call('HGET', key, 'state') ~= 'active' then
+                return -1
+            end
+
+            local n = tonumber(ARGV[1])
+            for i = 1, n do
+                local field = ARGV[i + 1]
+                if tonumber(redis.call('HGET', key, field) or '0') ~= 1 then
+                    return 0
+                end
+            end
+
+            local lap = tonumber(redis.call('HGET', key, 'lap') or '0') + 1
+            redis.call('HSET', key, 'lap', lap)
+
+            for i = 1, n do
+                redis.call('HSET', key, ARGV[i + 1], 0)
+            end
+
+            return lap
+            """
+        )
 
     def _ensure_user_key_if_test(self, key_user: str, timestamp: float):
         if not self.test_mode:
@@ -123,34 +152,46 @@ class SetUpEvaluate:
     def check_lap_1_user(self, user_id) -> bool:
         user_id = str(user_id)
         key_user = f"user:{user_id}:data"
-        if not self.redis_client.exists(key_user):
+        flag_fields = [f"flag_{c}" for c in self.id_run_process]
+
+        # Atomic finalize in Redis: only increment lap when all flags are set,
+        # and reset flags in the same operation to avoid race conditions.
+        script = """
+        local key = KEYS[1]
+        if redis.call('EXISTS', key) == 0 then
+            return -2
+        end
+        if redis.call('HGET', key, 'state') ~= 'active' then
+            return -1
+        end
+
+        local n = tonumber(ARGV[1])
+        for i = 1, n do
+            local field = ARGV[i + 1]
+            if tonumber(redis.call('HGET', key, field) or '0') ~= 1 then
+                return 0
+            end
+        end
+
+        local lap = tonumber(redis.call('HGET', key, 'lap') or '0') + 1
+        redis.call('HSET', key, 'lap', lap)
+        for i = 1, n do
+            redis.call('HSET', key, ARGV[i + 1], 0)
+        end
+        return lap
+        """
+
+        result = int(
+            self._lap_script(
+                keys=[key_user],
+                args=[str(len(flag_fields)), *flag_fields],
+            )
+        )
+
+        if result <= 0:
             return False
 
-        lap_lock = f"user:{user_id}:lap_lock"
-        locked = self.redis_client.set(lap_lock, 1, nx=True, ex=self.cfg.lap_lock_seconds)
-        if not locked:
-            return False
-
-        if _decode(self.redis_client.hget(key_user, "state")) != "active":
-            return False
-
-        pipe = self.redis_client.pipeline()
-        for c in self.id_run_process:
-            pipe.hget(key_user, f"flag_{c}")
-        flags_raw = pipe.execute()
-        flags = [int(_decode(v) or 0) for v in flags_raw]
-        if not all(flags):
-            return False
-
-        lap_number = int(_decode(self.redis_client.hget(key_user, "lap")) or 0) + 1
-        reset_map = {f"flag_{c}": 0 for c in self.id_run_process}
-
-        pipe = self.redis_client.pipeline()
-        pipe.hset(key_user, "lap", lap_number)
-        pipe.hset(key_user, mapping=reset_map)
-        pipe.execute()
-
-        logger.info("User {} completed lap {}", user_id, lap_number)
+        logger.info("User {} completed lap {}", user_id, result)
         return True
 
 
