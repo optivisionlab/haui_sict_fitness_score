@@ -117,7 +117,7 @@ async def send_tracking_to_api(
 
     files = [("images", ("frame.jpg", encoded_image.tobytes(), "image/jpeg"))]
 
-    return http_post_async(
+    return await http_post_async(
         url=f"{SEARCH_API_URL}/faces/search",
         data=payload,
         files=files,
