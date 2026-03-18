@@ -156,31 +156,6 @@ class SetUpEvaluate:
 
         # Atomic finalize in Redis: only increment lap when all flags are set,
         # and reset flags in the same operation to avoid race conditions.
-        script = """
-        local key = KEYS[1]
-        if redis.call('EXISTS', key) == 0 then
-            return -2
-        end
-        if redis.call('HGET', key, 'state') ~= 'active' then
-            return -1
-        end
-
-        local n = tonumber(ARGV[1])
-        for i = 1, n do
-            local field = ARGV[i + 1]
-            if tonumber(redis.call('HGET', key, field) or '0') ~= 1 then
-                return 0
-            end
-        end
-
-        local lap = tonumber(redis.call('HGET', key, 'lap') or '0') + 1
-        redis.call('HSET', key, 'lap', lap)
-        for i = 1, n do
-            redis.call('HSET', key, ARGV[i + 1], 0)
-        end
-        return lap
-        """
-
         result = int(
             self._lap_script(
                 keys=[key_user],
