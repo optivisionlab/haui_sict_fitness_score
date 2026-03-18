@@ -1,6 +1,6 @@
 import time
 import random
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from loguru import logger
 
 from src.engine.curl_api_search import send_tracking_to_api
@@ -27,8 +27,29 @@ class SimpleTracker:
             s.add(self._rng.randint(1, 2_147_483_647))  # 31-bit int
         return list(s)
 
-    def detect_frame(self, frame):
-        # detect only (no track)
+    @staticmethod
+    def _intersection_over_box(box_xyxy: List[int], zone_xyxy: List[int]) -> float:
+        bx1, by1, bx2, by2 = box_xyxy
+        zx1, zy1, zx2, zy2 = zone_xyxy
+
+        ix1 = max(bx1, zx1)
+        iy1 = max(by1, zy1)
+        ix2 = min(bx2, zx2)
+        iy2 = min(by2, zy2)
+
+        if ix2 <= ix1 or iy2 <= iy1:
+            return 0.0
+
+        inter = (ix2 - ix1) * (iy2 - iy1)
+        box_area = max(1, (bx2 - bx1) * (by2 - by1))
+        return inter / box_area
+
+    def detect_frame(
+        self,
+        frame,
+        call_zone_xyxy: Optional[List[int]] = None,
+        min_overlap_ratio: float = 0.8,
+    ):
         result = self.detection_model(frame, conf=0.65, iou=0.8, verbose=False)[0]
 
         boxes: List[List[int]] = []
@@ -37,10 +58,18 @@ class SimpleTracker:
 
         for box in result.boxes:
             cls = int(box.cls[0]) if box.cls is not None else -1
-            if cls != 0:  # only person
+            if cls != 0:
                 continue
+
             x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
-            boxes.append([x1, y1, x2, y2])
+            person_box = [x1, y1, x2, y2]
+
+            if call_zone_xyxy is not None:
+                ratio = self._intersection_over_box(person_box, call_zone_xyxy)
+                if ratio < min_overlap_ratio:
+                    continue
+
+            boxes.append(person_box)
 
         ids = self._gen_unique_ids(len(boxes))
         return ids, boxes, frame
@@ -71,13 +100,13 @@ class APIHandler:
         self.evaluator = evaluator
         self.collection_name = collection_name
 
-        # cooldown per user to prevent double count
-        self._user_cooldown_until: Dict[str, float] = {}
-        self.user_cooldown_seconds = 1.0
+        # cooldown per user to prevent double count (stored in milliseconds)
+        self._user_cooldown_until_ms: Dict[str, int] = {}
+        self.user_cooldown_ms = 1000  # 1s in milliseconds
 
-        # per-cam gate to reduce API spam
-        self._cam_last_call_ts: Dict[str, float] = {}
-        self.cam_call_min_interval = 0.03  # seconds
+        # per-cam gate to reduce API spam (timestamps stored in milliseconds)
+        self._cam_last_call_ts_ms: Dict[str, int] = {}
+        self.cam_call_min_interval_ms = 3  # milliseconds
 
         # line band (hysteresis) around the line to approximate "crossing"
         self.band_ratio = 0.06  # 6% of image height
@@ -105,40 +134,35 @@ class APIHandler:
         return y_center > y_line
 
     async def process(self, cam_id, frame, xyxy_boxes, ids, timestamp=None):
-        now = float(timestamp) if timestamp is not None else time.time()
-        logger.debug("Processing detections for cam_id={}, frame_time={}".format(cam_id, timestamp))
         cam_id = str(cam_id)
 
-        # per-cam rate limit: avoid calling search too frequently in high FPS
-        last = self._cam_last_call_ts.get(cam_id, 0.0)
-        if now - last < self.cam_call_min_interval:
-            logger.debug(f"Skipping API call for cam {cam_id} due to rate limit ({now - last:.2f}s since last call)")
-            return
+        # monotonic clock in milliseconds for rate limiting / cooldowns
+        now_mono_ms = time.perf_counter_ns() // 1_000_000
+        # event timestamp in milliseconds since epoch (from headers) or current time
+        event_ts_ms = int(timestamp) if timestamp is not None else time.time_ns() // 1_000_000
 
-        y_line = int(frame.shape[0] * LINE_BEGIN_SEARCH)
-
-        # keep only boxes in scoring zone (below line)
-        valid_ids: List[int] = []
-        valid_boxes: List[List[int]] = []
-        for rid, box in zip(ids, xyxy_boxes):
-            if self._is_below_line(box, y_line, mode="xyxy"):
-                valid_ids.append(rid)
-                valid_boxes.append(box)
-
-        if not valid_ids:
+        # per-camera rate limit
+        last_call_ms = self._cam_last_call_ts_ms.get(cam_id, 0)
+        if now_mono_ms - last_call_ms < self.cam_call_min_interval_ms:
+            logger.warning(
+                f"Skipping API call for cam {cam_id} due to rate limit "
+                f"({now_mono_ms - last_call_ms}ms since last call)"
+            )
             return
 
         try:
             response = await send_tracking_to_api(
-                valid_ids,
-                valid_boxes,
+                ids,
+                xyxy_boxes,
                 frame,
                 collection_name=self.collection_name,
                 crop_mode="none",
             )
             if not response or response.status_code != 200:
                 return
-            self._cam_last_call_ts[cam_id] = now
+
+            # update last-call timestamp for this camera (monotonic, in ms)
+            self._cam_last_call_ts_ms[cam_id] = now_mono_ms
 
             api_data = response.json().get("data", [])
             map_local_to_user = {}
@@ -151,29 +175,38 @@ class APIHandler:
                     map_local_to_user[int(sent_local_id)] = str(user_id)
 
             detections = []
-            for local_id, box in zip(valid_ids, valid_boxes):
+            for local_id, box in zip(ids, xyxy_boxes):
                 uid = map_local_to_user.get(int(local_id))
                 if uid:
                     detections.append([uid, box])
 
             for user_id, box in detections:
-                until = self._user_cooldown_until.get(user_id, 0.0)
-                if now < until:
+                # per-user cooldown based on monotonic milliseconds
+                until_ms = self._user_cooldown_until_ms.get(user_id, 0)
+                if now_mono_ms < until_ms:
                     continue
 
                 draw_frame = None
                 if self.evaluator.cfg.upload_each_checkin:
                     draw_frame = self.__draw_detections__(frame.copy(), [user_id, box])
-                ok = self.evaluator.set_flag_redis(user_id, cam_id, draw_frame, timestamp=timestamp)
+
+                # pass event timestamp in milliseconds downstream
+                ok = self.evaluator.set_flag_redis(
+                    user_id,
+                    cam_id,
+                    copy_frame=draw_frame,
+                    timestamp=event_ts_ms,
+                )
                 if not ok:
+                    logger.warning(f"User {user_id} is already in cooldown for cam {cam_id}")
                     continue
 
                 lap_done = self.evaluator.check_lap_1_user(user_id)
                 if lap_done:
                     # 1) log
                     logger.info("✅ user {} completed a lap (cam={})", user_id, cam_id)
-                    # 2) set cooldown to prevent double count
-                    self._user_cooldown_until[user_id] = now + self.user_cooldown_seconds
+                    # 2) set cooldown to prevent double count (store in ms)
+                    self._user_cooldown_until_ms[user_id] = now_mono_ms + self.user_cooldown_ms
 
         except Exception as e:
             logger.exception(f"API search error: {e}")

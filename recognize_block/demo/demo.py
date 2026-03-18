@@ -86,6 +86,11 @@ producer_conf = {
 
 consumer_conf = {"bootstrap.servers": KAFKA_SERVERS}
 
+CALL_ZONE_X1_RATIO = 0.0
+CALL_ZONE_Y1_RATIO = 0.0
+CALL_ZONE_X2_RATIO = 1.0
+CALL_ZONE_Y2_RATIO = 0.5
+CALL_ZONE_MIN_OVERLAP_RATIO = 0.8
 
 # ================== KAFKA UTILS ==================
 def create_topics(cam_ids):
@@ -157,7 +162,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
         topic_template=topic,
         jpeg_quality=60,
         drop_on_full=False,
-        max_backoff_sec=0.5,
+        max_backoff_sec=30,
     )
 
     if mode == "rtsp":
@@ -179,7 +184,12 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
 
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
+    call_zone = [
+        int(w * CALL_ZONE_X1_RATIO),
+        int(h * CALL_ZONE_Y1_RATIO),
+        int(w * CALL_ZONE_X2_RATIO),
+        int(h * CALL_ZONE_Y2_RATIO),
+    ]
     # out = cv2.VideoWriter(
     #     f"output_cam{cid}.mp4",
     #     cv2.VideoWriter_fourcc(*"mp4v"),
@@ -210,7 +220,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
 
             if frame_count % frame_step == 0:
                 t0 = time.perf_counter()
-                ids, boxes, _  = tracker.detect_frame(frame)
+                ids, boxes, _  = tracker.detect_frame(frame, call_zone_xyxy=call_zone, min_overlap_ratio=CALL_ZONE_MIN_OVERLAP_RATIO)
                 detect_time = time.perf_counter() - t0
 
 
@@ -227,25 +237,27 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
                 )
 
                 if ids:
-                    ts_s = int(time.time())
-                    for uid, box in zip(ids, boxes):
-                        copy_frame = draw_target(
-                            copy_frame,
-                            uid,
-                            box,
-                            name="Person",
-                            color=(0, 255, 0),
-                            thickness=2,
-                        )
+                    captured_at_ms = time.time_ns() // 1_000_000
+                    # for uid, box in zip(ids, boxes):
+                    #     copy_frame = draw_target(
+                    #         copy_frame,
+                    #         uid,
+                    #         box,
+                    #         name="Person",
+                    #         color=(0, 255, 0),
+                    #         thickness=2,
+                    #     )
 
                     headers = [
-                        ("timestamp", str(ts_s).encode()),   # epoch seconds,
+                        ("timestamp_ms", str(captured_at_ms).encode()),   # epoch seconds,
                         ("frame_id", str(frame_count).encode()),
                         ("person_ids", json.dumps(ids).encode()),
                         ("bboxes", json.dumps(boxes).encode()),
                     ]
 
-                    producer.send_frame(cid, frame, headers=headers)
+                    sent = producer.send_frame(cid, frame, headers=headers)
+                    if not sent:
+                        logger.warning(f"[Producer-{cid}] failed to enqueue frame={frame_count}")
 
             # ===== ALWAYS WRITE FULL VIDEO =====
             # out.write(copy_frame)
@@ -277,6 +289,10 @@ async def consumer_worker(cid: int):
         consumer_conf,
         topic,
         group_id=f"group-{topic}",
+        # Realtime mode: allow parallel processing but keep safe-commit ordering.
+        worker_concurrency=2,
+        max_pending_messages=16,
+        drop_oldest_on_full=True,
     )
 
     api = APIHandler(
@@ -292,10 +308,17 @@ async def consumer_worker(cid: int):
 
             hdrs = dict(msg.headers() or [])
 
-            person_ids = json.loads(hdrs.get("person_ids", b"[]").decode())
-            bboxes = json.loads(hdrs.get("bboxes", b"[]").decode())
-            frame_id = int(hdrs.get("frame_id", b"-1").decode())
-            timestamp = hdrs.get("timestamp", b"").decode()
+            person_ids = json.loads(
+                hdrs.get("person_ids", b"[]").decode()
+            )
+            bboxes = json.loads(
+                hdrs.get("bboxes", b"[]").decode()
+            )
+            frame_id = int(
+                hdrs.get("frame_id", b"-1").decode()
+            )
+            timestamp_ms_raw = hdrs.get("timestamp_ms", b"0").decode()
+            timestamp = int(timestamp_ms_raw) if timestamp_ms_raw else 0 #miliseconds
 
             logger.info(
                 f"[Consumer-{cid}] frame={frame_id}, persons={len(person_ids)}"
