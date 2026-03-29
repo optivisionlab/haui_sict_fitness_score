@@ -60,6 +60,7 @@ export default function EditInfor() {
     fetchUser();
   }, []);
 
+  // Xử lý thay đổi
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -79,6 +80,7 @@ export default function EditInfor() {
     [],
   );
 
+  // Lưu thông tin
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
