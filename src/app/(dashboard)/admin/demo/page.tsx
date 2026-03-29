@@ -3,6 +3,7 @@
 import { UserCard } from "@/components/demo/UserCard";
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { CameraBox } from "@/components/demo/CameraBox";
 
 /* TYPES */
 export interface CheckinEvent {
@@ -102,48 +103,6 @@ export default function RealtimePage() {
     };
   }, []);
 
-  // fake data for demo
-  const fakeCams: Record<number, CheckinEvent> = {
-    1: {
-      user_id: "22",
-      start_time: "",
-      last_time: "",
-      last_cam: "1",
-      step: "3",
-      lap: "1",
-      img_url: "/anhtest/1.jpg",
-    },
-    2: {
-      user_id: "30",
-      start_time: "",
-      last_time: "",
-      last_cam: "2",
-      step: "5",
-      lap: "1",
-      img_url: "/anhtest/2.jpg",
-    },
-    3: {
-      user_id: "13",
-      start_time: "",
-      last_time: "",
-      last_cam: "3",
-      step: "2",
-      lap: "2",
-      img_url: "/anhtest/3.jpg",
-    },
-    4: {
-      user_id: "21",
-      start_time: "",
-      last_time: "",
-      last_cam: "4",
-      step: "7",
-      lap: "1",
-      img_url: "/anhtest/4.jpg",
-    },
-  };
-
-  const fakeUsers: CheckinEvent[] = Object.values(fakeCams);
-
   /* UI */
   return (
     <div className="min-h-screen bg-gray-100 p-6 mt-15">
@@ -160,16 +119,9 @@ export default function RealtimePage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* CAMERA GRID */}
         <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[1, 2, 3, 4].map((cam) => (
+          {[3, 3, 3, 3].map((cam) => (
             <CameraBox key={cam} camId={cam} data={cams[cam]} />
           ))}
-          {/* {[1, 2, 3, 4].map((cam) => (
-            <CameraBox
-              key={cam}
-              camId={cam}
-              data={cams[cam] ?? fakeCams[cam]} // ← ưu tiên realtime, fallback fake
-            />
-          ))} */}
         </div>
 
         {/* USER LIST */}
@@ -198,82 +150,6 @@ export default function RealtimePage() {
   );
 }
 
-/* COMPONENTS */
 
-function CameraBox({
-  camId,
-  data,
-}: {
-  camId: number;
-  data: CheckinEvent | null;
-}) {
-  return (
-    <div className="bg-black rounded-xl overflow-hidden aspect-video relative flex items-center justify-center">
-      {data?.img_url ? (
-        <Image
-          // src={`${data.img_url}&t=${Date.now()}`}
-          src={`${data.img_url}`}
-          alt={`${data.img_url}`}
-          width={640}
-          height={360}
-          className="w-full h-full object-contain"
-        />
-      ) : (
-        // <div className="w-full h-full p-10 object-contain text-[#fff] text-sm break-all overflow-auto">
-        //   <a href={data.img_url} target="_blank" rel="noopener noreferrer">
-        //     {data.img_url}
-        //   </a>
-        // </div>
-        <span className="text-white">Đang chờ...</span>
-      )}
 
-      {/* Overlay */}
-      <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-        CAM {camId}
-      </div>
 
-      {data && (
-        <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-          User #{data.user_id}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// function CameraBox({
-//   camId,
-//   data,
-// }: {
-//   camId: number;
-//   data: CheckinEvent | null;
-// }) {
-//   return (
-//     <div className="rounded-xl overflow-hidden aspect-video relative">
-//       {data?.img_url ? (
-//         <Image
-//           src={data.img_url}
-//           alt={`Camera ${camId}`}
-//           fill
-//           className="object-cover" // QUAN TRỌNG
-//           sizes="(max-width: 768px) 100vw, 50vw"
-//         />
-//       ) : (
-//         <div className="w-full h-full flex items-center justify-center bg-gray-800">
-//           <span className="text-white">Đang chờ...</span>
-//         </div>
-//       )}
-
-//       {/* Overlay */}
-//       <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-//         CAM {camId}
-//       </div>
-
-//       {data && (
-//         <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-//           User #{data.user_id}
-//         </div>
-//       )}
-//     </div>
-//   );
-// }

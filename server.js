@@ -6,7 +6,7 @@ const middlewares = jsonServer.defaults();
 
 server.use(middlewares);
 
-// ✅ Cấu hình CORS đúng cho Next.js localhost:3000
+// Cấu hình CORS đúng cho Next.js localhost:3000
 server.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "http://localhost:3000");
   res.header("Access-Control-Allow-Credentials", "true");
@@ -21,5 +21,5 @@ server.use((req, res, next) => {
 server.use(router);
 
 server.listen(5001, () => {
-  console.log("✅ JSON Server running on http://localhost:5002");
+  console.log("JSON Server running on http://localhost:5002");
 });
