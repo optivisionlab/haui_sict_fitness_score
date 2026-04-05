@@ -119,7 +119,7 @@ export default function RealtimePage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* CAMERA GRID */}
         <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[3, 3, 3, 3].map((cam) => (
+          {[1, 2, 3, 4].map((cam) => (
             <CameraBox key={cam} camId={cam} data={cams[cam]} />
           ))}
         </div>
