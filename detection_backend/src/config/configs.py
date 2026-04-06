@@ -21,6 +21,7 @@ with open("configs.yml", "r") as f:
 
 RESNET_EMBEDDING_PATH = config.get("RESNET_EMBEDDING_PATH", "vggface2")
 QDRANT_URL = config.get("QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY = config.get("QDRANT_API_KEY", "test")
 VECTOR_SIZE = config.get('VECTOR_SIZE', 512)
 MTCNN_CONFIG = config.get("MTCNN_CONFIG", {})
 MONGDB_URI = config.get("MONGDB_URI", "Unknow")

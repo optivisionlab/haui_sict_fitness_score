@@ -20,7 +20,8 @@ class QdrantVectorStore:
         self,
         url: str = QDRANT_URL,
         collection_name: str = 'face',
-        vector_size: int = VECTOR_SIZE
+        vector_size: int = VECTOR_SIZE,
+        api_key: str = QDRANT_API_KEY
     ):
         """
         Initialize Qdrant vector store manager.
@@ -34,7 +35,8 @@ class QdrantVectorStore:
         self.vector_size = vector_size
         # Initialize Qdrant client
         logger.debug("Qdrant URL: {}", url)
-        self.client = QdrantClient(url=url)
+        self.client = QdrantClient(url=url, 
+                                   api_key=api_key)
 
     def create_collection(self, collection_name:str) -> bool:
         """
