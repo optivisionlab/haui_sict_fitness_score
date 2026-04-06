@@ -4,6 +4,8 @@ from src.api.sub_api import search, mongo_search
 from src.config.configs import DEVICE
 import torch
 import gc
+import os
+
 
 app = FastAPI()
 
@@ -25,4 +27,4 @@ async def cleanup_after_request(request: Request, call_next):
 
 
 if __name__ == "__main__":
-       uvicorn.run("main:app", host="0.0.0.0", port=8000)
+       uvicorn.run("main:app", host="0.0.0.0", port=os.getenv("API_PORT", 8000))
