@@ -5,7 +5,11 @@ from typing import Dict, Optional, Set, Tuple
 from confluent_kafka import KafkaException, TopicPartition
 from confluent_kafka.aio import AIOConsumer
 from loguru import logger
-
+import asyncio
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Optional, Set, Tuple
 
 @dataclass
 class _PartitionOffsetTracker:
@@ -49,6 +53,8 @@ class KafkaFrameConsumer:
         worker_concurrency: int = 4,
         poll_timeout: float = 1.0,
         drop_oldest_on_full: bool = False,
+        stats_file_path: Optional[str] = None,
+        stats_flush_interval: float = 5.0,
     ):
         self.topic = topic
         self.group_id = group_id
@@ -68,6 +74,18 @@ class KafkaFrameConsumer:
         self.running = False
         self._offset_lock = asyncio.Lock()
         self._offset_trackers: Dict[Tuple[str, int], _PartitionOffsetTracker] = {}
+        self.received_count = 0
+        self.enqueued_count = 0
+        self.processed_count = 0
+        self.failed_count = 0
+        self.dropped_on_full_count = 0   # cái bạn đang cần
+        self.skipped_failed_count = 0    # skip do xử lý lỗi, khác với drop_oldest
+        self.max_queue_size_seen = 0
+
+        self.stats_file_path = stats_file_path or f"{self.group_id}_consumer_stats.txt"
+        self.stats_flush_interval = max(1.0, float(stats_flush_interval))
+        self._stats_file_lock = asyncio.Lock()
+        self._stats_flush_task: Optional[asyncio.Task] = None
 
     def _tracker_for(self, topic: str, partition: int, first_seen_offset: int) -> _PartitionOffsetTracker:
         key = (topic, int(partition))
@@ -107,6 +125,38 @@ class KafkaFrameConsumer:
                     f"partition={partition} next_offset={committable + 1}"
                 )
 
+    def _build_stats_text(self) -> str:
+        return "\n".join([
+            f"timestamp={datetime.now().isoformat()}",
+            f"group_id={self.group_id}",
+            f"topic={self.topic}",
+            f"received_count={self.received_count}",
+            f"enqueued_count={self.enqueued_count}",
+            f"processed_count={self.processed_count}",
+            f"failed_count={self.failed_count}",
+            f"dropped_on_full_count={self.dropped_on_full_count}",
+            f"max_queue_size_seen={self.max_queue_size_seen}",
+            ""
+        ])
+
+    async def _flush_stats_to_file(self) -> None:
+        async with self._stats_file_lock:
+            Path(self.stats_file_path).write_text(
+                self._build_stats_text(),
+                encoding="utf-8"
+            )
+
+    async def _stats_flush_loop(self) -> None:
+        while self.running:
+            try:
+                await asyncio.sleep(self.stats_flush_interval)
+                # comment nếu không ghi file nữa
+                await self._flush_stats_to_file()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception(f"[{self.group_id}] failed to flush stats file")
+
     async def _worker_loop(self, queue: asyncio.Queue, handle_message):
         while True:
             msg = await queue.get()
@@ -116,8 +166,11 @@ class KafkaFrameConsumer:
 
                 try:
                     await handle_message(msg)
+                    self.processed_count += 1
                     await self._mark_done_and_commit_if_possible(msg)
                 except Exception:
+                    self.failed_count += 1
+                    self.skipped_failed_count += 1
                     logger.exception(
                         f"[{self.group_id}] skip failed message "
                         f"(topic={msg.topic()}, partition={msg.partition()}, offset={msg.offset()})"
@@ -132,6 +185,7 @@ class KafkaFrameConsumer:
     async def start(self, handle_message):
         await self.consumer.subscribe([self.topic])
         self.running = True
+        self._stats_flush_task = asyncio.create_task(self._stats_flush_loop())
 
         queue: asyncio.Queue = asyncio.Queue(maxsize=self.max_pending_messages)
         workers = [
@@ -142,7 +196,8 @@ class KafkaFrameConsumer:
         logger.info(
             f"[{self.group_id}] subscribed to {self.topic} "
             f"(max_pending_messages={self.max_pending_messages}, "
-            f"worker_concurrency={self.worker_concurrency})"
+            f"worker_concurrency={self.worker_concurrency}, "
+            f"drop_oldest_on_full={self.drop_oldest_on_full})"
         )
 
         try:
@@ -152,10 +207,15 @@ class KafkaFrameConsumer:
                     continue
                 if msg.error():
                     raise KafkaException(msg.error())
+                self.received_count += 1
+
+                if queue.qsize() > self.max_queue_size_seen:
+                    self.max_queue_size_seen = queue.qsize()
 
                 if queue.full() and self.drop_oldest_on_full:
                     dropped = queue.get_nowait()
                     queue.task_done()
+                    self.dropped_on_full_count += 1
                     logger.warning(
                         f"[{self.group_id}] dropped stale frame "
                         f"(topic={dropped.topic()}, partition={dropped.partition()}, offset={dropped.offset()})"
@@ -163,15 +223,34 @@ class KafkaFrameConsumer:
                     await self._mark_done_and_commit_if_possible(dropped, skipped=True)
 
                 await queue.put(msg)
+                self.enqueued_count += 1
+
+                if queue.qsize() > self.max_queue_size_seen:
+                    self.max_queue_size_seen = queue.qsize()
 
         finally:
             self.running = False
+            if self._stats_flush_task is not None:
+                self._stats_flush_task.cancel()
+                await asyncio.gather(self._stats_flush_task, return_exceptions=True)
+
             await queue.join()
 
             for _ in workers:
                 await queue.put(None)
 
             await asyncio.gather(*workers, return_exceptions=True)
+            await self._flush_stats_to_file()
+            logger.info(
+                f"[{self.group_id}] final stats: "
+                f"received={self.received_count}, "
+                f"enqueued={self.enqueued_count}, "
+                f"processed={self.processed_count}, "
+                f"failed={self.failed_count}, "
+                f"dropped_on_full={self.dropped_on_full_count}, "
+                f"max_queue_size_seen={self.max_queue_size_seen}, "
+                f"stats_file={self.stats_file_path}"
+            )
             await self.consumer.close()
 
     def stop(self):

@@ -16,9 +16,43 @@ def env(name, default=None, cast=None):
         return cast(v)
     return v
 
-SEARCH_API_URL = env("SEARCH_API_URL", config.get("SEARCH_CONFIG", {}).get("url", "http://127.0.0.1:8000"))
+
+def _parse_camera_url_mapping(raw_value: str):
+    mapping = {}
+    if not raw_value:
+        return mapping
+
+    pairs = [item.strip() for item in raw_value.split(",") if item.strip()]
+    for pair in pairs:
+        if "=" not in pair:
+            continue
+
+        cam_id, url = pair.split("=", 1)
+        cam_id = cam_id.strip()
+        url = url.strip().rstrip("/")
+
+        if cam_id and url:
+            mapping[str(cam_id)] = url
+
+    return mapping
+
+
+SEARCH_API_URL = env(
+    "SEARCH_API_URL",
+    config.get("SEARCH_CONFIG", {}).get("url", "http://127.0.0.1:8000"),
+).rstrip("/")
+
+SEARCH_API_CAMERA_URLS = _parse_camera_url_mapping(env("SEARCH_API_CAMERA_URLS", ""))
+
+
+def get_search_api_url(cam_id=None):
+    if cam_id is None:
+        return SEARCH_API_URL
+    return SEARCH_API_CAMERA_URLS.get(str(cam_id), SEARCH_API_URL)
+
+# SEARCH_API_URL = env("SEARCH_API_URL", config.get("SEARCH_CONFIG", {}).get("url", "http://127.0.0.1:8000"))
 KAFKA_SERVERS  = env("KAFKA_SERVERS",  config.get("KAFKA", {}).get("servers", "127.0.0.1:9092"))
-QDRANT_COLLECTION = env("QDRANT_COLLECTION", config.get("DATABASE", {}).get("qdrant_collection", "user_face"))
+QDRANT_COLLECTION = env("QDRANT_COLLECTION", config.get("DATABASE", {}).get("qdrant_collection", "face"))
 LINE_BEGIN_SEARCH = float(env("LINE_BEGIN_SEARCH", config.get("SEARCH_CONFIG", {}).get("line_begin_search", 0.5)))
 
 REDIS_HOST = env("REDIS_HOST", config.get("REDIS", {}).get("REDIS_HOST", "127.0.0.1"))
@@ -38,3 +72,4 @@ MINIO_SECRET_KEY = env("MINIO_SECRET_KEY", config.get("MINIO", {}).get("MINIO_SE
 MINIO_BUCKET_NAME = env("MINIO_BUCKET_NAME", config.get("MINIO", {}).get("MINIO_BUCKET_NAME", ""))
 
 TEST_MODE = env("TEST_MODE", config.get("TEST_MODE", "False")).lower() == "true"
+

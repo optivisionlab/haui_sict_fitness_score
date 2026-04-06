@@ -13,13 +13,13 @@ import cv2
 import numpy as np
 import requests
 from loguru import logger
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
-from src.config.config import SEARCH_API_URL
+# from src.config.config import SEARCH_API_URL
 import httpx
 import asyncio
 from typing import Optional
+
+from src.config.config import get_search_api_url
 
 
 _client: Optional[httpx.AsyncClient] = None
@@ -87,7 +87,8 @@ async def send_tracking_to_api(
     frame,
     collection_name="face",
     *,
-    similarity_threshold: float = 0.7,
+    cam_id=None,
+    similarity_threshold: float = 0.55,
     crop_mode: str = "union",  # "union" | "none"
 ):
     if not ids or frame is None:
@@ -99,7 +100,7 @@ async def send_tracking_to_api(
         "tracking_frame": tracking_frame,
         "similarity_threshold": similarity_threshold,
     }
-
+    logger.info("Prepared payload for search API: {}", payload)
     upload_frame = frame
     if crop_mode == "union" and len(xyxy_boxes) > 0:
         try:
@@ -116,9 +117,11 @@ async def send_tracking_to_api(
         encoded_image = np.array(encoded_image)
 
     files = [("images", ("frame.jpg", encoded_image.tobytes(), "image/jpeg"))]
-
+    base_url = get_search_api_url(cam_id)
+    request_url = f"{base_url}/faces/search"
+    logger.info("Calling search API for cam_id={} -> {}", cam_id, request_url)
     return await http_post_async(
-        url=f"{SEARCH_API_URL}/faces/search",
+        url=request_url,
         data=payload,
         files=files,
     )

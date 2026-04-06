@@ -21,10 +21,10 @@ def _decode(v):
 
 @dataclass
 class EvalConfig:
-    upload_each_checkin: bool = False
+    upload_each_checkin: bool = True
     # minimum interval (in milliseconds) between two valid check-ins of the same user
-    checkin_cooldown_ms: int = 500
-    lap_lock_seconds: int = 2
+    checkin_cooldown_ms: int = 10
+    lap_lock_seconds: int = 0
 
 
 class SetUpEvaluate:
@@ -73,6 +73,7 @@ class SetUpEvaluate:
             return lap
             """
         )
+        logger.info("Evaluator initialized with config: {}", self.cfg.upload_each_checkin)
 
     def _ensure_user_key_if_test(self, key_user: str, timestamp: float):
         if not self.test_mode:
@@ -126,8 +127,8 @@ class SetUpEvaluate:
         if last_cam == cam_id:
             return False
         # reject if too close in time (all in milliseconds)
-        if ts_ms - last_time_ms < self.cfg.checkin_cooldown_ms:
-            return False
+        # if ts_ms - last_time_ms < self.cfg.checkin_cooldown_ms:
+        #     return False
 
         pipe = self.redis_client.pipeline()
         pipe.hset(key_user, f"flag_{cam_id}", 1)
@@ -143,7 +144,7 @@ class SetUpEvaluate:
                 )
                 pipe.hset(key_user, "img_url", img_url)
             except Exception as e:
-                logger.warning("MinIO upload failed for user {}: {}", user_id, e)
+                logger.exception("MinIO upload failed for user {}: {}", user_id, e)
 
         pipe.execute()
         logger.debug("User {} set flag cam {}", user_id, cam_id)

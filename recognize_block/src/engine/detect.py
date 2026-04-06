@@ -6,6 +6,7 @@ from loguru import logger
 from src.engine.curl_api_search import send_tracking_to_api
 from src.engine.engine import draw_target
 from src.config.config import LINE_BEGIN_SEARCH, QDRANT_COLLECTION
+import cv2
 
 
 class SimpleTracker:
@@ -50,7 +51,7 @@ class SimpleTracker:
         call_zone_xyxy: Optional[List[int]] = None,
         min_overlap_ratio: float = 0.8,
     ):
-        result = self.detection_model(frame, conf=0.65, iou=0.8, verbose=False)[0]
+        result = self.detection_model(frame, conf=0.65, iou=0.8, verbose=False, save=True)[0]
 
         boxes: List[List[int]] = []
         if result is None or result.boxes is None:
@@ -70,7 +71,7 @@ class SimpleTracker:
                     continue
 
             boxes.append(person_box)
-
+            logger.info(f"Detected person box: {person_box} with confidence {box.conf[0].item():.2f}")
         ids = self._gen_unique_ids(len(boxes))
         return ids, boxes, frame
 
@@ -102,7 +103,7 @@ class APIHandler:
 
         # cooldown per user to prevent double count (stored in milliseconds)
         self._user_cooldown_until_ms: Dict[str, int] = {}
-        self.user_cooldown_ms = 1000  # 1s in milliseconds
+        self.user_cooldown_ms = 10  # 1s in milliseconds
 
         # per-cam gate to reduce API spam (timestamps stored in milliseconds)
         self._cam_last_call_ts_ms: Dict[str, int] = {}
@@ -156,11 +157,18 @@ class APIHandler:
                 xyxy_boxes,
                 frame,
                 collection_name=self.collection_name,
+                cam_id=cam_id,
                 crop_mode="none",
             )
             if not response or response.status_code != 200:
+                logger.warning("Search API returned no response")
                 return
 
+            logger.info("Search API status={} cam_id={}", response.status_code, cam_id)
+            logger.info("Search API raw body: {}", response.text)
+
+            if response.status_code != 200:
+                return
             # update last-call timestamp for this camera (monotonic, in ms)
             self._cam_last_call_ts_ms[cam_id] = now_mono_ms
 
@@ -188,9 +196,8 @@ class APIHandler:
 
                 draw_frame = None
                 if self.evaluator.cfg.upload_each_checkin:
-                    draw_frame = self.__draw_detections__(frame.copy(), [user_id, box])
+                    draw_frame = cv2.cvtColor(self.__draw_detections__(frame.copy(), [user_id, box]), cv2.COLOR_BGR2RGB)
 
-                # pass event timestamp in milliseconds downstream
                 ok = self.evaluator.set_flag_redis(
                     user_id,
                     cam_id,
@@ -198,8 +205,8 @@ class APIHandler:
                     timestamp=event_ts_ms,
                 )
                 if not ok:
-                    logger.warning(f"User {user_id} is already in cooldown for cam {cam_id}")
-                    continue
+                    logger.exception(f"User {user_id} is already in cooldown for cam {cam_id}")
+                    
 
                 lap_done = self.evaluator.check_lap_1_user(user_id)
                 if lap_done:

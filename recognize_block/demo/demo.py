@@ -28,7 +28,7 @@ CAM_IDS = [1, 2, 3, 4]   # camera id
 
 TOPIC_TEMPLATE = "camera-{cid}"
 START_BARRIER_TIMEOUT_SEC = 30
-UPLOAD_EACH_CHECKIN = False  # tắt upload proof trong hot path để ưu tiên realtime
+UPLOAD_EACH_CHECKIN = True  # tắt upload proof trong hot path để ưu tiên realtime
 
 # ================== REDIS ==================
 redis_client = redis.Redis(
@@ -87,10 +87,10 @@ producer_conf = {
 consumer_conf = {"bootstrap.servers": KAFKA_SERVERS}
 
 CALL_ZONE_X1_RATIO = 0.0
-CALL_ZONE_Y1_RATIO = 0.0
+CALL_ZONE_Y1_RATIO = 0.5
 CALL_ZONE_X2_RATIO = 1.0
-CALL_ZONE_Y2_RATIO = 0.5
-CALL_ZONE_MIN_OVERLAP_RATIO = 0.8
+CALL_ZONE_Y2_RATIO = 1.0
+CALL_ZONE_MIN_OVERLAP_RATIO = 0.7
 
 # ================== KAFKA UTILS ==================
 def create_topics(cam_ids):
@@ -160,7 +160,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
     producer = KafkaFrameProducer(
         producer_conf,
         topic_template=topic,
-        jpeg_quality=60,
+        jpeg_quality=80,
         drop_on_full=False,
         max_backoff_sec=30,
     )
@@ -179,7 +179,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
     logger.info(f"[Producer-{cid}] Video FPS = {video_fps}")
 
     frame_interval = 1.0 / video_fps
-    TARGET_DETECT_FPS = 6
+    TARGET_DETECT_FPS = video_fps
     frame_step = max(1, int(round(video_fps / TARGET_DETECT_FPS)))
 
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -292,7 +292,9 @@ async def consumer_worker(cid: int):
         # Realtime mode: allow parallel processing but keep safe-commit ordering.
         worker_concurrency=2,
         max_pending_messages=16,
-        drop_oldest_on_full=True,
+        drop_oldest_on_full=False,
+        stats_file_path=f'cam_{cid}_consumer_stats.txt',
+        stats_flush_interval=5.0,
     )
 
     api = APIHandler(
@@ -303,6 +305,7 @@ async def consumer_worker(cid: int):
 
     async def handle_frame(msg):
         try:
+            start_time = time.perf_counter()
             nparr = np.frombuffer(msg.value(), np.uint8)
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
@@ -334,6 +337,10 @@ async def consumer_worker(cid: int):
 
         except Exception:
             logger.exception(f"[Consumer-{cid}] error")
+        finally:
+            logger.info(f"[Consumer-{cid}] finished processing frame={frame_id} in {time.perf_counter() - start_time:.3f}s")
+            with open(f"consumer_{cid}_log.txt", "a", encoding="utf-8") as f:
+                f.write(f"{datetime.now()} | frame={frame_id} | persons={len(person_ids)} | process_time={(time.perf_counter() - start_time):.3f}s\n")
 
     await consumer.start(handle_frame)
 
@@ -361,10 +368,10 @@ def main():
     create_topics(CAM_IDS)
 
     video_sources = {
-        1: r"D:\haui_sict_fitness_score\data_test\0207 (1).mp4",
-        2: r"D:\haui_sict_fitness_score\data_test\0207 (1)(1).mp4",
-        3: r"D:\haui_sict_fitness_score\data_test\0207 (1)(2).mp4",
-        4: r"D:\haui_sict_fitness_score\data_test\0207 (1)(3).mp4",
+        1: r"rtsp://10.1.12.11:8554/cam1",
+        2: r"rtsp://10.1.12.11:8554/cam2",
+        3: r"rtsp://10.1.12.88:8554/cam3",
+        4: r"rtsp://10.1.12.88:8554/cam4",
     }
 
     ctx = mp.get_context("spawn")
@@ -381,7 +388,7 @@ def main():
     for cid in CAM_IDS:
         p = ctx.Process(
             target=tracker_producer_worker,
-            args=(cid, video_sources[cid], start_barrier),
+            args=(cid, video_sources[cid], start_barrier, 'rtsp'),
             daemon=False,
         )
         p.start()
