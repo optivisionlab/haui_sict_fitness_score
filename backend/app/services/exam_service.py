@@ -29,7 +29,7 @@ def create_exam(db: Session, exam_in: ExamCreate, class_id: Optional[int] = None
     integrity errors are treated as idempotent for the create flow.
     """
     # Create exam row
-    data = exam_in.dict()
+    data = exam_in.model_dump()
     exam = Exam(**data)
     db.add(exam)
     db.commit()
@@ -94,7 +94,7 @@ def update_exam(db: Session, exam_id: int, exam_in: ExamUpdate) -> Exam:
     if not exam:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
     
-    data = exam_in.dict(exclude_unset=True)
+    data = exam_in.model_dump(exclude_unset=True)
     for k, v in data.items():
         setattr(exam, k, v)
     # set updated timestamp

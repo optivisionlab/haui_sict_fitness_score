@@ -1,15 +1,21 @@
-from typing import Optional, List
-from sqlmodel import Session, select
-from fastapi import HTTPException, status
+"""User business logic: CRUD, authentication, registration."""
+
+import logging
+from typing import Optional
+
 from sqlalchemy import text
+from sqlmodel import Session, select
 
-from app.models.user import User
-from app.schemas.users import UserCreate, UserUpdate
+from app.core.exceptions import (
+    AlreadyExistsException,
+    InvalidInputException,
+    NotFoundException,
+)
 from app.core.security import hash_password, verify_password
+from app.models.user import User, UserStatus
+from app.schemas.users import UserCreate, UserUpdate
 
-from app.models.user import User
-from app.schemas.users import UserCreate, UserUpdate
-from app.core.security import hash_password, verify_password
+logger = logging.getLogger(__name__)
 
 
 def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
@@ -24,39 +30,103 @@ def get_user_by_username(db: Session, user_name: str) -> Optional[User]:
     return db.exec(select(User).where(User.user_name == user_name)).first()
 
 
-def list_users(db: Session, skip: int = 0, limit: int = 100) -> List[User]:
+def list_users(db: Session, skip: int = 0, limit: int = 100) -> list[User]:
     return db.exec(select(User).offset(skip).limit(limit)).all()
 
 
-def create_user(db: Session, user_in: UserCreate) -> User:
-    # uniqueness checks
-    if get_user_by_email(db, user_in.email):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
-    if get_user_by_username(db, user_in.user_name):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already registered")
+def register_user(db: Session, user_in: UserCreate) -> User:
+    """Register a new user with uniqueness checks and password hashing."""
+    if not user_in.password:
+        raise InvalidInputException("Password is required")
 
-    hashed = hash_password(user_in.password)
-    db_user = User(**user_in.dict(exclude={"password"}), password=hashed)
-    db.add(db_user)
+    email = user_in.email.strip() if user_in.email else None
+    user_name = user_in.user_name.strip() if user_in.user_name else None
+
+    if email and get_user_by_email(db, email):
+        raise AlreadyExistsException("The user with this email already exists.")
+
+    if user_name and get_user_by_username(db, user_name):
+        raise AlreadyExistsException("The user with this username already exists.")
+
+    payload = user_in.model_dump(exclude={"password"})
+    if email is not None:
+        payload["email"] = email
+    if user_name is not None:
+        payload["user_name"] = user_name
+
+    user = User(**payload, password=hash_password(user_in.password))
+    db.add(user)
     try:
         db.commit()
-        db.refresh(db_user)
-    except Exception as e:
+        db.refresh(user)
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-    return db_user
+        raise
+    return user
 
 
-def update_user(db: Session, user_id: int, user_in: UserUpdate) -> User:
+def authenticate_user(db: Session, username_or_email: str, password: str) -> User:
+    """Verify credentials (supports email or username login).
+
+    Raises NotFoundException if credentials are invalid.
+    """
+    user = db.exec(
+        select(User).where(
+            (User.email == username_or_email) | (User.user_name == username_or_email)
+        )
+    ).first()
+
+    if not user or not verify_password(password, user.password):
+        raise InvalidInputException("Incorrect username/email or password")
+
+    if user.user_status != UserStatus.active:
+        raise InvalidInputException("Inactive user")
+
+    return user
+
+
+def update_user(db: Session, user: User, user_in: UserUpdate) -> User:
+    """Update a user's fields. Handles password hashing if provided."""
+    update_data = user_in.model_dump(exclude_unset=True)
+
+    if "password" in update_data and update_data.get("password"):
+        update_data["password"] = hash_password(update_data["password"])
+
+    for field, value in update_data.items():
+        setattr(user, field, value)
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def update_user_by_id(db: Session, user_id: int, user_in: UserUpdate) -> User:
+    """Update user by ID with uniqueness checks for email/username."""
     user = get_user_by_id(db, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise NotFoundException("User")
 
-    data = user_in.dict(exclude_unset=True)
-    if "password" in data and data["password"]:
-        data["password"] = hash_password(data["password"])
+    update_data = user_in.model_dump(exclude_unset=True)
 
-    for field, value in data.items():
+    if "email" in update_data and update_data["email"]:
+        existing = db.exec(
+            select(User).where(User.email == update_data["email"], User.user_id != user_id)
+        ).first()
+        if existing:
+            raise AlreadyExistsException("Email already in use")
+
+    if "user_name" in update_data and update_data["user_name"]:
+        existing = db.exec(
+            select(User).where(User.user_name == update_data["user_name"], User.user_id != user_id)
+        ).first()
+        if existing:
+            raise AlreadyExistsException("Username already in use")
+
+    if "password" in update_data and update_data.get("password"):
+        update_data["password"] = hash_password(update_data["password"])
+
+    for field, value in update_data.items():
         setattr(user, field, value)
 
     db.add(user)
@@ -66,34 +136,15 @@ def update_user(db: Session, user_id: int, user_in: UserUpdate) -> User:
 
 
 def delete_user(db: Session, user_id: int) -> None:
+    """Delete a user and clean up related data."""
     user = get_user_by_id(db, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    # Cleanup related data explicitly to keep behavior consistent across DBs.
-    # 1) Set teacher_id = NULL for classes taught by this user
-    db.execute(text("""
-        UPDATE classes SET teacher_id = NULL WHERE teacher_id = :uid
-        """), {"uid": user_id})
-    # 2) Delete enrollments
-    db.execute(text("""
-        DELETE FROM user_class WHERE user_id = :uid
-        """), {"uid": user_id})
-    # 3) Delete results
-    db.execute(text("""
-        DELETE FROM results WHERE user_id = :uid
-        """), {"uid": user_id})
+        raise NotFoundException("User")
+
+    db.execute(text("UPDATE classes SET teacher_id = NULL WHERE teacher_id = :uid"), {"uid": user_id})
+    db.execute(text("DELETE FROM user_class WHERE user_id = :uid"), {"uid": user_id})
+    db.execute(text("DELETE FROM results WHERE user_id = :uid"), {"uid": user_id})
 
     db.delete(user)
     db.commit()
-
-
-def authenticate_user(db: Session, username_or_email: str, password: str) -> Optional[User]:
-    # allow login by email or username
-    user = db.exec(
-        select(User).where((User.email == username_or_email) | (User.user_name == username_or_email))
-    ).first()
-    if not user:
-        return None
-    if not verify_password(password, user.password):
-        return None
-    return user
+    logger.info("Deleted user_id=%s and related data", user_id)

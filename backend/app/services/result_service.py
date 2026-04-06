@@ -94,14 +94,14 @@ def create_result(db: Session, result_in: ResultCreate) -> Result:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Result already exists for this user, exam and step",
             )
-        result_data = result_in.dict()
+        result_data = result_in.model_dump()
     else:
         # Auto-assign step = max(existing steps) + 1 (or 1 if none exist)
         last = db.exec(
             select(Result).where((Result.user_id == result_in.user_id) & (Result.exam_id == result_in.exam_id)).order_by(Result.step.desc()).limit(1)
         ).first()
         next_step = 1 if not last or last.step is None else (last.step + 1)
-        result_data = result_in.dict()
+        result_data = result_in.model_dump()
         result_data["step"] = next_step
 
     result = Result(**result_data)
@@ -125,7 +125,7 @@ def update_result(db: Session, result_id: int, result_in: ResultUpdate) -> Resul
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
     
-    data = result_in.dict(exclude_unset=True)
+    data = result_in.model_dump(exclude_unset=True)
     # If updating any of user_id, exam_id or step we must ensure the
     # uniqueness constraint (user_id, exam_id, step) is preserved.
     # Reject explicit nulls for non-nullable DB columns to avoid IntegrityError.
