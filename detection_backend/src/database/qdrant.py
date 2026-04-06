@@ -127,7 +127,10 @@ class QdrantVectorStore:
 
         
         query_embeddings, boxes = get_embedding(query)
-        query_embeddings = [emb.detach().numpy()[0] if emb is not None else None for emb in query_embeddings]
+        query_embeddings = [
+            emb.detach().cpu().numpy()[0] if emb is not None else None
+            for emb in query_embeddings
+        ]
 
         all_results = []
 
