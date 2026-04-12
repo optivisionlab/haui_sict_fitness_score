@@ -9,12 +9,20 @@ import json
 from typing import List, Optional
 from src.depend.depend import BatchTrackRequest
 import uvicorn
-from src.config.config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.database.sql_model import PostgresHandler
 
-from src.config.config import POSTGRE_USER, POSTGRE_PASSWORD, POSTGRE_HOST, POSTGRE_PORT, POSTGRE_DB
+from src.config.config import (
+    REDIS_HOST,
+    REDIS_PORT,
+    REDIS_DB,
+    REDIS_PASSWORD,
+    POSTGRE_DSN,
+    SAVE_DB_API_HOST,
+    SAVE_DB_API_PORT,
+    CAM_IDS,
+)
 from loguru import logger
 
 
@@ -23,11 +31,10 @@ from loguru import logger
 redis_client = redis.Redis(
     host=REDIS_HOST,
     port=REDIS_PORT,
-    db=0,
+    db=REDIS_DB,
     password=REDIS_PASSWORD,
-    decode_responses=True
+    decode_responses=True,
 )
-
 try:
     redis_client.ping()
     print("✅ Kết nối Redis thành công!")
@@ -37,16 +44,7 @@ except redis.ConnectionError as e:
     # sys.exit(1)
 
 # Kết nối PostgreSQL
-user = "labelstudio"
-password = "Admin@221b"
-host = "10.100.200.119"
-port = 5555
-database = "fitness_score"
-
-encoded_password = quote_plus(password)
-# URL kết nối PostgreSQL
-DB_URL = f"postgresql+psycopg2://{user}:{encoded_password}@{host}:{port}/{database}"
-pg_handler = PostgresHandler(DB_URL)
+pg_handler = PostgresHandler(POSTGRE_DSN)
 
 app = FastAPI()
 
@@ -94,15 +92,16 @@ async def track_batch(req: BatchTrackRequest):
 
             if u.exam_id and u.start_time:
                 # Start tracking
-                redis_client.hset(start_user_key, mapping={
+                mapping = {
                     "state": "active",
                     "exam_id": u.exam_id,
                     "step": u.step if u.step is not None else "",
                     "start_time": u.start_time,
                     "lap": 0,
-                    "flag_1": 0, "flag_2": 0, "flag_3": 0, "flag_4": 0,
-                    "last_cam": -1
-                })
+                    "last_cam": -1,
+                    **{f"flag_{cam_id}": 0 for cam_id in CAM_IDS},
+                }
+                redis_client.hset(start_user_key, mapping=mapping)
                 results.append({"user_id": u.user_id, "status": "started"})
                 continue
 
@@ -114,4 +113,4 @@ async def track_batch(req: BatchTrackRequest):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="localhost", port=8001)
+    uvicorn.run(app, host=SAVE_DB_API_HOST, port=SAVE_DB_API_PORT)
