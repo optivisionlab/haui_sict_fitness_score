@@ -8,6 +8,7 @@ import io
 import requests
 from src.kafka.kafka_produce import KafkaFrameProducer
 from confluent_kafka import KafkaException, KafkaError
+from src.config.config import KAFKA_SERVERS
 
 
 def video_worker(video_path: str, camera_id: int, producer: KafkaFrameProducer, respect_fps: bool = True):
@@ -52,7 +53,7 @@ def video_worker(video_path: str, camera_id: int, producer: KafkaFrameProducer, 
 def create_topic(topics_name :list, 
                  number_of_partitions :int = 3, 
                  replication_factor :int = 1,
-                 host_servers:str = "localhost:9094"):
+                 host_servers:str = KAFKA_SERVERS):
     
 
     admin = AdminClient({"bootstrap.servers": host_servers})

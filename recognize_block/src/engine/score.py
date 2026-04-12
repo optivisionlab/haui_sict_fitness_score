@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
 from typing import Optional
 
 from loguru import logger
+from src.config.config import EvalConfig, EVAL_CONFIG
 from src.depend.depend import minio_client
+from datetime import datetime
 
 
 def _decode(v):
@@ -17,14 +18,6 @@ def _decode(v):
         except Exception:
             return str(v)
     return v
-
-
-@dataclass
-class EvalConfig:
-    upload_each_checkin: bool = True
-    # minimum interval (in milliseconds) between two valid check-ins of the same user
-    checkin_cooldown_ms: int = 10
-    lap_lock_seconds: int = 0
 
 
 class SetUpEvaluate:
@@ -43,7 +36,7 @@ class SetUpEvaluate:
         self.redis_client = redis_client
         self.pg_handler = pg_handler
         self.test_mode = test_mode
-        self.cfg = config or EvalConfig()
+        self.cfg = config or EVAL_CONFIG
         self._lap_script = self.redis_client.register_script(
             """
             local key = KEYS[1]
@@ -138,9 +131,11 @@ class SetUpEvaluate:
         # Optional (expensive): upload proof image
         if self.cfg.upload_each_checkin and copy_frame is not None:
             try:
+                dt = datetime.fromtimestamp(ts_ms / 1000.0)
+                destination_file = dt.strftime(f"%Y/%m/%d/%H/%M/%S/{user_id}.jpg")
                 img_url = minio_client.push_data(
                     image=copy_frame,
-                    destination_file=f"{int(ts_ms)}/{user_id}.jpg",
+                    destination_file=destination_file,
                 )
                 pipe.hset(key_user, "img_url", img_url)
             except Exception as e:
