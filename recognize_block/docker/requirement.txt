@@ -1,8 +1,8 @@
 # Python 3.11.9 Requirements
 # Computer Vision & Image Processing
-opencv-python==4.8.1.78
-numpy==1.24.3
+numpy==1.26.3
 Pillow==10.0.0
+opencv-python==4.8.1.78
 
 # Core Data Science & ML
 onnxruntime==1.16.3
@@ -45,3 +45,11 @@ notebook==7.0.5
 
 # Pandas
 pandas==3.0.1
+
+# Ultralytics
+ultralytics==8.3.193
+
+python-dotenv==1.2.2
+httpx==0.28.1
+
+matplotlib==3.10.8
