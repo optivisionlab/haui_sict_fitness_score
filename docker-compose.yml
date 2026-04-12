@@ -1,4 +1,33 @@
+version: '3.8'
+
 services:
+  # --------------------------------------------------------------------------
+  # Frontend (Next.js)
+  # --------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: frontend_image:v0.0.1
+    container_name: frontend_cont
+    restart: unless-stopped
+    env_file:
+      - ./frontend/.env
+    ports:
+      - "3000:3000"
+    networks:
+      - app-network
+    depends_on:
+      - backend
+    environment:
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   # --------------------------------------------------------------------------
   # Backend API
   # --------------------------------------------------------------------------
@@ -6,13 +35,13 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: backend_image:v0.0.2
+    image: backend_image:v0.0.1
     container_name: backend_cont
     restart: unless-stopped
     env_file:
-      - .env
+      - ./backend/.env
     ports:
-      - "2305:8000"
+      - "8888:8888"
     networks:
       - app-network
     depends_on:

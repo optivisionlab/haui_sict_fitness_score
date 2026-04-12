@@ -9,7 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Install build tools needed for compiling C extensions (psycopg2, argon2, etc.)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       build-essential gcc libpq-dev \
+    build-essential gcc libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -52,11 +52,11 @@ COPY --chown=appuser:appuser . .
 
 USER appuser
 
-EXPOSE 8000
+EXPOSE 8888
 
 # Health check - verify the /health endpoint responds
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
 # Default command: production-grade uvicorn (no --reload)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--log-level", "info"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8888", "--workers", "2", "--log-level", "info"]
