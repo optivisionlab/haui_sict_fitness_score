@@ -7,10 +7,29 @@ from ultralytics import YOLO
 from confluent_kafka.admin import AdminClient, NewTopic
 
 from src.engine.detect import SimpleTracker, APIHandler
-from src.engine.score import EvalConfig, SetUpEvaluate
+from src.engine.score import SetUpEvaluate
 from src.kafka.kafka_produce import KafkaFrameProducer
 from src.kafka.kafka_consumers import KafkaFrameConsumer
-from src.config.config import KAFKA_SERVERS, TEST_MODE
+from src.config.config import (
+    KAFKA_SERVERS,
+    TEST_MODE,
+    YOLO_MODEL_PATH,
+    CAM_IDS,
+    KAFKA_TOPIC_TEMPLATE,
+    START_BARRIER_TIMEOUT_SEC,
+    EVAL_CONFIG,
+    REDIS_HOST,
+    REDIS_PORT,
+    REDIS_DB,
+    REDIS_PASSWORD,
+    POSTGRE_DSN,
+    CALL_ZONE_X1_RATIO,
+    CALL_ZONE_Y1_RATIO,
+    CALL_ZONE_X2_RATIO,
+    CALL_ZONE_Y2_RATIO,
+    CALL_ZONE_MIN_OVERLAP_RATIO,
+    CAMERA_SOURCE_URLS,
+)
 import json
 from src.engine.engine import draw_target
 import pandas as pd
@@ -22,21 +41,17 @@ import asyncio
 
 
 # ================== CONFIG ==================
-MODEL_PATH = "weights\\yolo11n.pt"
-CAM_IDS = [1, 2, 3, 4]   # camera id
-# CAM_IDS = [1]   # camera id
+MODEL_PATH = YOLO_MODEL_PATH
 
-TOPIC_TEMPLATE = "camera-{cid}"
-START_BARRIER_TIMEOUT_SEC = 30
-UPLOAD_EACH_CHECKIN = True  # tắt upload proof trong hot path để ưu tiên realtime
+TOPIC_TEMPLATE = KAFKA_TOPIC_TEMPLATE
 
 # ================== REDIS ==================
 redis_client = redis.Redis(
-    host="10.100.200.119",
-    port=6379,
-    db=0,  # mặc định
-    password="optivisionlab",
-    decode_responses=True,  # để trả về string thay vì bytes
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    db=REDIS_DB,
+    password=REDIS_PASSWORD,
+    decode_responses=True,
 )
 
 try:
@@ -47,26 +62,12 @@ except redis.ConnectionError as e:
 
 
 # ================== POSTGRES ==================
-user = "labelstudio"
-password = "Admin@221b"
-host = "10.100.200.119"
-port = 5555
-database = "fitness_db"
-
-encoded_password = quote_plus(password)
-
-# URL kết nối PostgreSQL
-DB_URL = (
-    f"postgresql+psycopg2://{user}:{encoded_password}"
-    f"@{host}:{port}/{database}"
-)
-
-pg_handler = PostgresHandler(DB_URL)
+pg_handler = PostgresHandler(POSTGRE_DSN)
 
 
 # ================== KAFKA CONFIG ==================
 producer_conf = {
-    "bootstrap.servers": "10.100.200.119:9098",  # hoặc list broker
+    "bootstrap.servers": KAFKA_SERVERS,  # hoặc list broker
     "acks": "1",  # nhanh hơn "all"
     "message.timeout.ms": 60000,  # timeout gửi 60s
     "delivery.timeout.ms": 120000,  # timeout delivery 120s
@@ -86,11 +87,6 @@ producer_conf = {
 
 consumer_conf = {"bootstrap.servers": KAFKA_SERVERS}
 
-CALL_ZONE_X1_RATIO = 0.0
-CALL_ZONE_Y1_RATIO = 0.5
-CALL_ZONE_X2_RATIO = 1.0
-CALL_ZONE_Y2_RATIO = 1.0
-CALL_ZONE_MIN_OVERLAP_RATIO = 0.7
 
 # ================== KAFKA UTILS ==================
 def create_topics(cam_ids):
@@ -282,7 +278,7 @@ async def consumer_worker(cid: int):
         redis_client=redis_client,
         pg_handler=pg_handler,
         test_mode=TEST_MODE,
-        config=EvalConfig(upload_each_checkin=UPLOAD_EACH_CHECKIN)
+        config=EVAL_CONFIG
     )
 
     consumer = KafkaFrameConsumer(
@@ -367,12 +363,10 @@ def main():
     logger.info("🚀 Starting demo...")
     create_topics(CAM_IDS)
 
-    video_sources = {
-        1: r"rtsp://10.1.12.11:8554/cam1",
-        2: r"rtsp://10.1.12.11:8554/cam2",
-        3: r"rtsp://10.1.12.88:8554/cam3",
-        4: r"rtsp://10.1.12.88:8554/cam4",
-    }
+    video_sources = CAMERA_SOURCE_URLS
+    missing_cam_ids = [cid for cid in CAM_IDS if str(cid) not in video_sources]
+    if missing_cam_ids:
+        raise ValueError(f"Missing CAMERA_SOURCE_URLS for cam ids: {missing_cam_ids}")
 
     ctx = mp.get_context("spawn")
 
@@ -388,7 +382,7 @@ def main():
     for cid in CAM_IDS:
         p = ctx.Process(
             target=tracker_producer_worker,
-            args=(cid, video_sources[cid], start_barrier, 'rtsp'),
+            args=(cid, video_sources[str(cid)], start_barrier, "rtsp"),
             daemon=False,
         )
         p.start()
