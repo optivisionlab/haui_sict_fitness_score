@@ -68,11 +68,25 @@ class SetUpEvaluate:
         )
         logger.info("Evaluator initialized with config: {}", self.cfg.upload_each_checkin)
 
+    @staticmethod
+    def _to_redis_datetime_str_from_ms(ts_ms: float) -> str:
+        return datetime.fromtimestamp(ts_ms / 1000.0).isoformat(timespec="milliseconds")
+
+    @staticmethod
+    def _from_redis_datetime_str(value):
+        raw = _decode(value)
+        if not raw:
+            return None
+        return datetime.fromisoformat(str(raw))
+    
     def _ensure_user_key_if_test(self, key_user: str, timestamp: float):
         if not self.test_mode:
             return
         if self.redis_client.exists(key_user):
             return
+        
+        start_time_str = self._to_redis_datetime_str_from_ms(timestamp)
+
         self.redis_client.hset(
             key_user,
             mapping={
@@ -80,7 +94,7 @@ class SetUpEvaluate:
                 "exam_id": -1,
                 "step": 0,
                 "lap": 0,
-                "start_time": timestamp,
+                "start_time": start_time_str,
                 "last_cam": "",
                 "last_time": 0,
                 "img_url": "",
@@ -88,6 +102,7 @@ class SetUpEvaluate:
             },
         )
         logger.warning("[TEST_MODE] init redis key for {}", key_user)
+    
 
     def set_flag_redis(self, user_id, cam_id, copy_frame=None, timestamp=None) -> bool:
         user_id = str(user_id)
@@ -97,6 +112,7 @@ class SetUpEvaluate:
             ts_ms = float(timestamp)
         else:
             ts_ms = time.time_ns() / 1_000_000.0
+        
         key_user = f"user:{user_id}:data"
 
         # ensure key exists (using ms-based timestamp)
@@ -114,7 +130,6 @@ class SetUpEvaluate:
         pipe.hget(key_user, "last_time")
         last_cam, last_time = pipe.execute()
         last_cam = str(_decode(last_cam) or "")
-        last_time_ms = float(_decode(last_time) or 0)
 
         # Dedup: same cam repeated OR too close in time
         if last_cam == cam_id:
@@ -126,7 +141,7 @@ class SetUpEvaluate:
         pipe = self.redis_client.pipeline()
         pipe.hset(key_user, f"flag_{cam_id}", 1)
         pipe.hset(key_user, "last_cam", cam_id)
-        pipe.hset(key_user, "last_time", ts_ms)
+        pipe.hset(key_user, "last_time", self._to_redis_datetime_str_from_ms(ts_ms))
 
         # Optional (expensive): upload proof image
         if self.cfg.upload_each_checkin and copy_frame is not None:
