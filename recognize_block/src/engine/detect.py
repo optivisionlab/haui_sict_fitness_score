@@ -5,7 +5,17 @@ from loguru import logger
 
 from src.engine.curl_api_search import send_tracking_to_api
 from src.engine.engine import draw_target
-from src.config.config import LINE_BEGIN_SEARCH, QDRANT_COLLECTION
+from src.config.config import (
+    LINE_BEGIN_SEARCH,
+    QDRANT_COLLECTION,
+    TRACKING_CONF,
+    TRACKING_IOU,
+    SAVE_TRACKING,
+    API_HANDLER_USER_COOLDOWN_MS,
+    API_HANDLER_CAM_CALL_MIN_INTERVAL_MS,
+    API_HANDLER_BAND_RATIO,
+    SEARCH_API_CROP_MODE,
+)
 import cv2
 
 
@@ -51,7 +61,13 @@ class SimpleTracker:
         call_zone_xyxy: Optional[List[int]] = None,
         min_overlap_ratio: float = 0.8,
     ):
-        result = self.detection_model(frame, conf=0.65, iou=0.8, verbose=False, save=True)[0]
+        result = self.detection_model(
+            frame,
+            conf=TRACKING_CONF,
+            iou=TRACKING_IOU,
+            verbose=False,
+            save=SAVE_TRACKING,
+        )[0]
 
         boxes: List[List[int]] = []
         if result is None or result.boxes is None:
@@ -77,7 +93,12 @@ class SimpleTracker:
 
 
     def detect_batch(self, frames: List):
-        results = self.detection_model(frames, conf=0.65, iou=0.8, verbose=False)
+        results = self.detection_model(
+            frames,
+            conf=TRACKING_CONF,
+            iou=TRACKING_IOU,
+            verbose=False,
+        )
 
         outs = []
         for frame, res in zip(frames, results):
@@ -103,14 +124,14 @@ class APIHandler:
 
         # cooldown per user to prevent double count (stored in milliseconds)
         self._user_cooldown_until_ms: Dict[str, int] = {}
-        self.user_cooldown_ms = 10  # 1s in milliseconds
+        self.user_cooldown_ms = API_HANDLER_USER_COOLDOWN_MS  # 1s in milliseconds
 
         # per-cam gate to reduce API spam (timestamps stored in milliseconds)
         self._cam_last_call_ts_ms: Dict[str, int] = {}
-        self.cam_call_min_interval_ms = 3  # milliseconds
+        self.cam_call_min_interval_ms = API_HANDLER_CAM_CALL_MIN_INTERVAL_MS  # milliseconds
 
         # line band (hysteresis) around the line to approximate "crossing"
-        self.band_ratio = 0.06  # 6% of image height
+        self.band_ratio = API_HANDLER_BAND_RATIO  # 6% of image height
 
     def __draw_detections__(self, frame, detection):
         user_id, box = detection
@@ -140,7 +161,7 @@ class APIHandler:
         # monotonic clock in milliseconds for rate limiting / cooldowns
         now_mono_ms = time.perf_counter_ns() // 1_000_000
         # event timestamp in milliseconds since epoch (from headers) or current time
-        event_ts_ms = int(timestamp) if timestamp is not None else time.time_ns() // 1_000_000
+        # event_ts_ms = int(timestamp) if timestamp is not None else time.time_ns() // 1_000_000
 
         # per-camera rate limit
         last_call_ms = self._cam_last_call_ts_ms.get(cam_id, 0)
@@ -158,7 +179,7 @@ class APIHandler:
                 frame,
                 collection_name=self.collection_name,
                 cam_id=cam_id,
-                crop_mode="none",
+                crop_mode=SEARCH_API_CROP_MODE,
             )
             if not response or response.status_code != 200:
                 logger.warning("Search API returned no response")
@@ -202,7 +223,7 @@ class APIHandler:
                     user_id,
                     cam_id,
                     copy_frame=draw_frame,
-                    timestamp=event_ts_ms,
+                    # timestamp=event_ts_ms,
                 )
                 if not ok:
                     logger.exception(f"User {user_id} is already in cooldown for cam {cam_id}")
