@@ -105,15 +105,25 @@ class QdrantVectorStore:
             points = []
             embeddings,_,b64_faces = get_embedding(images, verbose = False, return_b64=True)
 
-            for data, emb_in_img, b64 in zip(metadata, embeddings, b64_faces):
-                if emb_in_img is not None:
-                    points = []
-                    data['b64'] = b64
-                    points.extend([models.PointStruct(
-                        id=str(uuid.uuid4()),
-                        vector=emb,
-                        payload=data
-                    ) for emb in emb_in_img])
+            for data, emb_list, b64_list in zip(metadata, embeddings, b64_faces):
+                if emb_list is None:
+                    continue
+
+                points = []
+
+                for emb, b64 in zip(emb_list, b64_list):
+                    payload = data.copy() 
+                    payload['b64'] = b64
+
+                    points.append(
+                        models.PointStruct(
+                            id=str(uuid.uuid4()),
+                            vector=emb,
+                            payload=payload
+                        )
+                    )
+
+                if points:
                     self.client.upsert(
                         collection_name=collection_name,
                         points=points
