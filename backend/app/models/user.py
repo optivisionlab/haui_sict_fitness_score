@@ -45,6 +45,7 @@ class UserBase(SQLModel):
     email: str = Field(max_length=255, index=True, unique=True)
     phone_number: Optional[str] = Field(max_length=50, default=None)
     user_code: Optional[str] = Field(max_length=100, default=None, unique=True)
+    profile_picture: Optional[str] = Field(max_length=255, default=None)
     user_role: UserRole = Field(default=UserRole.student)
     user_status: UserStatus = Field(default=UserStatus.active)
     date_of_birth: Optional[date] = None
