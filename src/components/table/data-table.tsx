@@ -136,7 +136,7 @@ export function DataTable({ data, onReload }: DataTableProps) {
         open={openDialog}
         onOpenChange={setOpenDialog}
         onSuccess={onReload}
-        defaultData={[]}
+        defaultData={{}}
       />
     </div>
   );
