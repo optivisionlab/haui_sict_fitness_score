@@ -8,11 +8,33 @@ from typing import AsyncGenerator
 
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
+from sqlmodel import Session, select
 
 from app.core.redis import get_async_redis
+from app.core.database import engine
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def get_user_info(user_id: str) -> dict:
+    """Fetch user info from database by user_id."""
+    try:
+        with Session(engine) as session:
+            statement = select(User).where(User.user_id == int(user_id))
+            user = session.exec(statement).first()
+            if user:
+                return {
+                    "full_name": user.full_name,
+                    "user_code": user.user_code,
+                }
+    except Exception as e:
+        logger.error("Error fetching user info for user_id %s: %s", user_id, e)
+    return {
+        "full_name": None,
+        "user_code": None,
+    }
 
 
 @router.get("/events/global")
@@ -63,6 +85,9 @@ async def _global_sse_generator(request: Request) -> AsyncGenerator[str, None]:
                 if not user_id:
                     continue
 
+                # Fetch user info from database
+                user_info = get_user_info(user_id)
+
                 current_data = await redis_client.hgetall(real_key)
                 decoded = {}
                 if current_data:
@@ -73,6 +98,8 @@ async def _global_sse_generator(request: Request) -> AsyncGenerator[str, None]:
 
                 response_payload = {
                     "user_id": user_id,
+                    "full_name": user_info.get("full_name"),
+                    "user_code": user_info.get("user_code"),
                     "start_time": decoded.get("start_time"),
                     "last_time": decoded.get("last_time"),
                     "last_cam": decoded.get("last_cam"),
