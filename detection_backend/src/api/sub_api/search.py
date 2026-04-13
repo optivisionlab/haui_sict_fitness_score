@@ -1,18 +1,20 @@
 from fastapi import APIRouter, UploadFile, File, Form, status, BackgroundTasks
-from typing import List, Optional, Dict
+from typing import List
 from PIL import Image
 import requests
 from io import BytesIO
-from pydantic import HttpUrl, BaseModel
+from pydantic import HttpUrl
 from loguru import logger
 import json
-from collections import defaultdict
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from urllib.parse import quote_plus
 import asyncio
 import redis
-from json import dumps
+import os
+from datetime import datetime
+import time
+
 
 from src.config.depend import *
 from fastapi.responses import JSONResponse
@@ -77,37 +79,46 @@ async def search_face(
     tracking_frame: str = Form(None),
     similarity_threshold: float = Form(0.65)
 ):
-    tracking_data = tracking_frame
-    if tracking_frame:
-        try:
-            tracking_data = StudentTrackingInput.model_validate(json.loads(tracking_frame))
-        except Exception as e:
-            return {"error": f"Invalid tracking_frame format: {e}"}
-    pil_images = None
+    start_time = time.time()
+    try:
+        tracking_data = tracking_frame
+        if tracking_frame:
+            try:
+                tracking_data = StudentTrackingInput.model_validate(json.loads(tracking_frame))
+            except Exception as e:
+                return {"error": f"Invalid tracking_frame format: {e}"}
+        pil_images = None
 
-    if images:
-        pil_images = load_image_from_upload(images)
+        if images:
+            pil_images = load_image_from_upload(images)
 
-    elif image_urls:
-        pil_images = load_image_from_url(str(image_urls))
+        elif image_urls:
+            pil_images = load_image_from_url(str(image_urls))
 
-    if not pil_images:
-        return {"error": "No valid image input"}
+        if not pil_images:
+            return {"error": "No valid image input"}
 
-    tracking_object = []
+        tracking_object = []
 
-    logger.info("tracking_frame: {}", tracking_frame)
+        logger.info("tracking_frame: {}", tracking_frame)
 
-    for bbox in tracking_data.bbox:
-        tracking_object.append(pil_images.crop(bbox))
+        for bbox in tracking_data.bbox:
+            images_person = pil_images.crop(bbox)
+            tracking_object.append(images_person)
+            now = datetime.now()
+            if DEBUG_MODE:
+                os.makedirs("../tmp", exist_ok=True)
+                images_person.save(f"../tmp/{now.strftime('%Y_%m_%d_%H_%M_%S')}.png")
 
-    search_data = qdrant_db.get_relevant_faces(query=tracking_object, collection_name=collection_name, k = 1, threshold= similarity_threshold)
+        search_data = qdrant_db.get_relevant_faces(query=tracking_object, collection_name=collection_name, k = 1, threshold= similarity_threshold)
 
-    result_data = []
-    for id, student_data in zip(tracking_data.id, search_data):
-        result_data.append({'id' : id, "infor" : student_data if student_data else None})
-    
-    return JSONResponse(content={'status_code' : 200, 'status': "insert oke", "data": result_data}, status_code= status.HTTP_200_OK)
+        result_data = []
+        for id, student_data in zip(tracking_data.id, search_data):
+            result_data.append({'id' : id, "infor" : student_data if student_data else None})
+        
+        return JSONResponse(content={'status_code' : 200, 'status': "insert oke", "data": result_data}, status_code= status.HTTP_200_OK)
+    finally:
+        logger.debug(f"Face search Backend Time: {time.time() - start_time}")
     # else:
     #     return JSONResponse(content={'status_code' : 422, 'status': "Search failt", "data": None}, status_code= status.HTTP_422_UNPROCESSABLE_ENTITY)
 

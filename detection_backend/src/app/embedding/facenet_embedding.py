@@ -11,8 +11,19 @@ from loguru import logger
 import os
 from src.app.embedding.align_face import align_face_5pts
 
+import base64
+from io import BytesIO
+import cv2
 
-def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False):
+def cv2_to_b64(img, format=".png"):
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    success, buffer = cv2.imencode(format, img_rgb)
+    if not success:
+        raise ValueError("Image encoding failed")
+    b64_string = base64.b64encode(buffer).decode("utf-8")
+    return b64_string
+
+def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False, return_b64=False):
     
     if isinstance(images, Image.Image):
         images = [images]
@@ -20,6 +31,7 @@ def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False):
     all_faces = []
     face_counts = []
     all_face_bbox = []
+    b64_str = []
     for img_idx, image in enumerate(images):
         image = image.convert("RGB")
         face_bbox, conf, landmarks = mtcnn.detect(image, landmarks=True)
@@ -40,6 +52,8 @@ def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False):
                 face_pil = Image.fromarray(face)
                 face_pil.save(f"tmp/debug_img/img{img_idx}_face{box_idx}.jpg")
             faces.append(face)
+            if return_b64:
+                b64_str.append(cv2_to_b64(face))
 
         all_faces.extend(faces)
         face_counts.append(len(faces))
@@ -54,15 +68,23 @@ def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False):
     all_embeddings = resnet_embedding(face_images)
     embedding = []
     box_result = []
+    b64_result = []
     idx = 0
     for count in face_counts:
         if count == 0:
             embedding.append(None)
             box_result.append(None)
+            b64_result.append(None)
         else:
             embedding.append(all_embeddings[idx:idx + count])
             box_result.append(all_face_bbox[idx:idx + count])
+            if return_b64:
+                b64_result.append(b64_str[idx:idx + count])
             idx += count
+    
+    if return_b64:
+        return embedding, box_result, b64_result
+
     return embedding, box_result
 
 if __name__ == "__main__":

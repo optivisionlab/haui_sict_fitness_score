@@ -103,11 +103,12 @@ class QdrantVectorStore:
                 pass
             # Prepare documents for insertion
             points = []
-            embeddings,_ = get_embedding(images, verbose = True)
+            embeddings,_,b64_faces = get_embedding(images, verbose = False, return_b64=True)
 
-            for data, emb_in_img in zip(metadata, embeddings):
+            for data, emb_in_img, b64 in zip(metadata, embeddings, b64_faces):
                 if emb_in_img is not None:
                     points = []
+                    data['b64'] = b64
                     points.extend([models.PointStruct(
                         id=str(uuid.uuid4()),
                         vector=emb,
