@@ -10,6 +10,9 @@ export function UserCard({ user }: { user: CheckinEvent }) {
 
       <div className="text-xs text-gray-600 space-y-1">
         <p>
+          <span className="font-medium">User name:</span> {user.user_name}
+        </p>
+        <p>
           <span className="font-medium">Step:</span> {user.step}
         </p>
         <p>
