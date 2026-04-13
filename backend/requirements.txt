@@ -15,4 +15,5 @@ httpx==0.28.0
 loguru==0.7.3
 passlib==1.7.4
 pydantic==2.12.5
+argon2_cffi==23.1.0
 pydantic[email]
