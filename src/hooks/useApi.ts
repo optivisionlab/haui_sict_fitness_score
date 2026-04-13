@@ -6,14 +6,14 @@ export function useApi() {
     return res.data;
   }
 
-  async function post(url: string, data?: any) {
+  async function post(url: string, data?: unknown) {
     const res = data
       ? await axiosClient.post(url, data)
       : await axiosClient.post(url);
     return res.data;
   }
 
-  async function put(url: string, data: any) {
+  async function put(url: string, data: unknown) {
     const res = await axiosClient.put(url, data);
     return res.data;
   }

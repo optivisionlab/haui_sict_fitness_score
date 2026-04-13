@@ -23,7 +23,12 @@ import { useState } from "react";
 import { getUserColumns } from "@/app/(dashboard)/admin/users/columns";
 import { UserDialog } from "../common/UserDialog";
 
-export function DataTable<T>({ data, onReload }: any) {
+interface DataTableProps {
+  data: any[];
+  onReload: () => void;
+}
+
+export function DataTable({ data, onReload }: DataTableProps) {
   const columns = getUserColumns(onReload);
   const [openDialog, setOpenDialog] = useState(false);
 

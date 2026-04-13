@@ -3,7 +3,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import CustomButton from "./CustomButton";
 
-export default function TimerButton({ running, onStart, onStop }) {
+interface TimerButtonProps {
+  running: boolean;
+  onStart: (time: number) => void;
+  onStop: (time: number, elapsed: number) => void;
+}
+
+export default function TimerButton({ running, onStart, onStop }: TimerButtonProps) {
   const [elapsed, setElapsed] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);

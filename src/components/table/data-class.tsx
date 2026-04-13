@@ -24,7 +24,12 @@ import { UserDialog } from "../common/UserDialog";
 import { getClassColumns } from "@/app/(dashboard)/admin/classes/columns";
 import { ClassDialog } from "../common/ClassDialog";
 
-export function DataClass<T>({ data, onReload }: any) {
+interface DataClassProps {
+  data: any[];
+  onReload: () => void;
+}
+
+export function DataClass({ data, onReload }: DataClassProps) {
   const columns = getClassColumns(onReload);
   const [openDialog, setOpenDialog] = useState(false);
 
@@ -132,7 +137,7 @@ export function DataClass<T>({ data, onReload }: any) {
         open={openDialog}
         onOpenChange={setOpenDialog}
         onSuccess={onReload}
-        defaultData={[]}
+        defaultData={{}}
       />
     </div>
   );

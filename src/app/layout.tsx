@@ -32,25 +32,7 @@ export default function RootLayout({
           richColors
           toastOptions={{
             className: "rounded-md px-4 py-2 font-medium shadow-lg",
-            success: {
-              style: {
-                background: "#22c55e",
-                color: "#fff",
-              },
-            },
-            error: {
-              style: {
-                background: "#ef4444",
-                color: "#fff",
-              },
-            },
-            warning: {
-              style: {
-                background: "#facc15",
-                color: "#000",
-              },
-            },
-          }}
+          } as any}
         />
       </body>
     </html>

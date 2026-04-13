@@ -32,7 +32,7 @@ export default function WatchScores() {
 
         // Tạo chart data từ results (ví dụ uv = avg_speed)
         setChartData(
-          results.map((item) => ({
+          results.map((item: any) => ({
             name: item.exam_title,
             uv: item.avg_speed ?? 0,
           }))

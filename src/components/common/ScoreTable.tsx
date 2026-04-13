@@ -62,7 +62,7 @@ export default function ScoreTable({ data, classId }: ScoreTableProps) {
             <TableRow
               key={infor.user.user_id}
               className={cn(index % 2 !== 0 && "bg-[#f6f0f0]")}
-              onClick={() => handleClick(infor.user.user_id, classId)}
+              onClick={() => classId && handleClick(infor.user.user_id, classId)}
             >
               <TableCell className="font-medium">{index + 1}</TableCell>
               <TableCell>{infor.user.user_code}</TableCell>

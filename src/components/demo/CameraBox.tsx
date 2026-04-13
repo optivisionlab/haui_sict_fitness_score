@@ -12,8 +12,10 @@ const CAM_BASE: Record<number, string | undefined> = {
 
 export function CameraBox({
   camId,
+  data,
 }: {
   camId: number;
+  data?: unknown;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 

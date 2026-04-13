@@ -12,8 +12,8 @@ import { Input } from "@/components/ui/input";
 import { useState } from "react";
 
 // Tạo type cho login, gửi lên submit
-type LoginFormProps = React.ComponentProps<"form"> & {
-  onSubmit?: (data: { username: string; password: string }) => void;
+type LoginFormProps = Omit<React.ComponentProps<"form">, "onSubmit"> & {
+  onSubmit?: (data: { username: string; password: string }) => void | Promise<void>;
 };
 export function LoginForm({ className, onSubmit, ...props }: LoginFormProps) {
   // Tạo form lưu

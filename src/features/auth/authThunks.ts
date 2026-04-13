@@ -34,8 +34,9 @@ export const loginUserThunk = createAsyncThunk(
       sessionStorage.setItem("user", JSON.stringify(userData));
 
       return { access_token, user: userData };
-    } catch (err: any) {
-      return rejectWithValue(err.message);
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err.message : "Đăng nhập thất bại";
+      return rejectWithValue(error);
     }
   }
 );

@@ -41,7 +41,11 @@ export default function EditInfor() {
         user_code: reduxUser.user_code || "",
         phone_number: reduxUser.phone_number || "",
         email: reduxUser.email || "",
-        date_of_birth: reduxUser.date_of_birth || "",
+        date_of_birth: reduxUser.date_of_birth
+          ? typeof reduxUser.date_of_birth === "string"
+            ? reduxUser.date_of_birth
+            : (reduxUser.date_of_birth as any).toISOString?.().split("T")[0] || ""
+          : "",
       });
     }
   }, [reduxUser]);
