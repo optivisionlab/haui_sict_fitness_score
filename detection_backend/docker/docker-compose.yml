@@ -9,6 +9,9 @@ services:
       options:
         max-size: "50m"
         max-file: "3"
+    environment:
+      QDRANT__SERVICE__API_KEY: "test"
+
   broker:
     image: apache/kafka:latest
     container_name: broker
@@ -16,7 +19,7 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_LISTENERS: INTERNAL://broker:9036,EXTERNAL://0.0.0.0:9098,CONTROLLER://broker:9099
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://broker:9036,EXTERNAL://10.100.200.119:9098
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://broker:9036,EXTERNAL://100.95.228.82:9098
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker:9099
