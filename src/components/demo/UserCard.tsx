@@ -4,14 +4,14 @@ export function UserCard({ user }: { user: CheckinEvent }) {
   return (
     <div className="rounded-xl border bg-white p-3 shadow-sm hover:shadow transition">
       <div className="flex items-center justify-between mb-1">
-        <span className="font-semibold text-sm">👤 User #{user.user_id}</span>
+        <span className="font-semibold text-sm">👤 User {user.full_name}</span>
         <span className="text-xs text-gray-500">CAM {user.last_cam}</span>
       </div>
 
       <div className="text-xs text-gray-600 space-y-1">
-        <p>
-          <span className="font-medium">User name:</span> {user.user_name}
-        </p>
+        {/* <p>
+          <span className="font-medium">User name:</span> {user.full_name}
+        </p> */}
         <p>
           <span className="font-medium">Step:</span> {user.step}
         </p>

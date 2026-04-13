@@ -8,7 +8,7 @@ import { CameraBox } from "@/components/demo/CameraBox";
 /* TYPES */
 export interface CheckinEvent {
   user_id: string;
-  user_name: string;
+  full_name: string;
   start_time: string;
   last_time: string;
   img_url: string;
