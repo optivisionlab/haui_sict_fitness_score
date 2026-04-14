@@ -27,6 +27,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
+# Add vim and nano
+RUN apk add --no-cache nano vim
+
 # Create non-root user first
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nextjs -u 1001
