@@ -150,6 +150,8 @@ class EvalConfig:
 
 EVAL_CONFIG = EvalConfig(
     upload_each_checkin=as_bool(env("EVAL_UPLOAD_EACH_CHECKIN", True)),
-    checkin_cooldown_ms=int(env("EVAL_CHECKIN_COOLDOWN_MS", 10)),
+    checkin_cooldown_ms=int(env("EVAL_CHECKIN_COOLDOWN_MS", 0)),
     lap_lock_seconds=int(env("EVAL_LAP_LOCK_SECONDS", 0)),
 )
+
+DROP_OLDEST_FRAME = as_bool(env("DROP_OLDEST_FRAME", False))

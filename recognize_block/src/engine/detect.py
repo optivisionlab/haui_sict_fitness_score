@@ -67,6 +67,7 @@ class SimpleTracker:
             iou=TRACKING_IOU,
             verbose=False,
             save=SAVE_TRACKING,
+            classes=0,  # only person class
         )[0]
 
         boxes: List[List[int]] = []
@@ -173,6 +174,7 @@ class APIHandler:
             return
 
         try:
+            start_time = time.time()
             response = await send_tracking_to_api(
                 ids,
                 xyxy_boxes,
@@ -181,12 +183,13 @@ class APIHandler:
                 cam_id=cam_id,
                 crop_mode=SEARCH_API_CROP_MODE,
             )
+            logger.info(f"API call latency: {(time.time() - start_time):.2f}s")
             if not response or response.status_code != 200:
                 logger.warning("Search API returned no response")
                 return
 
             logger.info("Search API status={} cam_id={}", response.status_code, cam_id)
-            logger.info("Search API raw body: {}", response.text)
+            # logger.info("Search API raw body: {}", response.text)
 
             if response.status_code != 200:
                 return

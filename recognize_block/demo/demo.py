@@ -29,6 +29,7 @@ from src.config.config import (
     CALL_ZONE_Y2_RATIO,
     CALL_ZONE_MIN_OVERLAP_RATIO,
     CAMERA_SOURCE_URLS,
+    DROP_OLDEST_FRAME
 )
 import json
 from src.engine.engine import draw_target
@@ -86,9 +87,10 @@ producer_conf = {
 }
 
 consumer_conf = {"bootstrap.servers": KAFKA_SERVERS}
+logger.info(f"Kafka Producer Config: {producer_conf}")
+logger.info(f"Kafka Consumer Config: {consumer_conf}")
 
-
-# ================== KAFKA UTILS ==================
+# ================== KAFKA UTILS ================== 
 def create_topics(cam_ids):
     admin = AdminClient({"bootstrap.servers": KAFKA_SERVERS})
 
@@ -175,7 +177,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
     logger.info(f"[Producer-{cid}] Video FPS = {video_fps}")
 
     frame_interval = 1.0 / video_fps
-    TARGET_DETECT_FPS = video_fps
+    TARGET_DETECT_FPS = 15
     frame_step = max(1, int(round(video_fps / TARGET_DETECT_FPS)))
 
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -272,7 +274,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
 # ================== CONSUMER (1 per camera) ==================
 async def consumer_worker(cid: int):
     topic = TOPIC_TEMPLATE.format(cid=cid)
-
+    logger.info(f"[Consumer-{cid}] DROP_OLDEST_FRAME={DROP_OLDEST_FRAME}")
     setup_eval = SetUpEvaluate(
         id_run_process=CAM_IDS,
         redis_client=redis_client,
@@ -288,7 +290,7 @@ async def consumer_worker(cid: int):
         # Realtime mode: allow parallel processing but keep safe-commit ordering.
         worker_concurrency=2,
         max_pending_messages=16,
-        drop_oldest_on_full=False,
+        drop_oldest_on_full=DROP_OLDEST_FRAME,
         stats_file_path=f'cam_{cid}_consumer_stats.txt',
         stats_flush_interval=5.0,
     )
@@ -322,7 +324,10 @@ async def consumer_worker(cid: int):
             logger.info(
                 f"[Consumer-{cid}] frame={frame_id}, persons={len(person_ids)}"
             )
-
+            import asyncio
+            logger.info(
+                f"[Consumer-{cid}] task={id(asyncio.current_task())} start frame={frame_id}"
+            )
             await api.process(
                 cid,
                 frame,
@@ -330,7 +335,9 @@ async def consumer_worker(cid: int):
                 person_ids,
                 timestamp=timestamp,
             )
-
+            logger.info(
+                f"[Consumer-{cid}] task={id(asyncio.current_task())} done frame={frame_id}"
+            )
         except Exception:
             logger.exception(f"[Consumer-{cid}] error")
         finally:
