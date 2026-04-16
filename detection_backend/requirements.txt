@@ -21,3 +21,4 @@ numpy==1.26.4
 python-multipart
 sqlalchemy
 redis
+onnxruntime
