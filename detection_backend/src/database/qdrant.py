@@ -152,7 +152,8 @@ class QdrantVectorStore:
                     collection_name=collection_name,
                     query=emb,
                     limit=k,
-                    score_threshold=threshold
+                    score_threshold=threshold,
+                    with_payload=models.PayloadSelectorExclude(exclude=["b64"])
                 )
                 logger.debug(results)
                 all_results.append([results.points, box])
