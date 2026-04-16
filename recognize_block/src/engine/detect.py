@@ -26,10 +26,11 @@ class SimpleTracker:
     - Generate TEMP random ids ONLY for mapping in face-search response.
     """
 
-    def __init__(self, detection_model, cam_id):
+    def __init__(self, detection_model, cam_id, tracker_config: Optional[str] = None):
         self.detection_model = detection_model
         self.cam_id = cam_id
         self._rng = random.SystemRandom()
+        self.tracker_config = tracker_config
 
     def _gen_unique_ids(self, n: int) -> List[int]:
         # random but guaranteed unique within one request
@@ -61,36 +62,50 @@ class SimpleTracker:
         call_zone_xyxy: Optional[List[int]] = None,
         min_overlap_ratio: float = 0.8,
     ):
-        result = self.detection_model(
+        result = self.detection_model.track(
             frame,
             conf=TRACKING_CONF,
             iou=TRACKING_IOU,
             verbose=False,
             save=SAVE_TRACKING,
-            classes=0,  # only person class
+            persist=True,
+            tracker=self.tracker_config,
+            classes=[0],
         )[0]
 
+        track_ids: List[int] = []
         boxes: List[List[int]] = []
+
         if result is None or result.boxes is None:
             return [], [], frame
 
-        for box in result.boxes:
-            cls = int(box.cls[0]) if box.cls is not None else -1
-            if cls != 0:
+        boxes_obj = result.boxes
+        if boxes_obj.id is None:
+            return [], [], frame
+
+        id_list = boxes_obj.id.int().cpu().tolist()
+        xyxy_list = boxes_obj.xyxy.int().cpu().tolist()
+        cls_list = boxes_obj.cls.int().cpu().tolist() if boxes_obj.cls is not None else [0] * len(id_list)
+        conf_list = boxes_obj.conf.cpu().tolist() if boxes_obj.conf is not None else [0.0] * len(id_list)
+
+        for track_id, xyxy, cls_id, conf in zip(id_list, xyxy_list, cls_list, conf_list):
+            if cls_id != 0:
                 continue
 
-            x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
-            person_box = [x1, y1, x2, y2]
+            person_box = [int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])]
 
             if call_zone_xyxy is not None:
                 ratio = self._intersection_over_box(person_box, call_zone_xyxy)
                 if ratio < min_overlap_ratio:
                     continue
 
+            track_ids.append(int(track_id))
             boxes.append(person_box)
-            logger.info(f"Detected person box: {person_box} with confidence {box.conf[0].item():.2f}")
-        ids = self._gen_unique_ids(len(boxes))
-        return ids, boxes, frame
+            logger.info(
+                f"Tracked person box: {person_box} with confidence {conf:.2f}, track_id={track_id}"
+            )
+
+        return track_ids, boxes, frame
 
 
     def detect_batch(self, frames: List):
@@ -189,7 +204,7 @@ class APIHandler:
                 return
 
             logger.info("Search API status={} cam_id={}", response.status_code, cam_id)
-            # logger.info("Search API raw body: {}", response.text)
+            logger.info("Search API raw body: {}", response.text)
 
             if response.status_code != 200:
                 return

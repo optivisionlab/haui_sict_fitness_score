@@ -29,7 +29,9 @@ from src.config.config import (
     CALL_ZONE_Y2_RATIO,
     CALL_ZONE_MIN_OVERLAP_RATIO,
     CAMERA_SOURCE_URLS,
-    DROP_OLDEST_FRAME
+    DROP_OLDEST_FRAME,
+    YOLO_TRACKER_CONFIG,
+    TRACK_MEMORY_TTL_SEC,
 )
 import json
 from src.engine.engine import draw_target
@@ -148,7 +150,11 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
     logger.info(f"[Producer-{cid}] loading model...")
     model = YOLO(MODEL_PATH)
 
-    tracker = SimpleTracker(detection_model=model, cam_id=cid)
+    tracker = SimpleTracker(
+        detection_model=model,
+        cam_id=cid,
+        tracker_config=YOLO_TRACKER_CONFIG,
+    )
 
     _wait_start_barrier(cid, start_barrier, "Producer")
     logger.info(f"[Producer-{cid}] started")
@@ -172,12 +178,11 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
         logger.error(f"[Producer-{cid}] Cannot open video {video_path}")
         return
 
-    # ================= VIDEO INFO =================
     video_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     logger.info(f"[Producer-{cid}] Video FPS = {video_fps}")
 
     frame_interval = 1.0 / video_fps
-    TARGET_DETECT_FPS = 15
+    TARGET_DETECT_FPS = video_fps
     frame_step = max(1, int(round(video_fps / TARGET_DETECT_FPS)))
 
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -188,19 +193,28 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
         int(w * CALL_ZONE_X2_RATIO),
         int(h * CALL_ZONE_Y2_RATIO),
     ]
-    # out = cv2.VideoWriter(
-    #     f"output_cam{cid}.mp4",
-    #     cv2.VideoWriter_fourcc(*"mp4v"),
-    #     video_fps,
-    #     (w, h),
-    # )
 
     frame_count = 0
     next_frame_time = time.time()
 
+    # memory dedup for this camera only: {track_id: last_seen_ts}
+    seen_tracks = {}
+    def cleanup_seen_tracks(now_ts: float):
+        expired_track_ids = [
+            track_id
+            for track_id, last_seen_ts in seen_tracks.items()
+            if now_ts - last_seen_ts > TRACK_MEMORY_TTL_SEC
+        ]
+        for track_id in expired_track_ids:
+            seen_tracks.pop(track_id, None)
+
+        if expired_track_ids:
+            logger.debug(
+                f"[Producer-{cid}] cleaned {len(expired_track_ids)} expired track(s): {expired_track_ids}"
+            )
+
     try:
         while True:
-            # ===== REAL-TIME SYNC =====
             now = time.time()
 
             if now < next_frame_time:
@@ -214,51 +228,57 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
                 logger.info(f"[Producer-{cid}] End of video")
                 break
 
-            copy_frame = frame.copy()
-
             if frame_count % frame_step == 0:
                 t0 = time.perf_counter()
-                ids, boxes, _  = tracker.detect_frame(frame, call_zone_xyxy=call_zone, min_overlap_ratio=CALL_ZONE_MIN_OVERLAP_RATIO)
+                track_ids, boxes, _ = tracker.detect_frame(
+                    frame,
+                    call_zone_xyxy=call_zone,
+                    min_overlap_ratio=CALL_ZONE_MIN_OVERLAP_RATIO,
+                )
                 detect_time = time.perf_counter() - t0
-
-
-                # log_detect_time(
-                #     cam_id=cid,
-                #     frame_id=frame_count,
-                #     detect_time=detect_time,
-                #     num_ids=len(ids),
-                # )
 
                 logger.info(
                     f"[Producer-{cid}] frame={frame_count}, "
-                    f"detect_time={detect_time:.3f}s, ids={len(ids)}"
+                    f"detect_time={detect_time:.3f}s, track_ids={len(track_ids)}"
                 )
 
-                if ids:
+                now_seen_ts = time.time()
+                cleanup_seen_tracks(now_seen_ts)
+
+                new_track_ids = []
+                new_boxes = []
+                logger.info("seen_tracks: {}", seen_tracks)
+                for track_id, box in zip(track_ids, boxes):
+                    if track_id in seen_tracks:
+                        seen_tracks[track_id] = now_seen_ts
+                        logger.debug(
+                            f"[Producer-{cid}] skip duplicated track_id={track_id} frame={frame_count}"
+                        )
+                        continue
+
+                    seen_tracks[track_id] = now_seen_ts
+                    new_track_ids.append(track_id)
+                    new_boxes.append(box)
+
+                if new_track_ids:
                     captured_at_ms = time.time_ns() // 1_000_000
-                    # for uid, box in zip(ids, boxes):
-                    #     copy_frame = draw_target(
-                    #         copy_frame,
-                    #         uid,
-                    #         box,
-                    #         name="Person",
-                    #         color=(0, 255, 0),
-                    #         thickness=2,
-                    #     )
 
                     headers = [
-                        ("timestamp_ms", str(captured_at_ms).encode()),   # epoch seconds,
+                        ("timestamp_ms", str(captured_at_ms).encode()),
                         ("frame_id", str(frame_count).encode()),
-                        ("person_ids", json.dumps(ids).encode()),
-                        ("bboxes", json.dumps(boxes).encode()),
+                        # giữ nguyên key header để downstream không phải sửa
+                        ("person_ids", json.dumps(new_track_ids).encode()),
+                        ("bboxes", json.dumps(new_boxes).encode()),
                     ]
 
                     sent = producer.send_frame(cid, frame, headers=headers)
+                    if sent:
+                        logger.info(f"[Producer-{cid}] enqueued frame={frame_count} with {len(new_track_ids)} new track(s)")
                     if not sent:
                         logger.warning(f"[Producer-{cid}] failed to enqueue frame={frame_count}")
+                else:
+                    logger.debug(f"[Producer-{cid}] no new track to send at frame={frame_count}")
 
-            # ===== ALWAYS WRITE FULL VIDEO =====
-            # out.write(copy_frame)
             frame_count += 1
 
     except Exception as e:
@@ -266,7 +286,6 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
 
     finally:
         cap.release()
-        # out.release()
         producer.flush(5)
         logger.info(f"[Producer-{cid}] finished")
 

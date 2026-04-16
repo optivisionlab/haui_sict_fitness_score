@@ -155,3 +155,9 @@ EVAL_CONFIG = EvalConfig(
 )
 
 DROP_OLDEST_FRAME = as_bool(env("DROP_OLDEST_FRAME", False))
+
+YOLO_TRACKER_CONFIG = env(
+    "YOLO_TRACKER_CONFIG",
+    str(BASE_DIR / "src" / "config" / "botsort.yaml"),
+)
+TRACK_MEMORY_TTL_SEC = float(env("TRACK_MEMORY_TTL_SEC", 2.0))
