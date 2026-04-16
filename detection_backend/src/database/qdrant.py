@@ -11,7 +11,8 @@ from tqdm import tqdm
 from PIL import Image
 from pathlib import Path
 
-from src.app.embedding.facenet_embedding import get_embedding
+# from src.app.embedding.facenet_embedding import get_embedding
+from src.app.embedding.insightface_embedding import get_embedding
 from src.config.configs import *
 load_dotenv()
 
