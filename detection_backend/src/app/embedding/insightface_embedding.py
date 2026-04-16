@@ -104,11 +104,15 @@ def get_embedding(images: Union[Image.Image, List[Image.Image]], verbose=False, 
 
 if __name__ == "__main__":
 
-
+    parser = argparse.ArgumentParser(description="A script that greets the user.")
+    parser.add_argument("--image1_path", type=str, default='image1.jpg')
+    parser.add_argument("--image2_path", type=str, default='image2.jpg')
+    
+    args = parser.parse_args()
 
     try:
-        img1 = Image.open("/u01/hoangchu/tmp/ibeta_images_labeled/live/083009ecaa675de475a90f6a78a2e702b08_1.png")
-        img2 = Image.open("/u01/hoangchu/tmp/ibeta_images_labeled/live/083009ecaa675de475a90f6a78a2e702b08_2.png")
+        img1 = Image.open(args.image1_path)
+        img2 = Image.open(args.image2_path)
         emb_list, boxes = get_embedding(images=[img1, img2], verbose=True)
         for emb in emb_list:
             logger.debug("embedding shape: {}", emb.shape if emb is not None else None)
