@@ -1,6 +1,7 @@
 import time
 import random
-from typing import Dict, List, Tuple, Optional
+from collections import defaultdict
+from typing import Dict, List, Tuple, Optional, Set
 from loguru import logger
 
 from src.engine.curl_api_search import send_tracking_to_api
@@ -146,6 +147,7 @@ class APIHandler:
         self._cam_last_call_ts_ms: Dict[str, int] = {}
         self.cam_call_min_interval_ms = API_HANDLER_CAM_CALL_MIN_INTERVAL_MS  # milliseconds
 
+        self._successful_tracks: Dict[str, Set[int]] = defaultdict(set)
         # line band (hysteresis) around the line to approximate "crossing"
         self.band_ratio = API_HANDLER_BAND_RATIO  # 6% of image height
 
@@ -174,12 +176,30 @@ class APIHandler:
     async def process(self, cam_id, frame, xyxy_boxes, ids, timestamp=None):
         cam_id = str(cam_id)
 
-        # monotonic clock in milliseconds for rate limiting / cooldowns
-        now_mono_ms = time.perf_counter_ns() // 1_000_000
-        # event timestamp in milliseconds since epoch (from headers) or current time
-        # event_ts_ms = int(timestamp) if timestamp is not None else time.time_ns() // 1_000_000
+        if not ids or not xyxy_boxes:
+            return
 
-        # per-camera rate limit
+        # ids ở đây chính là track_ids từ producer
+        incoming_pairs = [
+            (int(track_id), box)
+            for track_id, box in zip(ids, xyxy_boxes)
+        ]
+
+        # bỏ các track đã match thành công trước đó
+        pending_pairs = [
+            (track_id, box)
+            for track_id, box in incoming_pairs
+            if track_id not in self._successful_tracks[cam_id]
+        ]
+
+        if not pending_pairs:
+            logger.info(f"Skip search API for cam {cam_id}: all tracks already successful")
+            return
+
+        pending_track_ids = [track_id for track_id, _ in pending_pairs]
+        pending_boxes = [box for _, box in pending_pairs]
+
+        now_mono_ms = time.perf_counter_ns() // 1_000_000
         last_call_ms = self._cam_last_call_ts_ms.get(cam_id, 0)
         if now_mono_ms - last_call_ms < self.cam_call_min_interval_ms:
             logger.warning(
@@ -187,71 +207,87 @@ class APIHandler:
                 f"({now_mono_ms - last_call_ms}ms since last call)"
             )
             return
+        logger.warning(
+            f"API call check passed for cam {cam_id} "
+        )
 
         try:
+            logger.error(
+                f"Calling search API for cam {cam_id} with {len(pending_track_ids)} pending tracks"
+            )
             start_time = time.time()
             response = await send_tracking_to_api(
-                ids,
-                xyxy_boxes,
+                pending_track_ids,
+                pending_boxes,
                 frame,
                 collection_name=self.collection_name,
                 cam_id=cam_id,
                 crop_mode=SEARCH_API_CROP_MODE,
             )
             logger.info(f"API call latency: {(time.time() - start_time):.2f}s")
+
             if not response or response.status_code != 200:
                 logger.warning("Search API returned no response")
                 return
 
             logger.info("Search API status={} cam_id={}", response.status_code, cam_id)
-            logger.info("Search API raw body: {}", response.text)
-
-            if response.status_code != 200:
-                return
-            # update last-call timestamp for this camera (monotonic, in ms)
+            logger.debug("Search API response: {}", response.text)
             self._cam_last_call_ts_ms[cam_id] = now_mono_ms
 
             api_data = response.json().get("data", [])
-            map_local_to_user = {}
+            map_track_to_user = {}
+
             for entry in api_data:
-                sent_local_id = entry.get("id")
+                sent_track_id = entry.get("id")
                 infor = entry.get("infor", {}) or {}
                 metadata = infor.get("metadata", {}) if isinstance(infor, dict) else {}
                 user_id = metadata.get("id") or metadata.get("user_id") or metadata.get("uid")
-                if sent_local_id is not None and user_id is not None:
-                    map_local_to_user[int(sent_local_id)] = str(user_id)
+
+                if sent_track_id is not None and user_id is not None:
+                    map_track_to_user[int(sent_track_id)] = str(user_id)
 
             detections = []
-            for local_id, box in zip(ids, xyxy_boxes):
-                uid = map_local_to_user.get(int(local_id))
+            for track_id, box in pending_pairs:
+                uid = map_track_to_user.get(int(track_id))
                 if uid:
-                    detections.append([uid, box])
+                    detections.append((track_id, uid, box))
 
-            for user_id, box in detections:
-                # per-user cooldown based on monotonic milliseconds
+            if not detections:
+                logger.info(f"No matched user returned from search API for cam {cam_id}")
+                return
+
+            for track_id, user_id, box in detections:
                 until_ms = self._user_cooldown_until_ms.get(user_id, 0)
                 if now_mono_ms < until_ms:
                     continue
 
                 draw_frame = None
                 if self.evaluator.cfg.upload_each_checkin:
-                    draw_frame = cv2.cvtColor(self.__draw_detections__(frame.copy(), [user_id, box]), cv2.COLOR_BGR2RGB)
+                    draw_frame = cv2.cvtColor(
+                        self.__draw_detections__(frame.copy(), [user_id, box]),
+                        cv2.COLOR_BGR2RGB,
+                    )
 
                 ok = self.evaluator.set_flag_redis(
                     user_id,
                     cam_id,
                     copy_frame=draw_frame,
-                    # timestamp=event_ts_ms,
                 )
                 if not ok:
                     logger.exception(f"User {user_id} is already in cooldown for cam {cam_id}")
-                    
+
+                # chỉ khi có match user thì mới coi track này là thành công
+                self._successful_tracks[cam_id].add(int(track_id))
+                logger.info(
+                    "Marked successful track cam_id={} track_id={} -> user_id={}",
+                    cam_id,
+                    track_id,
+                    user_id,
+                )
 
                 lap_done = self.evaluator.check_lap_1_user(user_id)
                 if lap_done:
-                    # 1) log
                     logger.info("✅ user {} completed a lap (cam={})", user_id, cam_id)
-                    # 2) set cooldown to prevent double count (store in ms)
                     self._user_cooldown_until_ms[user_id] = now_mono_ms + self.user_cooldown_ms
 
         except Exception as e:

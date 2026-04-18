@@ -59,6 +59,18 @@ async def http_post_async(url, data=None, files=None):
     try:
         response = await client.post(url, data=data, files=files)
         return response
+    except httpx.ConnectTimeout as e:
+        logger.error("Connect timeout calling face-search: {}", e)
+        return None
+    except httpx.ReadTimeout as e:
+        logger.error("Read timeout calling face-search: {}", e)
+        return None
+    except httpx.WriteTimeout as e:
+        logger.error("Write timeout calling face-search: {}", e)
+        return None
+    except httpx.PoolTimeout as e:
+        logger.error("Pool timeout calling face-search: {}", e)
+        return None
     except httpx.HTTPError as e:
         logger.error("HTTP error calling face-search: {}", e)
         return None
@@ -88,7 +100,7 @@ async def send_tracking_to_api(
     collection_name="face",
     *,
     cam_id=None,
-    similarity_threshold: float = 0.7,
+    similarity_threshold: float = 0.6,
     crop_mode: str = "union",  # "union" | "none"
 ):
     if not ids or frame is None:

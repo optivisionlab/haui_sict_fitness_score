@@ -32,6 +32,10 @@ from src.config.config import (
     DROP_OLDEST_FRAME,
     YOLO_TRACKER_CONFIG,
     TRACK_MEMORY_TTL_SEC,
+    TRACK_RETRY_INTERVAL_SEC,
+    TRACK_MAX_RETRY,
+    TRACK_RETRY_GROWTH_FACTOR,
+    MIN_SEARCH_BOX_AREA,
 )
 import json
 from src.engine.engine import draw_target
@@ -197,16 +201,29 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
     frame_count = 0
     next_frame_time = time.time()
 
-    # memory dedup for this camera only: {track_id: last_seen_ts}
-    seen_tracks = {}
-    def cleanup_seen_tracks(now_ts: float):
+    # per-track state for this camera only
+    # {
+    #   track_id: {
+    #       "last_seen_ts": float,
+    #       "last_sent_ts": float,
+    #       "retry_count": int,
+    #       "best_sent_area": int,
+    #   }
+    # }
+    track_states = {}
+
+    def box_area(box):
+        x1, y1, x2, y2 = box
+        return max(0, x2 - x1) * max(0, y2 - y1)
+
+    def cleanup_track_states(now_ts: float):
         expired_track_ids = [
             track_id
-            for track_id, last_seen_ts in seen_tracks.items()
-            if now_ts - last_seen_ts > TRACK_MEMORY_TTL_SEC
+            for track_id, state in track_states.items()
+            if now_ts - state["last_seen_ts"] > TRACK_MEMORY_TTL_SEC
         ]
         for track_id in expired_track_ids:
-            seen_tracks.pop(track_id, None)
+            track_states.pop(track_id, None)
 
         if expired_track_ids:
             logger.debug(
@@ -243,42 +260,102 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
                 )
 
                 now_seen_ts = time.time()
-                cleanup_seen_tracks(now_seen_ts)
+                cleanup_track_states(now_seen_ts)
 
-                new_track_ids = []
-                new_boxes = []
-                logger.info("seen_tracks: {}", seen_tracks)
+                send_track_ids = []
+                send_boxes = []
+
                 for track_id, box in zip(track_ids, boxes):
-                    if track_id in seen_tracks:
-                        seen_tracks[track_id] = now_seen_ts
+                    area = box_area(box)
+
+                    state = track_states.get(track_id)
+                    if state is None:
+                        state = {
+                            "last_seen_ts": now_seen_ts,
+                            "last_sent_ts": 0.0,
+                            "retry_count": 0,
+                            "best_sent_area": 0,
+                        }
+                        track_states[track_id] = state
+
+                    state["last_seen_ts"] = now_seen_ts
+
+                    # bbox còn quá nhỏ thì chưa gửi, chờ frame sau tốt hơn
+                    if area < MIN_SEARCH_BOX_AREA:
                         logger.debug(
-                            f"[Producer-{cid}] skip duplicated track_id={track_id} frame={frame_count}"
+                            f"[Producer-{cid}] skip small box track_id={track_id}, area={area}, frame={frame_count}"
                         )
                         continue
 
-                    seen_tracks[track_id] = now_seen_ts
-                    new_track_ids.append(track_id)
-                    new_boxes.append(box)
+                    should_send = False
 
-                if new_track_ids:
+                    # lần đầu đủ điều kiện -> gửi
+                    if state["retry_count"] == 0:
+                        should_send = True
+                    else:
+                        enough_wait = (now_seen_ts - state["last_sent_ts"]) >= TRACK_RETRY_INTERVAL_SEC
+                        improved_enough = area >= max(
+                            MIN_SEARCH_BOX_AREA,
+                            int(state["best_sent_area"] * TRACK_RETRY_GROWTH_FACTOR),
+                        )
+                        under_retry_limit = state["retry_count"] < TRACK_MAX_RETRY
+
+                        if enough_wait and improved_enough and under_retry_limit:
+                            should_send = True
+
+                    if not should_send:
+                        logger.debug(
+                            f"[Producer-{cid}] hold track_id={track_id}, frame={frame_count}, "
+                            f"area={area}, retry_count={state['retry_count']}, "
+                            f"best_sent_area={state['best_sent_area']}"
+                        )
+                        continue
+
+                    send_track_ids.append(track_id)
+                    send_boxes.append(box)
+
+                logger.info(
+                    f"[Producer-{cid}] frame={frame_count}, raw_track_ids={track_ids}, send_track_ids={send_track_ids}"
+                )
+
+                if send_track_ids:
                     captured_at_ms = time.time_ns() // 1_000_000
 
                     headers = [
                         ("timestamp_ms", str(captured_at_ms).encode()),
                         ("frame_id", str(frame_count).encode()),
-                        # giữ nguyên key header để downstream không phải sửa
-                        ("person_ids", json.dumps(new_track_ids).encode()),
-                        ("bboxes", json.dumps(new_boxes).encode()),
+                        ("person_ids", json.dumps(send_track_ids).encode()),
+                        ("bboxes", json.dumps(send_boxes).encode()),
                     ]
 
+                    logger.warning(
+                        f"[Producer-{cid}] WILL_ENQUEUE frame={frame_count}, send_track_ids={send_track_ids}"
+                    )
+
                     sent = producer.send_frame(cid, frame, headers=headers)
-                    if sent:
-                        logger.info(f"[Producer-{cid}] enqueued frame={frame_count} with {len(new_track_ids)} new track(s)")
+
+                    logger.warning(
+                        f"[Producer-{cid}] ENQUEUE_RESULT frame={frame_count}, sent={sent}"
+                    )
+
                     if not sent:
                         logger.warning(f"[Producer-{cid}] failed to enqueue frame={frame_count}")
-                else:
-                    logger.debug(f"[Producer-{cid}] no new track to send at frame={frame_count}")
+                    else:
+                        sent_track_id_set = set(send_track_ids)
+                        for track_id, box in zip(track_ids, boxes):
+                            if track_id not in sent_track_id_set:
+                                continue
 
+                            state = track_states.get(track_id)
+                            if state is None:
+                                continue
+
+                            area = box_area(box)
+                            state["last_sent_ts"] = now_seen_ts
+                            state["retry_count"] += 1
+                            state["best_sent_area"] = max(state["best_sent_area"], area)
+                else:
+                    logger.debug(f"[Producer-{cid}] no eligible track to send at frame={frame_count}")
             frame_count += 1
 
     except Exception as e:

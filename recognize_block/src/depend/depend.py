@@ -18,4 +18,4 @@ class UserTrack(BaseModel):
 class BatchTrackRequest(BaseModel):
     users: List[UserTrack]
 
-minio_client = MinioClient()
+minio_client = None

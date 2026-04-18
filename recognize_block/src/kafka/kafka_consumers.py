@@ -204,6 +204,7 @@ class KafkaFrameConsumer:
             while self.running:
                 msg = await self.consumer.poll(self.poll_timeout)
                 if msg is None:
+                    logger.debug("[Consumer-{}] poll timeout no message")
                     continue
                 if msg.error():
                     raise KafkaException(msg.error())
