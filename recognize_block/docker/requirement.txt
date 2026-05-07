@@ -1,6 +1,6 @@
 # Python 3.11.9 Requirements
 # Computer Vision & Image Processing
-numpy==1.26.3
+numpy==1.26.4
 Pillow==10.0.0
 opencv-python==4.8.1.78
 
