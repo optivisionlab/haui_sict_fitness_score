@@ -45,7 +45,8 @@ from src.database.sql_model import PostgresHandler
 from urllib.parse import quote_plus
 from datetime import datetime
 import asyncio
-
+import csv
+from pathlib import Path
 
 # ================== CONFIG ==================
 MODEL_PATH = YOLO_MODEL_PATH
@@ -138,6 +139,68 @@ def log_detect_time(
 
     with open(logfile, "a", encoding="utf-8") as f:
         f.write(line)
+
+
+def append_csv_row(csv_path, header, row):
+    file_path = Path(csv_path)
+    file_exists = file_path.exists()
+
+    with file_path.open("a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+
+        if not file_exists:
+            writer.writerow(header)
+
+        writer.writerow(row)
+
+
+def merge_frame_metrics_csv(cid):
+    producer_file = Path(f"producer_{cid}_frames.csv")
+    consumer_file = Path(f"consumer_{cid}_frames.csv")
+    output_file = Path(f"frame_{cid}_final_metrics.csv")
+
+    producer_rows = {}
+
+    if producer_file.exists():
+        with producer_file.open("r", newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                frame_id = int(row["frame_id"])
+                producer_rows[frame_id] = {
+                    "frame_id": frame_id,
+                    "time_seconds": float(row["producer_time_sec"]),
+                    "status": row["status"],
+                }
+
+    if consumer_file.exists():
+        with consumer_file.open("r", newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                frame_id = int(row["frame_id"])
+                total_time_sec = float(row["total_time_sec"])
+
+                producer_rows[frame_id] = {
+                    "frame_id": frame_id,
+                    "time_seconds": total_time_sec,
+                    "status": row["status"],
+                }
+
+    rows = sorted(producer_rows.values(), key=lambda x: x["frame_id"])
+
+    with output_file.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "frame_id",
+                "time_seconds",
+                "status",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(rows)
+
+    logger.info(f"[Metric-{cid}] exported final csv: {output_file}")
+
 
 def _wait_start_barrier(cid: int, start_barrier, role: str):
     logger.info(f"[{role}-{cid}] ready, waiting at barrier...")
@@ -245,6 +308,10 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
                 logger.info(f"[Producer-{cid}] End of video")
                 break
 
+            frame_start_perf = time.perf_counter()
+            frame_start_ms = time.time_ns() // 1_000_000
+            frame_status = "no_person_or_not_sent"
+
             if frame_count % frame_step == 0:
                 t0 = time.perf_counter()
                 track_ids, boxes, _ = tracker.detect_frame(
@@ -322,6 +389,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
                     captured_at_ms = time.time_ns() // 1_000_000
 
                     headers = [
+                        ("frame_start_ms", str(frame_start_ms).encode()),
                         ("timestamp_ms", str(captured_at_ms).encode()),
                         ("frame_id", str(frame_count).encode()),
                         ("person_ids", json.dumps(send_track_ids).encode()),
@@ -334,6 +402,10 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
 
                     sent = producer.send_frame(cid, frame, headers=headers)
 
+                    if sent:
+                        frame_status = "sent_to_kafka"
+                    else:
+                        frame_status = "send_failed"
                     logger.warning(
                         f"[Producer-{cid}] ENQUEUE_RESULT frame={frame_count}, sent={sent}"
                     )
@@ -356,6 +428,21 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
                             state["best_sent_area"] = max(state["best_sent_area"], area)
                 else:
                     logger.debug(f"[Producer-{cid}] no eligible track to send at frame={frame_count}")
+            producer_time_sec = time.perf_counter() - frame_start_perf
+
+            append_csv_row(
+                csv_path=f"producer_{cid}_frames.csv",
+                header=[
+                    "frame_id",
+                    "producer_time_sec",
+                    "status",
+                ],
+                row=[
+                    frame_count,
+                    round(producer_time_sec, 6),
+                    frame_status,
+                ],
+            )
             frame_count += 1
 
     except Exception as e:
@@ -385,7 +472,7 @@ async def consumer_worker(cid: int):
         group_id=f"group-{topic}",
         # Realtime mode: allow parallel processing but keep safe-commit ordering.
         worker_concurrency=2,
-        max_pending_messages=16,
+        max_pending_messages=10,
         drop_oldest_on_full=DROP_OLDEST_FRAME,
         stats_file_path=f'cam_{cid}_consumer_stats.txt',
         stats_flush_interval=5.0,
@@ -396,10 +483,14 @@ async def consumer_worker(cid: int):
     )
 
     logger.info(f"[Consumer-{cid}] started")
-
+    metric_csv_lock = asyncio.Lock()
     async def handle_frame(msg):
+        frame_id = -1
+        person_ids = []
+        frame_start_ms = 0
+        consumer_start_perf = time.perf_counter()
+
         try:
-            start_time = time.perf_counter()
             nparr = np.frombuffer(msg.value(), np.uint8)
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
@@ -414,16 +505,21 @@ async def consumer_worker(cid: int):
             frame_id = int(
                 hdrs.get("frame_id", b"-1").decode()
             )
+
+            frame_start_ms_raw = hdrs.get("frame_start_ms", b"0").decode()
+            frame_start_ms = int(frame_start_ms_raw) if frame_start_ms_raw else 0
+
             timestamp_ms_raw = hdrs.get("timestamp_ms", b"0").decode()
-            timestamp = int(timestamp_ms_raw) if timestamp_ms_raw else 0 #miliseconds
+            timestamp = int(timestamp_ms_raw) if timestamp_ms_raw else 0
 
             logger.info(
                 f"[Consumer-{cid}] frame={frame_id}, persons={len(person_ids)}"
             )
-            import asyncio
+
             logger.info(
                 f"[Consumer-{cid}] task={id(asyncio.current_task())} start frame={frame_id}"
             )
+
             await api.process(
                 cid,
                 frame,
@@ -431,16 +527,49 @@ async def consumer_worker(cid: int):
                 person_ids,
                 timestamp=timestamp,
             )
+
             logger.info(
                 f"[Consumer-{cid}] task={id(asyncio.current_task())} done frame={frame_id}"
             )
-        except Exception:
-            logger.exception(f"[Consumer-{cid}] error")
-        finally:
-            logger.info(f"[Consumer-{cid}] finished processing frame={frame_id} in {time.perf_counter() - start_time:.3f}s")
-            with open(f"consumer_{cid}_log.txt", "a", encoding="utf-8") as f:
-                f.write(f"{datetime.now()} | frame={frame_id} | persons={len(person_ids)} | process_time={(time.perf_counter() - start_time):.3f}s\n")
 
+            status = "processed"
+
+        except Exception:
+            status = "consumer_error"
+            logger.exception(f"[Consumer-{cid}] error")
+
+        finally:
+            consumer_end_ms = time.time_ns() // 1_000_000
+            consumer_time_sec = time.perf_counter() - consumer_start_perf
+
+            if frame_start_ms > 0:
+                total_time_sec = (consumer_end_ms - frame_start_ms) / 1000
+            else:
+                total_time_sec = -1
+
+            async with metric_csv_lock:
+                append_csv_row(
+                    csv_path=f"consumer_{cid}_frames.csv",
+                    header=[
+                        "frame_id",
+                        "consumer_time_sec",
+                        "total_time_sec",
+                        "status",
+                    ],
+                    row=[
+                        frame_id,
+                        round(consumer_time_sec, 6),
+                        round(total_time_sec, 6),
+                        status,
+                    ],
+                )
+
+            logger.info(
+                f"[Consumer-{cid}] finished processing frame={frame_id} "
+                f"consumer_time={consumer_time_sec:.3f}s "
+                f"total_time={total_time_sec:.3f}s "
+                f"status={status}"
+            )
     await consumer.start(handle_frame)
 
 
@@ -511,7 +640,16 @@ def main():
         for p in processes:
             p.terminate()
             p.join()
+    finally:
+        logger.info("📊 Merging frame metrics CSV...")
 
+        for cid in CAM_IDS:
+            try:
+                merge_frame_metrics_csv(cid)
+            except Exception:
+                logger.exception(f"[Metric-{cid}] failed to merge csv")
+
+        logger.info("✅ Merge frame metrics CSV finished")
 
 if __name__ == "__main__":
     main()
