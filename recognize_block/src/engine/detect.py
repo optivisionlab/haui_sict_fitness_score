@@ -207,14 +207,8 @@ class APIHandler:
                 f"({now_mono_ms - last_call_ms}ms since last call)"
             )
             return
-        logger.warning(
-            f"API call check passed for cam {cam_id} "
-        )
 
         try:
-            logger.error(
-                f"Calling search API for cam {cam_id} with {len(pending_track_ids)} pending tracks"
-            )
             start_time = time.time()
             response = await send_tracking_to_api(
                 pending_track_ids,
@@ -268,13 +262,24 @@ class APIHandler:
                         cv2.COLOR_BGR2RGB,
                     )
 
-                ok = self.evaluator.set_flag_redis(
+                status, lap_value = self.evaluator.set_flag_and_check_lap_redis(
                     user_id,
                     cam_id,
                     copy_frame=draw_frame,
                 )
-                if not ok:
-                    logger.exception(f"User {user_id} is already in cooldown for cam {cam_id}")
+
+                if status < 0:
+                    logger.warning(
+                        "Skip user {} cam {} due to invalid state/status={}",
+                        user_id,
+                        cam_id,
+                        status,
+                    )
+                    continue
+
+                if status == 0:
+                    logger.debug("Duplicate same cam for user {} cam {}", user_id, cam_id)
+                    continue
 
                 # chỉ khi có match user thì mới coi track này là thành công
                 self._successful_tracks[cam_id].add(int(track_id))
@@ -285,9 +290,8 @@ class APIHandler:
                     user_id,
                 )
 
-                lap_done = self.evaluator.check_lap_1_user(user_id)
-                if lap_done:
-                    logger.info("✅ user {} completed a lap (cam={})", user_id, cam_id)
+                if status == 2:
+                    logger.info("✅ user {} completed a lap={} (cam={})", user_id, lap_value, cam_id)
                     self._user_cooldown_until_ms[user_id] = now_mono_ms + self.user_cooldown_ms
 
         except Exception as e:
