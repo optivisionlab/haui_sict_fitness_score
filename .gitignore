@@ -188,3 +188,6 @@ env/
 *.exe
 *.avi
 nckh_fitness/
+*.csv
+*.txt
+*.png
