@@ -165,9 +165,9 @@ class APIHandler:
         self.evaluator = evaluator
         self.collection_name = collection_name
 
-        # cooldown per user to prevent double count (stored in milliseconds)
-        self._user_cooldown_until_ms: Dict[str, int] = {}
-        self.user_cooldown_ms = API_HANDLER_USER_COOLDOWN_MS  # 1s in milliseconds
+        # Cooldown theo từng user_id + cam_id, không phải toàn user
+        self._user_cam_cooldown_until_ms = {}
+        self.user_cooldown_ms = API_HANDLER_USER_COOLDOWN_MS
 
         # per-cam gate to reduce API spam (timestamps stored in milliseconds)
         self._cam_last_call_ts_ms: Dict[str, int] = {}
@@ -299,6 +299,11 @@ class APIHandler:
                 return
 
             for track_id, user_id, box in detections:
+                cooldown_key = (str(user_id), str(cam_id))
+                until_ms = self._user_cam_cooldown_until_ms.get(cooldown_key, 0)
+
+                if now_mono_ms < until_ms:
+                    continue
                 self._mark_success_track(cam_id, track_id)
                 logger.info(
                     "MARK_SUCCESS cam={} track={} user={} cache={}",
@@ -307,10 +312,6 @@ class APIHandler:
                     user_id,
                     self._successful_tracks.get(str(cam_id), {}),
                 )
-                until_ms = self._user_cooldown_until_ms.get(user_id, 0)
-                if now_mono_ms < until_ms:
-                    continue
-
                 draw_frame = None
                 if self.evaluator.cfg.upload_each_checkin:
                     draw_frame = cv2.cvtColor(
@@ -333,13 +334,10 @@ class APIHandler:
                     )
                     continue
 
-                if status == 0:
-                    logger.debug("Duplicate same cam for user {} cam {}", user_id, cam_id)
-                    continue
-
-                if status == 2:
-                    logger.info("✅ user {} completed a lap={} (cam={})", user_id, lap_value, cam_id)
-                    self._user_cooldown_until_ms[user_id] = now_mono_ms + self.user_cooldown_ms
-
+                if status >= 0:
+                    cooldown_key = (user_id, cam_id)
+                    self._user_cam_cooldown_until_ms[cooldown_key] = (
+                        now_mono_ms + self.user_cooldown_ms
+                    )
         except Exception as e:
             logger.exception(f"API search error: {e}")
