@@ -1,7 +1,7 @@
 from datetime import timedelta
-from typing import Any, List
+from typing import Any, List, Optional
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Body, Request
 from sqlmodel import Session, select
 from app.core.security import (
     hash_password,
@@ -65,17 +65,35 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)) -> Any:
     return user
 
 @router.post("/login", response_model=Token)
-def login(credentials: UserLogin, db: Session = Depends(get_db)) -> Token:
-    """Login with JSON body {username, password}."""
-    username = credentials.username
-    password = credentials.password
+async def login(
+    request: Request,
+    credentials: Optional[UserLogin] = Body(default=None),
+    db: Session = Depends(get_db),
+) -> Token:
+    """Login with JSON body or Form Data {username, password}."""
+    username = None
+    password = None
+
+    if credentials and credentials.username and credentials.password:
+        username = credentials.username
+        password = credentials.password
+    else:
+        try:
+            form = await request.form()
+            username = form.get("username") or form.get("user_name") or form.get("email")
+            password = form.get("password")
+        except Exception:
+            pass
 
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username and password are required")
 
+    username = str(username).strip()
+    password = str(password)
+
     user = db.exec(
         select(User).where(
-            (User.email == username) | (User.user_name == username)
+            (User.email.ilike(username)) | (User.user_name == username)
         )
     ).first()
 
@@ -95,7 +113,7 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)) -> Token:
         "token_type": "bearer",
     }
     logger.info("login success for user_id=%s", getattr(user, "user_id", None))
-    return token
+    return Token(**token)
 
 
 @router.get("/me", response_model=UserRead)
