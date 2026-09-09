@@ -1,0 +1,199 @@
+.not-found-wrapper {
+  position: relative;
+  min-height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+
+  // Chuyển màu xanh lá sinh thái Eco Wellness đồng bộ với Login
+  background: linear-gradient(
+    135deg,
+    #a8e6cf 0%,
+    #c8e6c9 35%,
+    #dcedc8 70%,
+    #f0fdf4 100%
+  );
+}
+
+// Ambient diffuse light orbs for soft atmospheric gradient depth
+.ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(80px);
+  opacity: 0.65;
+  animation: orb-float 12s ease-in-out infinite alternate;
+
+  &.orb-1 {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, #ffffff 0%, #c8e6c9 60%, transparent 80%);
+    top: -120px;
+    left: -80px;
+  }
+
+  &.orb-2 {
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, #a8e6cf 0%, #81c784 55%, transparent 80%);
+    bottom: -120px;
+    right: -80px;
+    animation-delay: -5s;
+    animation-duration: 14s;
+  }
+
+  &.orb-3 {
+    width: 420px;
+    height: 420px;
+    background: radial-gradient(circle, #dcedc8 0%, #4caf50 60%, transparent 80%);
+    top: 35%;
+    left: 55%;
+    animation-delay: -8s;
+    animation-duration: 16s;
+  }
+}
+
+@keyframes orb-float {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate(30px, -25px) scale(1.06);
+  }
+
+  100% {
+    transform: translate(-25px, 30px) scale(0.96);
+  }
+}
+
+// Central Content
+.not-found-content {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+}
+
+// 404 Big Number - thu nhỏ vừa vặn, tinh tế
+.error-code {
+  font-size: clamp(5.5rem, 12vw, 8.5rem);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  color: #ffffff;
+  margin: 0;
+  padding: 0;
+
+  // Soft dimensional drop shadow matching the Eco Wellness theme
+  text-shadow:
+    0 12px 30px rgba(46, 125, 50, 0.35),
+    0 24px 50px rgba(76, 175, 80, 0.22),
+    0 3px 6px rgba(0, 0, 0, 0.06);
+
+  animation: subtle-float 6s ease-in-out infinite;
+}
+
+// Not Found text - thu nhỏ hài hòa
+.error-text {
+  font-size: clamp(1.4rem, 3.2vw, 2.2rem);
+  font-weight: 700;
+  color: #ffffff;
+  margin-top: 10px;
+  letter-spacing: -0.02em;
+
+  text-shadow:
+    0 6px 18px rgba(46, 125, 50, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.05);
+
+  animation: subtle-float 6s ease-in-out infinite 0.2s;
+}
+
+@keyframes subtle-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+// Sleek Glass Action Group
+.action-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.glass-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #334155; // Màu xám đậm vừa, rõ nét không bị chìm
+  text-decoration: none;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 20px -4px rgba(46, 125, 50, 0.15), 0 2px 6px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  svg {
+    color: #475569;
+    transition: color 0.25s ease;
+  }
+
+  &:hover {
+    background: #ffffff;
+    border-color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 25px -4px rgba(46, 125, 50, 0.22);
+    color: #0f172a;
+
+    svg {
+      color: #0f172a;
+    }
+  }
+
+  &:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  &.glass-btn-secondary {
+    background: rgba(255, 255, 255, 0.52);
+    border-color: rgba(255, 255, 255, 0.7);
+    color: #475569;
+
+    svg {
+      color: #64748b;
+    }
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.88);
+      border-color: #ffffff;
+      color: #0f172a;
+
+      svg {
+        color: #0f172a;
+      }
+    }
+  }
+}

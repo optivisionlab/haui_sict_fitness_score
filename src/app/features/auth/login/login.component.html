@@ -1,0 +1,113 @@
+<div class="eco-wrapper">
+  <!-- Falling Leaves Nature Background -->
+  <div class="nature-background">
+    <div class="falling-leaf leaf-1"></div>
+    <div class="falling-leaf leaf-2"></div>
+    <div class="falling-leaf leaf-3"></div>
+    <div class="falling-leaf leaf-4"></div>
+    <div class="falling-leaf leaf-5"></div>
+    <div class="falling-leaf leaf-6"></div>
+    <div class="falling-leaf leaf-7"></div>
+    <div class="falling-leaf leaf-8"></div>
+    <div class="falling-leaf leaf-9"></div>
+    <div class="falling-leaf leaf-10"></div>
+  </div>
+
+  <!-- Login Card Container -->
+  <div class="login-container">
+    <div class="wellness-card">
+      <div class="organic-border"></div>
+
+      <!-- Mindful Header -->
+      <div class="mindful-header">
+        <div class="zen-logo">
+          <img src="assets/images/logo.png" alt="OptiVisionLab Logo" class="brand-logo" />
+          <div class="zen-glow"></div>
+        </div>
+        <h1>OptiVisionLab</h1>
+        <p>Cổng đăng nhập hệ thống chấm điểm thể dục</p>
+      </div>
+
+      <!-- Form -->
+      <form class="harmony-form" (submit)="onSubmit($event)" novalidate>
+        <!-- Email / Student ID Field -->
+        <div class="organic-field" [class.has-error]="emailError()">
+          <div class="field-nature"></div>
+          <input type="text" id="email" name="email" placeholder=" " required [ngModel]="email()"
+            (ngModelChange)="email.set($event)" autocomplete="username" />
+          <label for="email">Mã sinh viên</label>
+          <div class="growth-indicator">
+            <div class="leaf-sprout"></div>
+          </div>
+          @if (emailError()) {
+          <span class="gentle-error">{{ emailError() }}</span>
+          }
+        </div>
+
+        <!-- Password Field -->
+        <div class="organic-field" [class.has-error]="passwordError()">
+          <div class="field-nature"></div>
+          <input [type]="showPassword() ? 'text' : 'password'" id="password" name="password" placeholder=" " required
+            [ngModel]="password()" (ngModelChange)="password.set($event)" autocomplete="current-password" />
+          <label for="password">Mật khẩu</label>
+          <button
+            type="button"
+            class="nature-toggle"
+            (click)="togglePassword()"
+            [attr.aria-label]="showPassword() ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'"
+            [attr.title]="showPassword() ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'"
+          >
+            @if (showPassword()) {
+              <!-- Unbroken eye with complete diagonal slash (no white gaps) -->
+              <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                <circle cx="12" cy="12" r="3"/>
+                <line x1="3" y1="3" x2="21" y2="21"/>
+              </svg>
+            } @else {
+              <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            }
+          </button>
+          @if (passwordError()) {
+          <span class="gentle-error">{{ passwordError() }}</span>
+          }
+        </div>
+
+        <!-- Options: Remember Me & Forgot Password -->
+        <div class="mindful-options">
+          <label class="green-checkbox">
+            <input
+              type="checkbox"
+              id="remember"
+              name="remember"
+              [ngModel]="rememberMe()"
+              (ngModelChange)="rememberMe.set($event)"
+            />
+            <span class="checkbox-square">
+              <svg class="check-mark" width="11" height="9" viewBox="0 0 11 9" fill="none">
+                <path d="M1.5 4.5L4 7L9.5 1.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span class="checkbox-text">Duy trì đăng nhập</span>
+          </label>
+          <a href="#" (click)="$event.preventDefault()" class="healing-link">Quên mật khẩu?</a>
+        </div>
+
+        <!-- Submit Button with Organic Loading Circles -->
+        <button type="submit" class="harmony-button" [class.loading]="isLoading()" [disabled]="isLoading()">
+          <div class="button-earth"></div>
+          <span class="button-text">Đăng nhập</span>
+          <div class="button-growth">
+            <div class="growing-circle circle-1"></div>
+            <div class="growing-circle circle-2"></div>
+            <div class="growing-circle circle-3"></div>
+          </div>
+          <div class="button-aura"></div>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,161 @@
+$primary-green: #2e7d32;
+$primary-green-hover: #1b5e20;
+$primary-green-light: #e8f5e9;
+$primary-green-soft: #f0fdf4;
+
+.custom-select-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  user-select: none;
+}
+
+.select-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted, #4a6b52);
+}
+
+.select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.select-trigger {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--text-main, #14351a);
+  background-color: #ffffff;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #94a3b8;
+  }
+
+  &.active,
+  &:focus {
+    border-color: $primary-green;
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
+
+    .chevron-icon {
+      color: $primary-green;
+    }
+  }
+
+  .trigger-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+
+    &.is-placeholder {
+      color: #94a3b8;
+    }
+  }
+
+  .chevron-icon {
+    color: #64748b;
+    flex-shrink: 0;
+    transition: transform 0.2s ease, color 0.2s ease;
+
+    &.rotated {
+      transform: rotate(180deg);
+    }
+  }
+}
+
+/* --- Xổ xuống: Menu danh sách màu xanh lá sang trọng --- */
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 100%;
+  min-width: 150px;
+  background-color: #ffffff;
+  border: 1.5px solid rgba(76, 175, 80, 0.25);
+  border-radius: 8px;
+  box-shadow:
+    0 12px 28px -4px rgba(46, 125, 50, 0.16),
+    0 4px 10px rgba(0, 0, 0, 0.04);
+  padding: 4px;
+  z-index: 100;
+  animation: dropdownFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.options-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 240px;
+  overflow-y: auto;
+
+  /* Custom scrollbar cho danh sách */
+  &::-webkit-scrollbar {
+    width: 5px;
+  }
+  &::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #c2e0c9;
+    border-radius: 4px;
+
+    &:hover {
+      background: #a3d4ad;
+    }
+  }
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-main, #14351a);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background-color: $primary-green-soft;
+    color: $primary-green-hover;
+  }
+
+  /* Mục đang được chọn - hiển thị nền xanh lá mát mắt */
+  &.selected {
+    background-color: $primary-green-light;
+    color: $primary-green-hover;
+    font-weight: 600;
+
+    .check-icon {
+      color: $primary-green;
+      flex-shrink: 0;
+    }
+  }
+}

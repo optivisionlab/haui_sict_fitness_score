@@ -1,0 +1,613 @@
+<div class="profile-page">
+  <!-- Toast Thông báo -->
+  @if (toastMessage(); as toast) {
+    <div class="toast-alert" [ngClass]="toast.type">
+      @if (toast.type === 'success') {
+        <svg lucideCheck [size]="18"></svg>
+      } @else {
+        <svg lucideAlertCircle [size]="18"></svg>
+      }
+      <span>{{ toast.text }}</span>
+    </div>
+  }
+
+  <!-- Header Tiêu đề -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Hồ sơ cá nhân</h1>
+      <p class="page-subtitle">Quản lý và cập nhật thông tin tài khoản, bảo mật học tập của bạn tại OptiVisionLab</p>
+    </div>
+  </div>
+
+  <!-- Thẻ Tóm Tắt Sinh Viên (Overview Card) -->
+  <div class="profile-hero-card">
+    <div class="hero-left">
+      <!-- Avatar kèm nút đổi ảnh -->
+      <div class="avatar-container">
+        <img [src]="profile().avatarUrl" alt="Avatar" class="profile-avatar" />
+        <label class="avatar-upload-btn" title="Thay đổi ảnh đại diện">
+          <svg lucideCamera [size]="15"></svg>
+          <input type="file" accept="image/*" (change)="onAvatarChange($event)" hidden />
+        </label>
+      </div>
+
+      <!-- Tên & Thông tin cơ bản -->
+      <div class="hero-info">
+        <div class="name-row">
+          <h2 class="student-name">{{ profile().fullName }}</h2>
+          <span class="status-badge active">
+            <span class="status-dot"></span>
+            {{ profile().status }}
+          </span>
+        </div>
+        <div class="student-meta">
+          <span class="meta-tag">
+            <svg lucideGraduationCap [size]="14"></svg>
+            {{ profile().studentId }}
+          </span>
+          <span class="meta-divider">•</span>
+          <span class="meta-faculty">{{ profile().faculty }}</span>
+          <span class="meta-divider">•</span>
+          <span class="meta-class">{{ profile().classCode }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats tóm tắt -->
+    <div class="hero-stats">
+      <div class="stat-pill">
+        <span class="stat-num text-green">{{ profile().gpa }}</span>
+        <span class="stat-label">Điểm tích lũy (GPA)</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-num">{{ profile().creditsEarned }}</span>
+        <span class="stat-label">Tín chỉ tích lũy</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-num">{{ profile().academicYear }}</span>
+        <span class="stat-label">Tiến độ đào tạo</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Thanh Tab Bar (Kiểu Pill hiện đại không viền dưới) -->
+  <div class="tab-bar">
+    <button
+      type="button"
+      class="tab-btn"
+      [class.active]="activeTab() === 'info'"
+      (click)="setTab('info')">
+      <svg lucideUser [size]="16"></svg>
+      <span>Thông tin cá nhân</span>
+    </button>
+    <button
+      type="button"
+      class="tab-btn"
+      [class.active]="activeTab() === 'security'"
+      (click)="setTab('security')">
+      <svg lucideKeyRound [size]="16"></svg>
+      <span>Bảo mật & Mật khẩu</span>
+    </button>
+  </div>
+
+  <!-- TAB 1: THÔNG TIN CÁ NHÂN -->
+  @if (activeTab() === 'info') {
+    <div class="tab-content">
+      <div class="form-grid">
+        <!-- Cột 1: Thông tin học vấn (Read-only) -->
+        <div class="card form-section-card">
+          <div class="section-header">
+            <div class="section-icon">
+              <svg lucideGraduationCap [size]="20"></svg>
+            </div>
+            <div>
+              <h3 class="section-title">Thông tin học vấn</h3>
+              <p class="section-desc">Thông tin do nhà trường cấp và quản lý</p>
+            </div>
+          </div>
+
+          <div class="info-list">
+            <div class="info-row">
+              <span class="info-label">Mã sinh viên:</span>
+              <span class="info-val highlight">{{ profile().studentId }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Khoa / Viện:</span>
+              <span class="info-val">{{ profile().faculty }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Chuyên ngành:</span>
+              <span class="info-val">{{ profile().major }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Lớp sinh hoạt:</span>
+              <span class="info-val">{{ profile().classCode }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Khóa đào tạo:</span>
+              <span class="info-val">{{ profile().cohort }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Email trường cấp:</span>
+              <span class="info-val email-val">{{ profile().email }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Số CCCD / CMND:</span>
+              <span class="info-val">{{ profile().idCardNumber }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Dân tộc:</span>
+              <span class="info-val">{{ profile().ethnicity }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cột 2: Thông tin liên lạc & Cá nhân (Cho phép chỉnh sửa) -->
+        <div class="card form-section-card">
+          <div class="section-header">
+            <div class="section-icon">
+              <svg lucideUser [size]="20"></svg>
+            </div>
+            <div>
+              <h3 class="section-title">Chỉnh sửa thông tin</h3>
+              <p class="section-desc">Bạn có thể cập nhật các thông tin liên lạc dưới đây</p>
+            </div>
+          </div>
+
+          <form (ngSubmit)="saveProfile()" class="edit-form">
+            <!-- Họ và tên -->
+            <div class="form-group">
+              <label class="form-label">Họ và tên</label>
+              <div class="input-wrapper">
+                <svg lucideUser class="field-icon" [size]="16"></svg>
+                <input
+                  type="text"
+                  class="form-control"
+                  [(ngModel)]="editForm.fullName"
+                  name="fullName"
+                  placeholder="Nhập họ và tên đầy đủ"
+                  required />
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <!-- Số điện thoại -->
+              <div class="form-group">
+                <label class="form-label">Số điện thoại</label>
+                <div class="input-wrapper">
+                  <svg lucidePhone class="field-icon" [size]="16"></svg>
+                  <input
+                    type="tel"
+                    class="form-control"
+                    [(ngModel)]="editForm.phone"
+                    name="phone"
+                    placeholder="VD: 0987 654 321" />
+                </div>
+              </div>
+
+              <!-- Email cá nhân -->
+              <div class="form-group">
+                <label class="form-label">Email cá nhân</label>
+                <div class="input-wrapper">
+                  <svg lucideMail class="field-icon" [size]="16"></svg>
+                  <input
+                    type="email"
+                    class="form-control"
+                    [(ngModel)]="editForm.personalEmail"
+                    name="personalEmail"
+                    placeholder="VD: email@gmail.com" />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <!-- Ngày sinh -->
+              <div class="form-group">
+                <label class="form-label">Ngày sinh</label>
+                <div class="input-wrapper">
+                  <svg lucideCalendar class="field-icon" [size]="16"></svg>
+                  <input
+                    type="date"
+                    class="form-control"
+                    [(ngModel)]="editForm.birthDate"
+                    name="birthDate" />
+                </div>
+              </div>
+
+              <!-- Giới tính dùng Custom Select -->
+              <div class="form-group">
+                <app-select
+                  label="Giới tính"
+                  [options]="genderOptions"
+                  [(value)]="editForm.gender">
+                </app-select>
+              </div>
+            </div>
+
+            <!-- Quê quán -->
+            <div class="form-group">
+              <label class="form-label">Quê quán (Tỉnh / Thành phố)</label>
+              <div class="input-wrapper">
+                <svg lucideMapPin class="field-icon" [size]="16"></svg>
+                <input
+                  type="text"
+                  class="form-control"
+                  [(ngModel)]="editForm.hometown"
+                  name="hometown"
+                  placeholder="VD: Thái Bình" />
+              </div>
+            </div>
+
+            <!-- Địa chỉ hiện tại -->
+            <div class="form-group">
+              <label class="form-label">Địa chỉ liên hệ thường trú</label>
+              <div class="input-wrapper">
+                <svg lucideMapPin class="field-icon" [size]="16"></svg>
+                <textarea
+                  class="form-control textarea"
+                  rows="2"
+                  [(ngModel)]="editForm.address"
+                  name="address"
+                  placeholder="Nhập địa chỉ tạm trú / thường trú"></textarea>
+              </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions">
+              <button
+                type="button"
+                class="btn-secondary"
+                (click)="resetEditForm()"
+                [disabled]="isSaving()">
+                <svg lucideRefreshCw [size]="15"></svg>
+                <span>Khôi phục</span>
+              </button>
+
+              <button
+                type="submit"
+                class="btn-primary"
+                [disabled]="isSaving()">
+                @if (isSaving()) {
+                  <svg lucideRefreshCw class="spin" [size]="16"></svg>
+                  <span>Đang lưu...</span>
+                } @else {
+                  <svg lucideSave [size]="16"></svg>
+                  <span>Lưu thay đổi</span>
+                }
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- TAB 2: BẢO MẬT & MẬT KHẨU -->
+  @if (activeTab() === 'security') {
+    <div class="tab-content security-tab">
+      <div class="security-grid">
+        <!-- Đổi mật khẩu Form -->
+        <div class="card security-card">
+          <div class="section-header">
+            <div class="section-icon">
+              <svg lucideLock [size]="20"></svg>
+            </div>
+            <div>
+              <h3 class="section-title">Đổi mật khẩu</h3>
+              <p class="section-desc">Cập nhật mật khẩu định kỳ để tăng cường an toàn tài khoản</p>
+            </div>
+          </div>
+
+          <form (ngSubmit)="changePassword()" class="security-form">
+            <!-- Mật khẩu hiện tại -->
+            <div class="form-group">
+              <div class="label-row">
+                <label class="form-label">Mật khẩu hiện tại</label>
+                <button
+                  type="button"
+                  class="forgot-link-btn"
+                  (click)="openForgotPasswordModal()">
+                  Quên mật khẩu?
+                </button>
+              </div>
+              <div class="input-wrapper">
+                <svg lucideLock class="field-icon" [size]="16"></svg>
+                <input
+                  [type]="showCurrentPassword() ? 'text' : 'password'"
+                  class="form-control"
+                  [(ngModel)]="passwordForm.currentPassword"
+                  name="currentPassword"
+                  placeholder="Nhập mật khẩu hiện tại"
+                  required />
+                <button
+                  type="button"
+                  class="eye-btn"
+                  (click)="showCurrentPassword.set(!showCurrentPassword())">
+                  @if (showCurrentPassword()) {
+                    <svg lucideEyeOff [size]="16"></svg>
+                  } @else {
+                    <svg lucideEye [size]="16"></svg>
+                  }
+                </button>
+              </div>
+            </div>
+
+            <!-- Mật khẩu mới -->
+            <div class="form-group">
+              <label class="form-label">Mật khẩu mới</label>
+              <div class="input-wrapper">
+                <svg lucideKeyRound class="field-icon" [size]="16"></svg>
+                <input
+                  [type]="showNewPassword() ? 'text' : 'password'"
+                  class="form-control"
+                  [(ngModel)]="passwordForm.newPassword"
+                  name="newPassword"
+                  placeholder="Tối thiểu 6 ký tự"
+                  required />
+                <button
+                  type="button"
+                  class="eye-btn"
+                  (click)="showNewPassword.set(!showNewPassword())">
+                  @if (showNewPassword()) {
+                    <svg lucideEyeOff [size]="16"></svg>
+                  } @else {
+                    <svg lucideEye [size]="16"></svg>
+                  }
+                </button>
+              </div>
+            </div>
+
+            <!-- Xác nhận mật khẩu mới -->
+            <div class="form-group">
+              <label class="form-label">Xác nhận mật khẩu mới</label>
+              <div class="input-wrapper">
+                <svg lucideKeyRound class="field-icon" [size]="16"></svg>
+                <input
+                  [type]="showConfirmPassword() ? 'text' : 'password'"
+                  class="form-control"
+                  [(ngModel)]="passwordForm.confirmPassword"
+                  name="confirmPassword"
+                  placeholder="Nhập lại mật khẩu mới"
+                  required />
+                <button
+                  type="button"
+                  class="eye-btn"
+                  (click)="showConfirmPassword.set(!showConfirmPassword())">
+                  @if (showConfirmPassword()) {
+                    <svg lucideEyeOff [size]="16"></svg>
+                  } @else {
+                    <svg lucideEye [size]="16"></svg>
+                  }
+                </button>
+              </div>
+            </div>
+
+            <!-- Tiêu chuẩn mật khẩu -->
+            <div class="password-rules-box">
+              <div class="rules-title">Yêu cầu bảo mật:</div>
+              <ul class="rules-list">
+                <li [class.valid]="passwordForm.newPassword.length >= 6">
+                  <svg lucideCheck [size]="13"></svg>
+                  Ít nhất 6 ký tự
+                </li>
+                <li [class.valid]="passwordForm.newPassword && passwordForm.newPassword === passwordForm.confirmPassword">
+                  <svg lucideCheck [size]="13"></svg>
+                  Mật khẩu xác nhận phải trùng khớp
+                </li>
+                <li>
+                  <svg lucideCheck [size]="13"></svg>
+                  Không trùng với họ tên hoặc mã sinh viên
+                </li>
+              </ul>
+            </div>
+
+            <div class="form-actions">
+              <button
+                type="submit"
+                class="btn-primary"
+                [disabled]="isChangingPassword()">
+                @if (isChangingPassword()) {
+                  <svg lucideRefreshCw class="spin" [size]="16"></svg>
+                  <span>Đang xử lý...</span>
+                } @else {
+                  <svg lucideShieldCheck [size]="16"></svg>
+                  <span>Cập nhật mật khẩu</span>
+                }
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Thẻ Hướng Dẫn & Quên Mật Khẩu Nhanh -->
+        <div class="card quick-recovery-card">
+          <div class="recovery-header">
+            <div class="recovery-badge">
+              <svg lucideShieldCheck [size]="24"></svg>
+            </div>
+            <h3 class="recovery-title">Bạn quên mật khẩu?</h3>
+            <p class="recovery-desc">
+              Nếu bạn không nhớ mật khẩu hiện tại, bạn có thể thực hiện khôi phục qua email sinh viên đã được định danh trên hệ thống.
+            </p>
+          </div>
+
+          <div class="recovery-steps">
+            <div class="step-item">
+              <span class="step-number">1</span>
+              <div class="step-text">
+                <strong>Gửi yêu cầu khôi phục</strong>
+                <span>Hệ thống sẽ gửi mã xác thực gồm 6 chữ số đến email trường</span>
+              </div>
+            </div>
+            <div class="step-item">
+              <span class="step-number">2</span>
+              <div class="step-text">
+                <strong>Nhập mã xác thực OTP</strong>
+                <span>Xác minh mã trong vòng 10 phút</span>
+              </div>
+            </div>
+            <div class="step-item">
+              <span class="step-number">3</span>
+              <div class="step-text">
+                <strong>Tạo mật khẩu mới</strong>
+                <span>Thiết lập mật khẩu an toàn và đăng nhập lại</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="recovery-btn"
+            (click)="openForgotPasswordModal()">
+            <svg lucideKeyRound [size]="16"></svg>
+            <span>Khôi phục mật khẩu ngay</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- POPUP / MODAL KHÔI PHỤC MẬT KHẨU (FORGOT PASSWORD MODAL) -->
+  @if (showForgotPasswordModal()) {
+    <div class="modal-overlay" (click)="closeForgotPasswordModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <!-- Modal Header -->
+        <div class="modal-header">
+          <div class="modal-header-info">
+            <div class="modal-icon">
+              <svg lucideKeyRound [size]="20"></svg>
+            </div>
+            <div>
+              <h3 class="modal-title">Khôi phục mật khẩu</h3>
+              <p class="modal-subtitle">Đặt lại mật khẩu cho tài khoản sinh viên</p>
+            </div>
+          </div>
+          <button type="button" class="close-btn" (click)="closeForgotPasswordModal()">
+            <svg lucideX [size]="20"></svg>
+          </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="modal-body">
+          <!-- BƯỚC 1: Nhập email -->
+          @if (forgotStep() === 'input') {
+            <div class="modal-step-pane">
+              <p class="step-instruction">
+                Nhập địa chỉ email liên kết với tài khoản sinh viên để nhận mã xác minh OTP:
+              </p>
+
+              <div class="form-group">
+                <label class="form-label">Email sinh viên</label>
+                <div class="input-wrapper">
+                  <svg lucideMail class="field-icon" [size]="16"></svg>
+                  <input
+                    type="email"
+                    class="form-control"
+                    [value]="forgotEmail()"
+                    (input)="forgotEmail.set($any($event.target).value)"
+                    placeholder="VD: nguyenvana.sv@optivisionlab.edu.vn" />
+                </div>
+              </div>
+
+              <div class="modal-actions">
+                <button type="button" class="btn-secondary" (click)="closeForgotPasswordModal()">
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  class="btn-primary"
+                  [disabled]="isSendingOtp()"
+                  (click)="sendResetOtp()">
+                  @if (isSendingOtp()) {
+                    <svg lucideRefreshCw class="spin" [size]="16"></svg>
+                    <span>Đang gửi...</span>
+                  } @else {
+                    <svg lucideSend [size]="15"></svg>
+                    <span>Gửi mã OTP</span>
+                  }
+                </button>
+              </div>
+            </div>
+          }
+
+          <!-- BƯỚC 2: Nhập OTP -->
+          @if (forgotStep() === 'sent') {
+            <div class="modal-step-pane">
+              <div class="otp-notice">
+                <svg lucideBadgeCheck [size]="20"></svg>
+                <span>Mã xác nhận gồm 6 chữ số đã được gửi tới <strong>{{ forgotEmail() }}</strong></span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Mã xác thực OTP</label>
+                <div class="input-wrapper">
+                  <input
+                    type="text"
+                    class="form-control text-center otp-input"
+                    maxlength="6"
+                    placeholder="VD: 886622"
+                    [value]="otpCode()"
+                    (input)="otpCode.set($any($event.target).value)" />
+                </div>
+                <span class="help-text">Nhập mã bất kỳ (VD: 123456) để tiếp tục thử nghiệm.</span>
+              </div>
+
+              <div class="modal-actions">
+                <button type="button" class="btn-secondary" (click)="forgotStep.set('input')">
+                  Quay lại
+                </button>
+                <button
+                  type="button"
+                  class="btn-primary"
+                  (click)="verifyOtpAndProceed()">
+                  <svg lucideCheck [size]="16"></svg>
+                  <span>Xác nhận mã</span>
+                </button>
+              </div>
+            </div>
+          }
+
+          <!-- BƯỚC 3: Đặt mật khẩu mới -->
+          @if (forgotStep() === 'reset') {
+            <div class="modal-step-pane">
+              <p class="step-instruction">
+                Xác thực thành công! Vui lòng nhập mật khẩu mới cho tài khoản của bạn:
+              </p>
+
+              <div class="form-group">
+                <label class="form-label">Mật khẩu mới</label>
+                <div class="input-wrapper">
+                  <svg lucideLock class="field-icon" [size]="16"></svg>
+                  <input
+                    type="password"
+                    class="form-control"
+                    placeholder="Tối thiểu 6 ký tự"
+                    [value]="resetNewPassword()"
+                    (input)="resetNewPassword.set($any($event.target).value)" />
+                </div>
+              </div>
+
+              <div class="modal-actions">
+                <button type="button" class="btn-secondary" (click)="closeForgotPasswordModal()">
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  class="btn-primary"
+                  [disabled]="isSendingOtp()"
+                  (click)="submitNewPassword()">
+                  @if (isSendingOtp()) {
+                    <svg lucideRefreshCw class="spin" [size]="16"></svg>
+                    <span>Đang cập nhật...</span>
+                  } @else {
+                    <svg lucideCheck [size]="16"></svg>
+                    <span>Hoàn tất đặt lại</span>
+                  }
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>

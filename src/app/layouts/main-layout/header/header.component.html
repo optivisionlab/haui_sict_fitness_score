@@ -1,0 +1,101 @@
+<header class="header">
+  <div class="header-title">{{ title() }}</div>
+
+  <div class="header-actions">
+    <!-- Notifications button with dropdown popover -->
+    <div class="notification-wrapper">
+      <button
+        type="button"
+        class="action-btn"
+        [class.active]="isNotificationOpen()"
+        (click)="toggleNotification($event)"
+        title="Thông báo">
+        <svg lucideBell [size]="18"></svg>
+        @if (notificationService.unreadCount() > 0) {
+          <span class="notification-badge">
+            {{ notificationService.unreadCount() }}
+          </span>
+        }
+      </button>
+
+      <!-- Dropdown Popover xổ xuống khi bấm chuông -->
+      @if (isNotificationOpen()) {
+        <div class="notifications-dropdown" (click)="$event.stopPropagation()">
+          <div class="dropdown-header">
+            <div class="header-left">
+              <span class="header-title-text">Thông báo</span>
+              @if (notificationService.unreadCount() > 0) {
+                <span class="unread-pill">{{ notificationService.unreadCount() }} mới</span>
+              }
+            </div>
+            @if (notificationService.unreadCount() > 0) {
+              <button type="button" class="mark-read-btn" (click)="markAllRead($event)" title="Đánh dấu tất cả đã đọc">
+                <svg lucideCheckCheck [size]="15"></svg>
+                <span>Đã đọc tất cả</span>
+              </button>
+            }
+          </div>
+
+          <!-- Notification Items List -->
+          <div class="dropdown-body custom-scrollbar">
+            @for (item of notificationService.notifications(); track item.id) {
+              <div
+                class="dropdown-item"
+                [class.unread]="!item.read"
+                (click)="onNotificationClick(item)">
+                <div class="item-icon-box" [ngClass]="item.type">
+                  @if (item.type === 'course') {
+                    <svg lucideGraduationCap [size]="18"></svg>
+                  } @else if (item.type === 'exam') {
+                    <svg lucideAlertCircle [size]="18"></svg>
+                  } @else {
+                    <svg lucideInfo [size]="18"></svg>
+                  }
+                </div>
+
+                <div class="item-content">
+                  <div class="item-title-row">
+                    <span class="item-title">{{ item.title }}</span>
+                    @if (!item.read) {
+                      <span class="unread-dot"></span>
+                    }
+                  </div>
+                  <p class="item-desc">{{ item.message }}</p>
+                  <div class="item-meta">
+                    <span class="item-time">{{ item.time }}</span>
+                    @if (item.sender) {
+                      <span class="item-sender">• {{ item.sender }}</span>
+                    }
+                  </div>
+                </div>
+              </div>
+            } @empty {
+              <div class="dropdown-empty">
+                Không có thông báo nào.
+              </div>
+            }
+          </div>
+
+          <!-- Dropdown Footer -->
+          <div class="dropdown-footer">
+            <button type="button" class="view-all-btn" (click)="viewAllNotifications()">
+              <span>Xem tất cả thông báo</span>
+              <svg lucideChevronRight [size]="16"></svg>
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- User Profile pill -->
+    <div class="user-pill" routerLink="/student/profile" title="Xem thông tin cá nhân">
+      <div class="avatar">
+        <svg lucideUser [size]="16"></svg>
+      </div>
+      <div class="user-info">
+        <span class="user-name">{{ userName() }}</span>
+        <span class="user-role">{{ studentId() }}</span>
+      </div>
+    </div>
+  </div>
+</header>

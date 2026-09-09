@@ -1,0 +1,400 @@
+<div class="intro-page">
+  <!-- ===== HEADER ===== -->
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="#" (click)="scrollToTop($event)" class="logo">
+        <img src="assets/images/logo.png" alt="OptiVisionLab Logo" class="brand-logo" />
+        <span class="brand-text">OptiVision<span class="brand-highlight">Lab</span></span>
+      </a>
+      <nav class="main-nav">
+        <a href="#gioi-thieu" (click)="scrollToSection($event, 'gioi-thieu')">Giới thiệu</a>
+        <a href="#tinh-nang" (click)="scrollToSection($event, 'tinh-nang')">Tính năng</a>
+        <a href="#quy-trinh" (click)="scrollToSection($event, 'quy-trinh')">Quy trình</a>
+        <a href="#doi-ngu" (click)="scrollToSection($event, 'doi-ngu')">Đội ngũ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- ===== HERO ===== -->
+    <section class="hero">
+      <div class="wrap hero-inner">
+        <div class="hero-copy">
+          <div class="kicker-badge">
+            <span class="kicker-dot"></span>
+            <p class="kicker">Hệ thống chấm điểm thể dục AI — HaUI SICT</p>
+          </div>
+          <h1>Mỗi động tác đều xứng đáng<br>một con số <span class="text-gradient">chính xác.</span></h1>
+          <p class="hero-sub">
+            OptiVisionLab ứng dụng thị giác máy tính và nhận diện tư thế qua camera để phân tích từng động tác thể dục theo thời gian thực, so sánh với chuẩn kỹ thuật và trả về điểm số minh bạch — thay cho việc chấm điểm cảm tính bằng mắt thường.
+          </p>
+          <div class="hero-actions">
+            <button type="button" class="btn btn-primary" (click)="navigateToLogin()">
+              <span>Bắt đầu ngay</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="hero-visual-wrapper">
+            <!-- Floating Badge Top -->
+            <div class="floating-badge badge-top">
+              <div class="badge-icon green-icon">
+                <img src="assets/images/run.png" alt="Theo dõi vận động" class="badge-sport-icon" />
+              </div>
+              <div class="badge-info">
+                <span class="badge-title">Độ chính xác</span>
+                <strong class="badge-value">98.6% chuẩn Olympic</strong>
+              </div>
+            </div>
+
+            <!-- Main Score Card -->
+            <div class="score-card">
+              <div class="score-card-top">
+                <div class="score-header-tag">
+                  <span class="pulse-status"></span> AI Real-time Vision
+                </div>
+                <span class="model-name">PoseNet 3D v2.4</span>
+              </div>
+              <span class="score-label">Điểm động tác trung bình</span>
+              <div class="score-display">
+                <span class="score-number" data-count-to="9.35">0.00</span>
+                <span class="score-max">/10</span>
+              </div>
+              <div class="score-bars">
+                <div class="score-bar">
+                  <span data-grow="88"></span>
+                  <label>Tư thế</label>
+                  <small class="bar-val">8.8</small>
+                </div>
+                <div class="score-bar">
+                  <span data-grow="95"></span>
+                  <label>Nhịp độ</label>
+                  <small class="bar-val">9.5</small>
+                </div>
+                <div class="score-bar">
+                  <span data-grow="76"></span>
+                  <label>Biên độ</label>
+                  <small class="bar-val">7.6</small>
+                </div>
+                <div class="score-bar">
+                  <span data-grow="91"></span>
+                  <label>Cân bằng</label>
+                  <small class="bar-val">9.1</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Floating Badge Bottom -->
+            <div class="floating-badge badge-bottom">
+              <div class="badge-icon blue-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polygon points="12 8 8 12 12 16 16 12 12 8"></polygon>
+                </svg>
+              </div>
+              <div class="badge-info">
+                <span class="badge-title">Tracking khớp</span>
+                <strong class="badge-value">33 mốc thời gian thực</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== GIỚI THIỆU ===== -->
+    <section id="gioi-thieu" class="about">
+      <div class="wrap about-inner">
+        <div class="about-image reveal">
+          <div class="ai-tracking-preview">
+            <div class="camera-indicator">
+              <span class="rec-dot"></span> HD AI Tracking Camera
+            </div>
+            <!-- Human Pose Wireframe / Keypoints Visual -->
+            <div class="pose-canvas">
+              <svg viewBox="0 0 240 300" class="pose-svg">
+                <!-- Head -->
+                <circle cx="120" cy="50" r="18" class="pose-head" />
+                <circle cx="120" cy="50" r="5" class="pose-joint head-point" />
+                <!-- Spine & Torso -->
+                <line x1="120" y1="68" x2="120" y2="150" class="pose-bone main-spine" />
+                <!-- Shoulders -->
+                <line x1="85" y1="95" x2="155" y2="95" class="pose-bone" />
+                <circle cx="85" cy="95" r="5" class="pose-joint" />
+                <circle cx="155" cy="95" r="5" class="pose-joint" />
+                <!-- Left Arm -->
+                <line x1="85" y1="95" x2="60" y2="135" class="pose-bone" />
+                <circle cx="60" cy="135" r="5" class="pose-joint" />
+                <line x1="60" y1="135" x2="45" y2="180" class="pose-bone" />
+                <circle cx="45" cy="180" r="5" class="pose-joint" />
+                <!-- Right Arm -->
+                <line x1="155" y1="95" x2="180" y2="135" class="pose-bone" />
+                <circle cx="180" cy="135" r="5" class="pose-joint" />
+                <line x1="180" y1="135" x2="195" y2="180" class="pose-bone" />
+                <circle cx="195" cy="180" r="5" class="pose-joint" />
+                <!-- Hips -->
+                <line x1="95" y1="150" x2="145" y2="150" class="pose-bone" />
+                <circle cx="95" cy="150" r="5" class="pose-joint" />
+                <circle cx="145" cy="150" r="5" class="pose-joint" />
+                <!-- Left Leg -->
+                <line x1="95" y1="150" x2="80" y2="210" class="pose-bone" />
+                <circle cx="80" cy="210" r="5" class="pose-joint" />
+                <line x1="80" y1="210" x2="70" y2="270" class="pose-bone" />
+                <circle cx="70" cy="270" r="5" class="pose-joint" />
+                <!-- Right Leg -->
+                <line x1="145" y1="150" x2="160" y2="210" class="pose-bone" />
+                <circle cx="160" cy="210" r="5" class="pose-joint" />
+                <line x1="160" y1="210" x2="170" y2="270" class="pose-bone" />
+                <circle cx="170" cy="270" r="5" class="pose-joint" />
+              </svg>
+              <!-- Target Angle Overlay -->
+              <div class="angle-badge angle-knee">Góc gối: 135° ✓</div>
+              <div class="angle-badge angle-arm">Góc tay: 92° ✓</div>
+            </div>
+            <div class="pose-footer-tag">33 mốc khung xương nhận diện đồng thời</div>
+          </div>
+        </div>
+        <div class="about-copy reveal">
+          <h2>Chấm điểm thể dục, nhưng bằng dữ liệu chứ không phải cảm tính.</h2>
+          <p>
+            Trong các buổi kiểm tra thể dục truyền thống, giáo viên phải quan sát và chấm điểm nhiều học sinh cùng lúc, dẫn đến sai số và thiếu nhất quán giữa các lượt chấm. OptiVisionLab ra đời để giải quyết bài toán đó.
+          </p>
+          <p>
+            Hệ thống sử dụng công nghệ nhận diện khung xương (pose estimation) để theo dõi chuyển động của người tập theo thời gian thực, sau đó đối chiếu với dữ liệu động tác chuẩn để đưa ra điểm số khách quan, đi kèm nhận xét chi tiết cho từng phần của bài tập.
+          </p>
+          <ul class="about-stats">
+            <li>
+              <strong data-count-to="33">0</strong>
+              <span>điểm khớp cơ thể được theo dõi</span>
+            </li>
+            <li>
+              <strong class="no-count">&lt;1s</strong>
+              <span>thời gian trả kết quả chấm điểm</span>
+            </li>
+            <li>
+              <strong data-count-to="4">0</strong>
+              <span>tiêu chí đánh giá cho mỗi động tác</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TÍNH NĂNG ===== -->
+    <section id="tinh-nang" class="features">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <h2>Những gì hệ thống làm được</h2>
+          <p>Bốn khả năng cốt lõi giúp việc chấm điểm thể dục trở nên nhanh, đúng và công bằng hơn.</p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card reveal">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              </svg>
+            </div>
+            <h3>Nhận diện tư thế thời gian thực</h3>
+            <p>Camera ghi lại chuyển động và hệ thống dựng khung xương 33 điểm ngay khi người tập bắt đầu bài, không cần thiết bị đeo trên người.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <circle cx="12" cy="12" r="6"></circle>
+                <circle cx="12" cy="12" r="2"></circle>
+              </svg>
+            </div>
+            <h3>Đối chiếu với động tác chuẩn</h3>
+            <p>Mỗi bài tập được so sánh với dữ liệu mẫu do giáo viên thiết lập, tính theo góc khớp, biên độ và thời điểm thực hiện.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 20v-6M6 20V10M18 20V4"></path>
+              </svg>
+            </div>
+            <h3>Điểm số minh bạch</h3>
+            <p>Kết quả được chia theo từng tiêu chí — tư thế, nhịp độ, biên độ, cân bằng — thay vì một con số chung chung khó giải thích.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+            <h3>Theo dõi tiến bộ theo thời gian</h3>
+            <p>Lịch sử điểm số của từng học sinh được lưu lại, giúp giáo viên và người tập nhìn thấy sự cải thiện qua từng buổi.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== QUY TRÌNH CHẤM ĐIỂM (HONEYCOMB EXACT LAYOUT) ===== -->
+    <section id="quy-trinh" class="process">
+      <div class="wrap">
+        <div class="honeycomb-layout">
+          <!-- Top Row: Hex 1, Center Brand Title, Hex 2 -->
+          <div class="honeycomb-row row-top">
+            <!-- Hexagon 1 (Top Left) -->
+            <div class="hex-item hex-1 reveal">
+              <div class="hex-inner">
+                <div class="hex-bg hex-bg-1"></div>
+                <div class="hex-content">
+                  <h3>GHI HÌNH ĐỘNG TÁC</h3>
+                  <p class="hex-desc">Người tập thực hiện bài thể dục trước camera; video được thu trực tiếp hoặc tải lên hệ thống với độ trễ siêu thấp dưới 1 giây.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Center Brand Title (Why Us style) -->
+            <div class="honeycomb-center reveal">
+              <span class="honeycomb-kicker">QUY TRÌNH HỆ THỐNG</span>
+              <h2>Sự Độc Đáo Từ<br><span class="brand-script">OptiVisionLab</span></h2>
+            </div>
+
+            <!-- Hexagon 2 (Top Right) -->
+            <div class="hex-item hex-2 reveal">
+              <div class="hex-inner">
+                <div class="hex-bg hex-bg-2"></div>
+                <div class="hex-content">
+                  <h3>NHẬN DIỆN KHUNG XƯƠNG</h3>
+                  <p class="hex-desc">Mô hình Pose Estimation xác định chính xác 33 tọa độ khớp chính trên cơ thể theo từng khung hình liên tục theo thời gian thực.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Row: Hex 3, Hex 4 (Interlocking Staggered) -->
+          <div class="honeycomb-row row-bottom">
+            <!-- Hexagon 3 (Bottom Left - Center) -->
+            <div class="hex-item hex-3 reveal">
+              <div class="hex-inner">
+                <div class="hex-bg hex-bg-3"></div>
+                <div class="hex-content">
+                  <h3>SO SÁNH VỚI CHUẨN</h3>
+                  <p class="hex-desc">Chuyển động thu được được thuật toán đối chiếu trực tiếp với dữ liệu bài tập chuẩn do giảng viên thiết lập theo từng góc khớp và biên độ.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Hexagon 4 (Bottom Right - Center) -->
+            <div class="hex-item hex-4 reveal">
+              <div class="hex-inner">
+                <div class="hex-bg hex-bg-4"></div>
+                <div class="hex-content">
+                  <h3>TRẢ ĐIỂM &amp; NHẬN XÉT</h3>
+                  <p class="hex-desc">Hệ thống tổng hợp điểm số minh bạch theo 4 tiêu chí cốt lõi (Tư thế, Nhịp độ, Biên độ, Cân bằng) và đưa ra gợi ý sửa lỗi động tác.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== ĐỘI NGŨ ===== -->
+    <section id="doi-ngu" class="team">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <h2>Đội ngũ thực hiện</h2>
+          <p>Nhóm nghiên cứu và phát triển dự án OptiVisionLab — HaUI SICT.</p>
+        </div>
+
+        <div class="team-grid">
+          <article class="team-card reveal">
+            <div class="team-photo-wrapper">
+              <div class="team-avatar-badge">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </div>
+            </div>
+            <h3>Sinh viên thực hiện</h3>
+            <p>Nghiên cứu &amp; Phát triển AI</p>
+            <span class="team-tag">HaUI SICT</span>
+          </article>
+
+          <article class="team-card reveal">
+            <div class="team-photo-wrapper">
+              <div class="team-avatar-badge">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </div>
+            </div>
+            <h3>Sinh viên thực hiện</h3>
+            <p>Lập trình Frontend &amp; UI/UX</p>
+            <span class="team-tag">HaUI SICT</span>
+          </article>
+
+          <article class="team-card reveal">
+            <div class="team-photo-wrapper">
+              <div class="team-avatar-badge">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </div>
+            </div>
+            <h3>Sinh viên thực hiện</h3>
+            <p>Hệ thống Backend &amp; API</p>
+            <span class="team-tag">HaUI SICT</span>
+          </article>
+
+          <article class="team-card reveal">
+            <div class="team-photo-wrapper">
+              <div class="team-avatar-badge">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </div>
+            </div>
+            <h3>Giảng viên hướng dẫn</h3>
+            <p>Cố vấn chuyên môn &amp; Định hướng</p>
+            <span class="team-tag">Khoa CNTT - HaUI</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== CTA ===== -->
+    <section id="cta" class="cta">
+      <div class="wrap cta-inner reveal">
+        <h2>Sẵn sàng trải nghiệm chấm điểm tự động cùng OptiVisionLab?</h2>
+        <p>Đăng nhập ngay để vào lớp học, tham gia các bài kiểm tra thể dục và nhận phản hồi chi tiết từ hệ thống AI.</p>
+        <button type="button" class="btn btn-light" (click)="navigateToLogin()">
+          <span>Bắt đầu ngay</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <div class="footer-left">
+        <span class="footer-brand">OptiVisionLab</span>
+        <span class="footer-desc">— Hệ thống chấm điểm thể dục tự động | HaUI SICT</span>
+      </div>
+      <div class="footer-right">
+        <span>© 2026 OptiVisionLab. All rights reserved.</span>
+      </div>
+    </div>
+  </footer>
+</div>

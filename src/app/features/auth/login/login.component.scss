@@ -1,0 +1,687 @@
+// Eco Wellness Login Form Component Styles
+.eco-wrapper {
+  position: relative;
+  min-height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 20px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #a8e6cf 0%, #dcedc8 50%, #f0fdf4 100%);
+  font-family: inherit;
+  user-select: none;
+}
+
+// Nature Background & Falling Leaves
+.nature-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  perspective: 600px;
+}
+
+.falling-leaf {
+  position: absolute;
+  top: -40px;
+  pointer-events: none;
+  border-radius: 0 100% 0 100%;
+  background: radial-gradient(ellipse at 40% 40%, #81c784 0%, #4caf50 60%, #388e3c 100%);
+  filter: drop-shadow(0 4px 8px rgba(46, 125, 50, 0.18));
+  will-change: transform, opacity;
+
+  // Staggered Falling Leaves Configurations
+  &.leaf-1 {
+    left: 8%;
+    width: 22px;
+    height: 22px;
+    animation: gentleFall1 11s cubic-bezier(0.4, 0.1, 0.6, 0.9) infinite -2s;
+  }
+
+  &.leaf-2 {
+    left: 22%;
+    width: 16px;
+    height: 16px;
+    opacity: 0.6;
+    border-radius: 100% 0 100% 0;
+    animation: gentleFall2 14s cubic-bezier(0.35, 0.15, 0.65, 0.85) infinite -7s;
+  }
+
+  &.leaf-3 {
+    left: 38%;
+    width: 26px;
+    height: 26px;
+    opacity: 0.7;
+    animation: gentleFall3 12s cubic-bezier(0.42, 0, 0.58, 1) infinite -4s;
+  }
+
+  &.leaf-4 {
+    left: 55%;
+    width: 18px;
+    height: 18px;
+    opacity: 0.5;
+    border-radius: 100% 0 100% 0;
+    animation: gentleFall1 15s cubic-bezier(0.3, 0.2, 0.7, 0.8) infinite -9s;
+  }
+
+  &.leaf-5 {
+    left: 70%;
+    width: 24px;
+    height: 24px;
+    opacity: 0.65;
+    animation: gentleFall2 13s cubic-bezier(0.4, 0.1, 0.6, 0.9) infinite -1s;
+  }
+
+  &.leaf-6 {
+    left: 86%;
+    width: 19px;
+    height: 19px;
+    opacity: 0.6;
+    animation: gentleFall3 10s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite -5s;
+  }
+
+  &.leaf-7 {
+    left: 15%;
+    width: 20px;
+    height: 20px;
+    opacity: 0.55;
+    animation: gentleFall2 16s cubic-bezier(0.4, 0.1, 0.6, 0.9) infinite -11s;
+  }
+
+  &.leaf-8 {
+    left: 48%;
+    width: 15px;
+    height: 15px;
+    opacity: 0.5;
+    border-radius: 100% 0 100% 0;
+    animation: gentleFall1 13.5s cubic-bezier(0.35, 0.2, 0.65, 0.8) infinite -6s;
+  }
+
+  &.leaf-9 {
+    left: 64%;
+    width: 25px;
+    height: 25px;
+    opacity: 0.7;
+    animation: gentleFall3 14.5s cubic-bezier(0.42, 0, 0.58, 1) infinite -12s;
+  }
+
+  &.leaf-10 {
+    left: 93%;
+    width: 17px;
+    height: 17px;
+    opacity: 0.55;
+    border-radius: 100% 0 100% 0;
+    animation: gentleFall2 12.5s cubic-bezier(0.4, 0.1, 0.6, 0.9) infinite -3.5s;
+  }
+}
+
+// Falling & Swaying Keyframes 1 (Lượn sóng sang phải rồi trái)
+@keyframes gentleFall1 {
+  0% {
+    top: -40px;
+    transform: translateX(0) rotate(15deg) rotateX(0deg) rotateY(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.7;
+  }
+  25% {
+    transform: translateX(35px) rotate(85deg) rotateX(45deg) rotateY(20deg);
+  }
+  50% {
+    transform: translateX(-25px) rotate(190deg) rotateX(15deg) rotateY(60deg);
+  }
+  75% {
+    transform: translateX(40px) rotate(290deg) rotateX(60deg) rotateY(30deg);
+    opacity: 0.7;
+  }
+  100% {
+    top: 108vh;
+    transform: translateX(-15px) rotate(390deg) rotateX(0deg) rotateY(0deg);
+    opacity: 0;
+  }
+}
+
+// Falling & Swaying Keyframes 2 (Lượn sóng sang trái rồi phải)
+@keyframes gentleFall2 {
+  0% {
+    top: -40px;
+    transform: translateX(0) rotate(-20deg) rotateX(0deg) rotateY(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.65;
+  }
+  30% {
+    transform: translateX(-40px) rotate(-90deg) rotateX(30deg) rotateY(45deg);
+  }
+  55% {
+    transform: translateX(30px) rotate(-180deg) rotateX(50deg) rotateY(20deg);
+  }
+  80% {
+    transform: translateX(-30px) rotate(-270deg) rotateX(25deg) rotateY(55deg);
+    opacity: 0.6;
+  }
+  100% {
+    top: 108vh;
+    transform: translateX(20px) rotate(-370deg) rotateX(0deg) rotateY(0deg);
+    opacity: 0;
+  }
+}
+
+// Falling & Swaying Keyframes 3 (Lượn sóng chữ S đung đưa nhẹ nhàng)
+@keyframes gentleFall3 {
+  0% {
+    top: -40px;
+    transform: translateX(0) rotate(40deg) rotateX(10deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.75;
+  }
+  35% {
+    transform: translateX(50px) rotate(130deg) rotateX(50deg) rotateY(40deg);
+  }
+  65% {
+    transform: translateX(-40px) rotate(220deg) rotateX(20deg) rotateY(65deg);
+  }
+  85% {
+    transform: translateX(25px) rotate(310deg) rotateX(45deg) rotateY(25deg);
+    opacity: 0.65;
+  }
+  100% {
+    top: 108vh;
+    transform: translateX(-20px) rotate(410deg) rotateX(0deg) rotateY(0deg);
+    opacity: 0;
+  }
+}
+
+// Login Container
+.login-container {
+  width: 100%;
+  max-width: 440px;
+  position: relative;
+  z-index: 10;
+}
+
+// Wellness Card
+.wellness-card {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(76, 175, 80, 0.22);
+  border-radius: 32px;
+  padding: 44px 36px;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 20px 40px rgba(76, 175, 80, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+// Organic Border Animation at top
+.organic-border {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, #4caf50, #8bc34a, #cddc39, #8bc34a, #4caf50);
+  background-size: 200% 100%;
+  animation: organicFlow 4s ease-in-out infinite;
+  border-radius: 32px 32px 0 0;
+}
+
+@keyframes organicFlow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+// Mindful Header
+.mindful-header {
+  text-align: center;
+  margin-bottom: 34px;
+
+  h1 {
+    color: #2e7d32;
+    font-size: 1.85rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: -0.02em;
+  }
+
+  p {
+    color: #66bb6a;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+}
+
+.zen-logo {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4caf50;
+
+  .brand-logo {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    position: relative;
+    z-index: 2;
+    border-radius: 14px;
+    mix-blend-mode: multiply;
+    animation: zenBreath 4s ease-in-out infinite;
+    filter: drop-shadow(0 4px 10px rgba(46, 125, 50, 0.18));
+  }
+
+  svg {
+    position: relative;
+    z-index: 2;
+    animation: zenBreath 4s ease-in-out infinite;
+  }
+}
+
+@keyframes zenBreath {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+.zen-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(76, 175, 80, 0.25) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: zenGlow 3s ease-in-out infinite;
+}
+
+@keyframes zenGlow {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.25); opacity: 0.9; }
+}
+
+// Form & Fields
+.harmony-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.organic-field {
+  position: relative;
+  margin-bottom: 24px;
+
+  .field-nature {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(76, 175, 80, 0.05);
+    border: 1.5px solid rgba(76, 175, 80, 0.22);
+    border-radius: 20px;
+    transition: all 0.3s ease;
+  }
+
+  input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    padding: 16px 50px 16px 20px;
+    color: #2e7d32;
+    font-size: 15px;
+    font-weight: 500;
+    outline: none;
+    position: relative;
+    z-index: 2;
+    font-family: inherit;
+
+    &::placeholder {
+      color: transparent;
+    }
+
+    &:focus ~ .field-nature {
+      border-color: #4caf50;
+      background: rgba(76, 175, 80, 0.1);
+      box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+    }
+
+    &:focus + label,
+    &:not(:placeholder-shown) + label {
+      top: 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: #4caf50;
+      transform: translateY(-50%);
+    }
+  }
+
+  label {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #81c784;
+    font-size: 15px;
+    font-weight: 500;
+    pointer-events: none;
+    transition: all 0.3s ease;
+    z-index: 3;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 0 6px;
+    border-radius: 4px;
+  }
+
+  &.has-error {
+    .field-nature {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.04);
+    }
+    label {
+      color: #ef4444;
+    }
+  }
+}
+
+// Leaf Sprout Growth Indicator
+.growth-indicator {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  z-index: 4;
+  pointer-events: none;
+
+  &.password-indicator {
+    right: 50px;
+  }
+}
+
+.leaf-sprout {
+  width: 100%;
+  height: 100%;
+  background: #4caf50;
+  border-radius: 0 100% 0 100%;
+  opacity: 0;
+  transform: scale(0) rotate(45deg);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.organic-field input:focus ~ .growth-indicator .leaf-sprout,
+.organic-field input:not(:placeholder-shown) ~ .growth-indicator .leaf-sprout {
+  opacity: 1;
+  transform: scale(1) rotate(45deg);
+}
+
+// Nature Toggle (Show/Hide Password)
+.nature-toggle {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #4caf50;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .toggle-icon {
+    color: #4caf50;
+    transition: all 0.2s ease;
+  }
+
+  &:hover {
+    background: rgba(76, 175, 80, 0.12);
+
+    .toggle-icon {
+      color: #2e7d32;
+      transform: scale(1.08);
+    }
+  }
+
+  &:active {
+    transform: translateY(-50%) scale(0.92);
+  }
+}
+
+// Error message
+.gentle-error {
+  display: block;
+  font-size: 12px;
+  color: #dc2626;
+  font-weight: 600;
+  margin-top: 6px;
+  margin-left: 14px;
+}
+
+// Mindful Options
+.mindful-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.green-checkbox {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+
+  input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+
+    &:checked + .checkbox-square {
+      background: linear-gradient(135deg, #4caf50, #43a047);
+      border-color: #4caf50;
+      box-shadow: 0 2px 8px rgba(76, 175, 80, 0.35);
+
+      .check-mark {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    &:focus-visible + .checkbox-square {
+      outline: 2px solid #4caf50;
+      outline-offset: 2px;
+    }
+  }
+
+  &:hover .checkbox-square {
+    border-color: #4caf50;
+  }
+}
+
+.checkbox-square {
+  width: 19px;
+  height: 19px;
+  margin-right: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1.8px solid rgba(76, 175, 80, 0.45);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+
+  .check-mark {
+    opacity: 0;
+    transform: scale(0.6);
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+}
+
+.checkbox-text {
+  font-size: 14px;
+  color: #2e7d32;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.green-checkbox:hover .checkbox-text {
+  color: #1b5e20;
+}
+
+.healing-link {
+  color: #4caf50;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #4caf50, #8bc34a);
+    transition: width 0.3s ease;
+  }
+
+  &:hover {
+    color: #2e7d32;
+    &::after {
+      width: 100%;
+    }
+  }
+}
+
+// Harmony Button
+.harmony-button {
+  width: 100%;
+  background: transparent;
+  color: #ffffff;
+  border: none;
+  border-radius: 20px;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  position: relative;
+  margin-bottom: 0;
+  overflow: hidden;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+
+  .button-earth {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #4caf50, #66bb6a, #8bc34a);
+    border-radius: 20px;
+    transition: all 0.3s ease;
+  }
+
+  &:hover:not(:disabled) .button-earth {
+    background: linear-gradient(135deg, #388e3c, #4caf50, #66bb6a);
+    transform: scale(1.02);
+  }
+
+  &:active:not(:disabled) .button-earth {
+    transform: scale(0.98);
+  }
+
+  .button-text {
+    position: relative;
+    z-index: 2;
+    transition: opacity 0.3s ease;
+  }
+
+  .button-growth {
+    position: absolute;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    display: flex;
+    gap: 6px;
+  }
+
+  &.loading {
+    .button-text {
+      opacity: 0;
+    }
+    .button-growth {
+      opacity: 1;
+    }
+  }
+
+  .button-aura {
+    position: absolute;
+    inset: -3px;
+    background: linear-gradient(135deg, #4caf50, #8bc34a);
+    border-radius: 23px;
+    opacity: 0;
+    filter: blur(12px);
+    transition: opacity 0.3s ease;
+    z-index: -1;
+  }
+
+  &:hover:not(:disabled) .button-aura {
+    opacity: 0.6;
+  }
+}
+
+// Glowing ripple circles for loading state
+.growing-circle {
+  width: 9px;
+  height: 9px;
+  background: #ffffff;
+  border-radius: 50%;
+  animation: organicGrow 1.5s ease-in-out infinite;
+
+  &.circle-2 { animation-delay: 0.2s; }
+  &.circle-3 { animation-delay: 0.4s; }
+}
+
+@keyframes organicGrow {
+  0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+  40% { transform: scale(1.25); opacity: 1; }
+}
+
+
+// Responsive
+@media (max-width: 480px) {
+  .wellness-card {
+    padding: 34px 22px;
+    border-radius: 24px;
+  }
+
+  .mindful-header h1 {
+    font-size: 1.6rem;
+  }
+}

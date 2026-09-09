@@ -1,0 +1,57 @@
+<aside class="sidebar">
+  <!-- Brand / Logo -->
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <img src="assets/images/logo.png" alt="OptiVisionLab Logo" class="brand-logo" />
+    </div>
+    <div class="sidebar-brand">OptiVisionLab</div>
+  </div>
+
+  <!-- Navigation Menu -->
+  <nav class="sidebar-nav">
+    <ul class="nav-menu">
+      <li>
+        <a routerLink="/student/home" routerLinkActive="active" class="nav-item">
+          <svg lucideHome class="nav-icon" [size]="20"></svg>
+          <span>Trang chủ</span>
+        </a>
+      </li>
+
+      <li>
+        <a routerLink="/student/courses" routerLinkActive="active" class="nav-item">
+          <svg lucideGraduationCap class="nav-icon" [size]="20"></svg>
+          <span>Khóa học của tôi</span>
+        </a>
+      </li>
+
+      <li>
+        <a routerLink="/student/notifications" routerLinkActive="active" class="nav-item">
+          <svg lucideBell class="nav-icon" [size]="20"></svg>
+          <span>Thông báo</span>
+        </a>
+      </li>
+
+      <li>
+        <a routerLink="/student/profile" routerLinkActive="active" class="nav-item">
+          <svg lucideUser class="nav-icon" [size]="20"></svg>
+          <span>Thông tin cá nhân</span>
+        </a>
+      </li>
+
+      <li class="nav-item-spaced">
+        <a routerLink="/student/grades" routerLinkActive="active" class="nav-item">
+          <svg lucideChartNoAxesColumn class="nav-icon" [size]="20"></svg>
+          <span>Kết quả học tập</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+
+  <!-- Logout Button at Bottom -->
+  <div class="sidebar-footer">
+    <button type="button" class="logout-btn" (click)="onLogout()">
+      <svg lucideLogOut class="logout-icon" [size]="18"></svg>
+      <span>Đăng xuất</span>
+    </button>
+  </div>
+</aside>

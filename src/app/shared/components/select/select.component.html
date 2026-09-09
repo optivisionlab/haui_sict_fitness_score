@@ -1,0 +1,43 @@
+<div class="custom-select-container">
+  @if (label()) {
+    <label class="select-label">{{ label() }}</label>
+  }
+
+  <div class="select-wrapper">
+    <!-- Trigger Button -->
+    <button
+      type="button"
+      class="select-trigger"
+      [class.active]="isOpen()"
+      (click)="toggleDropdown()">
+      <span class="trigger-label" [class.is-placeholder]="!selectedOption()">
+        {{ displayLabel() }}
+      </span>
+      <svg
+        lucideChevronDown
+        class="chevron-icon"
+        [class.rotated]="isOpen()"
+        [size]="16">
+      </svg>
+    </button>
+
+    <!-- Custom Dropdown Menu (Xổ xuống - hoàn toàn màu xanh lá) -->
+    @if (isOpen()) {
+      <div class="dropdown-menu">
+        <ul class="options-list">
+          @for (opt of options(); track opt.value) {
+            <li
+              class="option-item"
+              [class.selected]="opt.value === value()"
+              (click)="selectOption(opt)">
+              <span class="option-text">{{ opt.label }}</span>
+              @if (opt.value === value()) {
+                <svg lucideCheck class="check-icon" [size]="15"></svg>
+              }
+            </li>
+          }
+        </ul>
+      </div>
+    }
+  </div>
+</div>

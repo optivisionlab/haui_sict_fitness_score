@@ -1,0 +1,533 @@
+<div class="courses-page">
+
+  <!-- ==================== VIEW 1: DANH SÁCH KHÓA HỌC ==================== -->
+  @if (activeView() === 'list') {
+    <h1 class="page-title">Khóa học của tôi</h1>
+
+    <div class="card">
+      <!-- Tab Bar -->
+      <div class="tab-bar">
+        <button
+          type="button"
+          class="tab-btn"
+          [class.active]="selectedTab() === 'all'"
+          (click)="setTab('all')">
+          Tất cả khóa học
+        </button>
+        <button
+          type="button"
+          class="tab-btn"
+          [class.active]="selectedTab() === 'active'"
+          (click)="setTab('active')">
+          Đang học
+        </button>
+        <button
+          type="button"
+          class="tab-btn"
+          [class.active]="selectedTab() === 'done'"
+          (click)="setTab('done')">
+          Đã hoàn thành
+        </button>
+      </div>
+
+      <!-- Search Input dùng Shared SearchInputComponent -->
+      <div class="search-wrap">
+        <app-search-input
+          label="Tìm kiếm khóa học"
+          placeholder="Tìm kiếm theo tên khóa học, giảng viên..."
+          [(value)]="searchKeyword">
+        </app-search-input>
+      </div>
+
+      <!-- Courses List -->
+      <div class="courses-list">
+        @for (course of filteredCourses(); track course.id) {
+          <div class="course-card">
+            <!-- Thumbnail -->
+            <div class="course-thumb" [class.teal]="course.iconType === 'chay'" (click)="onStudy(course.id)">
+              @if (course.iconType === 'pickleball') {
+                <svg lucideDumbbell [size]="40"></svg>
+              } @else {
+                <svg lucideFootprints [size]="40"></svg>
+              }
+            </div>
+
+            <!-- Course Body -->
+            <div class="course-body">
+              <h3 class="course-title" (click)="onStudy(course.id)">{{ course.name }}</h3>
+
+              <div class="course-teacher">
+                <span class="avatar">
+                  <svg lucideUser [size]="14"></svg>
+                </span>
+                <span>Giảng viên: {{ course.teacher }}</span>
+              </div>
+
+              <div class="course-meta">
+                <div class="meta-col">
+                  <div class="meta-label">Thời gian học:</div>
+                  <div class="meta-value">{{ course.startDate }} – {{ course.endDate }}</div>
+                </div>
+                <div class="meta-col">
+                  <div class="meta-label">Ngày thi dự kiến:</div>
+                  <div class="meta-value">{{ course.examDate }}</div>
+                </div>
+              </div>
+
+              <!-- Progress row & Action Button -->
+              <div class="course-progress-row">
+                <div class="progress-wrap">
+                  <div class="progress-label">Hoàn thành {{ course.progress }}%</div>
+                  <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" [style.width.%]="course.progress"></div>
+                  </div>
+                </div>
+
+                <button type="button" class="btn-primary btn-study" (click)="onStudy(course.id)">
+                  Học ngay
+                </button>
+              </div>
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-state">
+            Không tìm thấy khóa học phù hợp.
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ==================== VIEW 2: CHI TIẾT MÔN HỌC ==================== -->
+  @if (activeView() === 'detail') {
+    @let c = currentCourse();
+    <div class="breadcrumb">
+      <span class="crumb-link" (click)="showView('list')">Khóa học của tôi</span> /
+      <span>{{ c.title }}</span>
+    </div>
+
+    <div class="card">
+      <div class="course-top">
+        <div class="course-thumb" [class.teal]="c.thumbClass === 'teal'">
+          @if (c.thumbIcon === 'pickleball') {
+            <svg lucideDumbbell [size]="44"></svg>
+          } @else {
+            <svg lucideFootprints [size]="44"></svg>
+          }
+        </div>
+        <div class="course-top-info">
+          <h2 class="detail-name">{{ c.title }}</h2>
+          <div class="course-teacher">
+            <span class="avatar"><svg lucideUser [size]="14"></svg></span>
+            <span>Giảng viên: {{ c.teacher }}</span>
+          </div>
+          <div class="course-meta">
+            <div>
+              <div class="meta-label">Thời gian học:</div>
+              <div class="meta-value">{{ c.dates }}</div>
+            </div>
+            <div>
+              <div class="meta-label">Ngày thi dự kiến:</div>
+              <div class="meta-value">{{ c.examDate }}</div>
+            </div>
+          </div>
+          <div class="progress-wrap mt-2">
+            <div class="progress-label">Hoàn thành {{ c.progress }}%</div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" [style.width.%]="c.progress"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Mã học phần: <span class="highlight-code">{{ c.code }}</span></div>
+
+      <div class="section-title">Mô tả học phần</div>
+      <div class="section-body">{{ c.desc }}</div>
+
+      <div class="section-title">Quản lý học tập</div>
+      <div class="contact-row">
+        <span class="avatar"><svg lucideUser [size]="16"></svg></span>
+        <span class="font-medium">QLHT. {{ c.qlhtName }}</span>
+        <span class="divider">•</span>
+        <svg lucidePhone [size]="15" class="contact-icon"></svg>
+        <span>{{ c.qlhtPhone }}</span>
+        <span class="divider">•</span>
+        <svg lucideMail [size]="15" class="contact-icon"></svg>
+        <a [href]="'mailto:' + c.qlhtEmail" class="email-link">{{ c.qlhtEmail }}</a>
+      </div>
+
+      <div class="section-title">Danh sách sinh viên trong khóa học</div>
+      <div class="student-list">
+        @for (st of c.students; track st) {
+          <div class="student-row">
+            <span class="student-avatar">{{ getInitials(st) }}</span>
+            <span class="student-name">{{ st }}</span>
+          </div>
+        }
+      </div>
+      <div class="student-more">
+        @if (c.studentTotal > c.students.length) {
+          và {{ c.studentTotal - c.students.length }} sinh viên khác — tổng cộng {{ c.studentTotal }} sinh viên
+        } @else {
+          Tổng cộng {{ c.studentTotal }} sinh viên
+        }
+      </div>
+
+      <button type="button" class="btn-primary mt-6" (click)="showView('lessons')">
+        <svg lucideList [size]="18"></svg>
+        <span>Xem danh sách bài học</span>
+      </button>
+    </div>
+  }
+
+  <!-- ==================== VIEW 3: DANH SÁCH BÀI HỌC THEO TUẦN ==================== -->
+  @if (activeView() === 'lessons') {
+    @let c = currentCourse();
+    <div class="breadcrumb">
+      <span class="crumb-link" (click)="showView('list')">Khóa học của tôi</span> /
+      <span class="crumb-link" (click)="showView('detail')">{{ c.title }}</span> /
+      <span>Danh sách bài học</span>
+    </div>
+
+    <h1 class="lessons-title">Danh sách bài học</h1>
+
+    <div class="weeks-container">
+      @for (w of currentWeeks(); track $index; let idx = $index) {
+        <div
+          class="week-block"
+          [class.collapsed]="isWeekCollapsed(idx)"
+          [class.locked]="w.status === 'locked'">
+
+          <!-- Week Header Accordion -->
+          <div class="week-header" (click)="toggleWeek(idx)">
+            <svg
+              lucideChevronDown
+              class="chevron"
+              [class.rotated]="!isWeekCollapsed(idx)"
+              [size]="18">
+            </svg>
+            <div class="week-title">{{ w.label }}</div>
+            @if (w.status === 'done') {
+              <svg lucideCheckCircle2 class="week-status-icon done" [size]="22"></svg>
+            } @else if (w.status === 'locked') {
+              <svg lucideLock class="week-status-icon locked" [size]="20"></svg>
+            }
+          </div>
+
+          <!-- Lessons summary list -->
+          @if (!isWeekCollapsed(idx)) {
+            <div class="week-lessons">
+              @for (l of w.lessons; track l) {
+                <div class="lesson-summary-item">{{ l }}</div>
+              }
+            </div>
+
+            <!-- Items list -->
+            <div class="week-items">
+              @for (item of w.items; track item.title) {
+                <div class="item-row" (click)="onItemClick(item)">
+                  <div class="item-title">{{ item.title }}</div>
+                  <div class="item-right">
+                    @if (item.graded) {
+                      <span class="score-tag">Đã hoàn thành · {{ item.score }} điểm</span>
+                    }
+                    <span class="item-type">{{ item.typeLabel }}</span>
+                    <span class="type-badge" [class.type-practice]="item.type === 'P'">
+                      {{ item.type }}
+                    </span>
+                  </div>
+                </div>
+              }
+
+              @if (w.status === 'locked') {
+                <div class="week-locked-note">Nội dung sẽ mở sau khi hoàn thành tuần trước.</div>
+              }
+            </div>
+          }
+        </div>
+      } @empty {
+        <div class="card empty-lessons-card">
+          <svg lucideClock [size]="36" class="empty-clock-icon"></svg>
+          <div>Danh sách bài học đang được cập nhật.</div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ==================== VIEW 4: BÀI TẬP (TASK) ==================== -->
+  @if (activeView() === 'task') {
+    @let c = currentCourse();
+    @let t = currentTask();
+    <div class="breadcrumb">
+      <span class="crumb-link" (click)="showView('list')">Khóa học của tôi</span> /
+      <span class="crumb-link" (click)="showView('detail')">{{ c.title }}</span> /
+      <span class="crumb-link" (click)="showView('lessons')">Danh sách bài học</span> /
+      <span>Bài tập</span>
+    </div>
+
+    <!-- Mini Course Card -->
+    <div class="card mini-course-card">
+      <div class="mini-thumb" [class.teal]="c.thumbClass === 'teal'">
+        @if (c.thumbIcon === 'pickleball') {
+          <svg lucideDumbbell [size]="32"></svg>
+        } @else {
+          <svg lucideFootprints [size]="32"></svg>
+        }
+      </div>
+      <div>
+        <div class="mini-title">{{ c.title }}</div>
+        <div class="mini-teacher">Giảng viên: {{ c.teacher }}</div>
+        <div class="mini-progress-bg">
+          <div class="mini-progress-fill" [style.width.%]="c.progress"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Task Info Card -->
+    <div class="card">
+      <h2 class="task-title">{{ t.title }}</h2>
+      <div class="task-facts">
+        <div>Phương pháp chấm điểm: <strong>{{ t.gradingMethod }}</strong></div>
+        <div>Giới hạn thời gian làm bài: <strong>{{ t.timeLimit }}</strong></div>
+        <div>Thời gian mở luyện tập: <strong>{{ t.openTime }}</strong></div>
+        <div>Thời gian đóng luyện tập: <strong>{{ t.closeTime }}</strong></div>
+      </div>
+
+      <!-- Actions -->
+      @if (t.type === 'video') {
+        <button type="button" class="btn-primary" (click)="openSubmitModal()">
+          <svg lucideUploadCloud [size]="18"></svg>
+          <span>Nộp bài</span>
+        </button>
+      } @else {
+        <button
+          type="button"
+          class="btn-primary"
+          [disabled]="isRunning()"
+          (click)="startRun()">
+          <svg lucidePlay [size]="18"></svg>
+          <span>{{ isRunning() ? 'Đang chạy...' : 'Bắt đầu' }}</span>
+        </button>
+      }
+    </div>
+
+    <!-- Run Simulation Card (Chạy) -->
+    @if (t.type === 'run-test' || t.type === 'run-practice') {
+      <div class="card">
+        @if (isRunning()) {
+          <div class="run-status">
+            <span class="pulse-dot"></span>
+            <span>{{ runStatusText() }}</span>
+            <span class="run-timer">{{ runTimerText() }}</span>
+          </div>
+        }
+
+        @if (currentRunLaps().length > 0) {
+          <div class="run-results-wrap mt-4">
+            <div class="section-title">Kết quả từng vòng</div>
+            <table class="run-table">
+              <thead>
+                <tr>
+                  <th>Vòng</th>
+                  <th>Thời gian</th>
+                  <th>Vận tốc</th>
+                  <th>Quãng đường</th>
+                  <th>Điểm</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (lap of currentRunLaps(); track $index; let i = $index) {
+                  <tr>
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ lap.time }}</td>
+                    <td>{{ lap.speed }}</td>
+                    <td>{{ lap.distance }}</td>
+                    <td class="font-bold text-green">{{ lap.score }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            @if (runSummaryText()) {
+              <div class="run-summary-box">{{ runSummaryText() }}</div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Attempt History Card (Pickleball Video) -->
+    @if (t.type === 'video') {
+      <div class="card">
+        <div class="section-title">Kết quả những lần làm bài trước</div>
+
+        @if (t.attempts.length === 0) {
+          <div class="empty-attempts-note">
+            Bạn chưa nộp bài lần nào cho mục này.
+          </div>
+        } @else {
+          <div class="highest-score">
+            Điểm làm bài cao nhất: <strong>{{ highestScore() }}</strong>
+          </div>
+          <table class="attempts-table">
+            <thead>
+              <tr>
+                <th>Ngày nộp</th>
+                <th>Thời lượng</th>
+                <th>Lần nộp</th>
+                <th>Trạng thái</th>
+                <th>Điểm</th>
+                <th>Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (att of t.attempts; track $index) {
+                <tr>
+                  <td>{{ att.date }}</td>
+                  <td>{{ att.duration || '—' }}</td>
+                  <td>{{ att.attemptNo }}</td>
+                  <td>
+                    @if (att.pending) {
+                      <span class="badge badge-processing">Đang xử lý</span>
+                    } @else {
+                      <span class="badge badge-good">Hoàn thành</span>
+                    }
+                  </td>
+                  <td>
+                    @if (att.pending) {
+                      <span class="text-muted">--</span>
+                    } @else {
+                      <span class="score-link" (click)="openScoreModal()">{{ att.score }}</span>
+                    }
+                  </td>
+                  <td>
+                    @if (att.pending) {
+                      <button type="button" class="btn-secondary" disabled>Đang chấm...</button>
+                    } @else {
+                      <button type="button" class="btn-secondary" (click)="openScoreModal()">Xem lại</button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    }
+  }
+
+</div>
+
+<!-- ==================== MODAL 1: NỘP VIDEO BÀI TẬP ==================== -->
+@if (isSubmitModalOpen()) {
+  <div class="modal-overlay" (click)="closeSubmitModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Nộp video bài tập</h3>
+        <button type="button" class="close-btn" (click)="closeSubmitModal()">
+          <svg lucideX [size]="20"></svg>
+        </button>
+      </div>
+
+      <div class="submit-info-grid">
+        <div class="info-label">Học phần:</div>
+        <div class="info-val">{{ currentCourse().title }}</div>
+        <div class="info-label">Bài kiểm tra:</div>
+        <div class="info-val">{{ currentTask().title }}</div>
+        <div class="info-label">Hạn nộp:</div>
+        <div class="info-val">{{ currentTask().closeTime }}</div>
+      </div>
+
+      <!-- Dropzone -->
+      <div
+        class="upload-dropzone"
+        (click)="fileInput.click()"
+        (dragover)="$event.preventDefault()"
+        (drop)="onFileDropped($event)">
+        <svg lucideUploadCloud [size]="36" class="upload-icon"></svg>
+        <div class="dz-title">Kéo thả video vào đây hoặc bấm để chọn</div>
+        <div class="dz-hint">Hỗ trợ định dạng .mp4, .mov — tối đa 200MB</div>
+        @if (selectedFileName()) {
+          <div class="dz-filename">🎬 {{ selectedFileName() }}</div>
+        }
+      </div>
+      <input
+        #fileInput
+        type="file"
+        accept="video/*"
+        class="hidden"
+        (change)="onFileSelected($event)" />
+
+      <!-- Note textarea -->
+      <textarea
+        class="submit-note"
+        rows="2"
+        placeholder="Ghi chú cho giảng viên (không bắt buộc)..."
+        [(ngModel)]="submitNote">
+      </textarea>
+
+      <!-- Actions -->
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="closeSubmitModal()">Hủy</button>
+        <button
+          type="button"
+          class="btn-primary"
+          [disabled]="!hasVideoSelected()"
+          (click)="submitVideo()">
+          Nộp bài
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ==================== MODAL 2: CHI TIẾT KẾT QUẢ AI TRACKING ==================== -->
+@if (isScoreModalOpen()) {
+  <div class="modal-overlay" (click)="closeScoreModal()">
+    <div class="modal-content modal-large" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title">Chi tiết kết quả phân tích AI</h3>
+        <button type="button" class="close-btn" (click)="closeScoreModal()">
+          <svg lucideX [size]="20"></svg>
+        </button>
+      </div>
+
+      <div class="score-modal-grid">
+        <!-- Video Mockup -->
+        <div class="video-preview-box">
+          <div class="video-placeholder">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <polygon points="10 8 16 12 10 16 10 8" />
+            </svg>
+            <span class="video-label">AI Tracking Video</span>
+          </div>
+        </div>
+
+        <!-- Metrics & Feedback -->
+        <div class="metrics-wrap">
+          <div class="score-header-box">
+            <div class="score-circle">8.0</div>
+            <div class="score-stats">
+              <div>Tổng số lần vung vợt: <strong>20 lần</strong></div>
+              <div>Trúng bóng: <strong class="text-primary-green">18 lần</strong></div>
+              <div>Tỷ lệ chuẩn xác: <strong class="text-green-dark">90%</strong></div>
+            </div>
+          </div>
+
+          <div class="feedback-box">
+            <div class="feedback-title">Nhận xét từ AI:</div>
+            Kỹ thuật giao bóng tốt, tốc độ vung vợt chuẩn xác và ổn định. Cần chú ý hơn ở tư thế chân chuẩn bị trước khi giao bóng.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Toast Notification -->
+@if (isToastVisible()) {
+  <div class="toast-popup">
+    {{ toastMessage() }}
+  </div>
+}

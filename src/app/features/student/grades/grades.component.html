@@ -1,0 +1,176 @@
+<div class="grades-page">
+  <div class="grades-card">
+
+    <!-- VIEW 1: DANH SÁCH HỌC PHẦN -->
+    @if (activeView() === 'list') {
+      <div class="view-list">
+        <h1 class="page-title">Kết quả học tập</h1>
+
+        <!-- Bộ lọc -->
+        <div class="filters-row">
+          <div class="filter-col flex-1">
+            <app-search-input
+              label="Học phần"
+              placeholder="Nhập từ khóa..."
+              [(value)]="searchKeyword"
+              (search)="onFilterChange()">
+            </app-search-input>
+          </div>
+
+          <div class="filter-col w-48">
+            <app-select
+              label="Trạng thái"
+              [options]="statusOptions"
+              [(value)]="statusFilter"
+              (change)="onFilterChange()">
+            </app-select>
+          </div>
+
+          <div class="filter-col w-48">
+            <app-select
+              label="Điều kiện dự thi"
+              [options]="conditionOptions"
+              [(value)]="conditionFilter"
+              (change)="onFilterChange()">
+            </app-select>
+          </div>
+        </div>
+
+        <!-- Bảng danh sách -->
+        <div class="table-container custom-scrollbar">
+          <table class="grades-table">
+            <thead>
+              <tr>
+                <th class="text-left col-subject">Học phần</th>
+                <th class="text-left col-class">Lớp học phần</th>
+                <th class="text-center col-date">Ngày bắt đầu</th>
+                <th class="text-center col-deadline leading-tight">Ngày chốt<br />điểm thường xuyên</th>
+                <th class="text-center col-liveclass leading-tight">Số buổi Học LiveClass<br />đã hoàn thành</th>
+                <th class="text-center col-practice leading-tight">Số bài luyện tập<br />đã hoàn thành</th>
+                <th class="text-center col-test leading-tight">Số bài TX/GK<br />đã hoàn thành</th>
+                <th class="text-center col-condition leading-tight">Điều kiện<br />dự thi</th>
+                <th class="text-center col-action">Chi tiết</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of paginatedSubjects(); track item.id; let odd = $odd) {
+                <tr [class.odd-row]="odd">
+                  <td class="text-left font-medium subject-name" (click)="openDetail(item)">
+                    {{ item.name }}
+                  </td>
+                  <td class="text-left text-muted">{{ item.classCode }}</td>
+                  <td class="text-center text-muted">{{ item.startDate }}</td>
+                  <td class="text-center text-muted">{{ item.regularGradeDeadline }}</td>
+                  <td class="text-center">{{ item.liveClassCompleted }}</td>
+                  <td class="text-center">{{ item.practiceCompleted }}</td>
+                  <td class="text-center">{{ item.testCompleted || '' }}</td>
+                  <td class="text-center">
+                    @if (item.examCondition === 'eligible') {
+                      <span class="badge badge-success">Đủ điều kiện</span>
+                    } @else if (item.examCondition === 'ineligible') {
+                      <span class="badge badge-danger">Không đủ ĐK</span>
+                    } @else {
+                      <span class="text-muted">-</span>
+                    }
+                  </td>
+                  <td class="text-center">
+                    <button type="button" class="btn-link" (click)="openDetail(item)">
+                      Xem thêm
+                    </button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="9" class="empty-state">
+                    Không tìm thấy học phần phù hợp.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Phân trang dùng Shared Component -->
+        <app-pagination
+          [(currentPage)]="currentPage"
+          [totalItems]="filteredSubjects().length"
+          [pageSize]="pageSize()"
+          (pageChange)="setPage($event)">
+        </app-pagination>
+      </div>
+    }
+
+    <!-- VIEW 2: CHI TIẾT HỌC PHẦN -->
+    @if (activeView() === 'detail' && selectedSubject(); as subject) {
+      <div class="view-detail">
+        <!-- Header chi tiết -->
+        <div class="detail-header">
+          <button
+            type="button"
+            class="btn-back"
+            (click)="backToList()"
+            title="Quay lại danh sách">
+            <svg lucideArrowLeft [size]="20"></svg>
+          </button>
+          <div>
+            <h1 class="page-title">{{ subject.name }}</h1>
+            <p class="detail-subtitle">Mã lớp học phần: {{ subject.classCode }}</p>
+          </div>
+        </div>
+
+        <!-- Bảng chi tiết từng tuần -->
+        <div class="table-container custom-scrollbar">
+          <table class="grades-table detail-table">
+            <thead>
+              <tr>
+                <th class="text-left border-col">Tuần</th>
+                <th class="text-left border-col">Thời gian học</th>
+                <th class="text-center border-col leading-tight">Số bài Luyện tập<br />đã hoàn thành</th>
+                <th class="text-center border-col leading-tight">Số buổi học<br />LiveClass</th>
+                <th class="text-center border-col leading-tight">Số bài TX/GK đã<br />hoàn thành</th>
+                <th class="text-center">Điều kiện dự thi</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (week of subject.weeklyDetails; track week.week; let odd = $odd) {
+                <tr [class.odd-row]="odd">
+                  <td class="text-left font-medium">{{ week.week }}</td>
+                  <td class="text-left text-muted">{{ week.period }}</td>
+                  <td class="text-center font-medium">{{ week.practiceCompleted || '' }}</td>
+                  <td class="text-center text-muted">{{ week.liveClassCompleted || '' }}</td>
+                  <td class="text-center text-muted">{{ week.testCompleted || '' }}</td>
+                  <td class="text-center">
+                    @if (week.examCondition) {
+                      <span class="badge badge-success">{{ week.examCondition }}</span>
+                    }
+                  </td>
+                </tr>
+              }
+
+              <!-- Dòng Tổng -->
+              @if (subject.summary) {
+                <tr class="summary-row">
+                  <td class="text-left font-bold">Tổng</td>
+                  <td class="text-left font-medium">{{ subject.summary.period }}</td>
+                  <td class="text-center font-bold">{{ subject.summary.practiceCompleted }}</td>
+                  <td class="text-center font-bold">{{ subject.summary.liveClassCompleted }}</td>
+                  <td class="text-center font-bold">{{ subject.summary.testCompleted }}</td>
+                  <td class="text-center">
+                    @if (subject.summary.examCondition === 'Đủ điều kiện') {
+                      <span class="badge badge-success">Đủ điều kiện</span>
+                    } @else if (subject.summary.examCondition === 'Không đủ điều kiện') {
+                      <span class="badge badge-danger">Không đủ ĐK</span>
+                    } @else {
+                      <span>{{ subject.summary.examCondition }}</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+  </div>
+</div>
