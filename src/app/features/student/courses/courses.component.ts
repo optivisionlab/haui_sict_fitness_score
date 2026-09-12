@@ -9,7 +9,6 @@ import {
   LucideCheckCircle2,
   LucideLock,
   LucideList,
-  LucideClock,
   LucideUploadCloud,
   LucidePlay,
   LucidePhone,
@@ -17,9 +16,7 @@ import {
   LucideX,
   LucideAward,
   LucideAlertCircle,
-  LucideInfo,
   LucideSparkles,
-  LucideVideo,
   LucideShieldCheck,
   LucideRotateCcw
 } from '@lucide/angular';
@@ -45,7 +42,6 @@ import {
     LucideCheckCircle2,
     LucideLock,
     LucideList,
-    LucideClock,
     LucideUploadCloud,
     LucidePlay,
     LucidePhone,
@@ -53,9 +49,7 @@ import {
     LucideX,
     LucideAward,
     LucideAlertCircle,
-    LucideInfo,
     LucideSparkles,
-    LucideVideo,
     LucideShieldCheck,
     LucideRotateCcw,
     SearchInputComponent

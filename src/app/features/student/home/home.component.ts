@@ -8,13 +8,11 @@ import {
   LucideChevronRight,
   LucidePlay,
   LucideBell,
-  LucideTrendingUp,
   LucideSparkles,
   LucideFileText,
   LucideMapPin,
   LucideAlertCircle,
-  LucideInfo,
-  LucideAward
+  LucideInfo
 } from '@lucide/angular';
 import { NotificationService } from '@core/services/notification.service';
 import {
@@ -34,13 +32,11 @@ import {
     LucideChevronRight,
     LucidePlay,
     LucideBell,
-    LucideTrendingUp,
     LucideSparkles,
     LucideFileText,
     LucideMapPin,
     LucideAlertCircle,
-    LucideInfo,
-    LucideAward
+    LucideInfo
   ],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss'
