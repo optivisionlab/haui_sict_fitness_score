@@ -58,7 +58,11 @@ export class LoginComponent {
     // Simulate login processing with realistic timeout
     setTimeout(() => {
       this.isLoading.set(false);
-      this.router.navigate(['/student/home']);
+      if (emailVal.toLowerCase().includes('admin')) {
+        this.router.navigate(['/admin/dashboard']);
+      } else {
+        this.router.navigate(['/student/home']);
+      }
     }, 1200);
   }
 }

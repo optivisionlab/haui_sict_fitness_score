@@ -1,0 +1,60 @@
+<aside class="sidebar">
+  <!-- Brand / Logo -->
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <img src="assets/images/logo.png" alt="OptiVisionLab Logo" class="brand-logo" />
+    </div>
+    <div class="sidebar-brand-group">
+      <div class="sidebar-brand">OptiVisionLab</div>
+      <div class="admin-badge">
+        <svg lucideShieldCheck class="badge-icon" [size]="12"></svg>
+        <span>Quản Trị Viên</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation Menu -->
+  <nav class="sidebar-nav">
+    <ul class="nav-menu">
+      <li>
+        <a routerLink="/admin/dashboard" routerLinkActive="active" class="nav-item">
+          <svg lucideLayoutDashboard class="nav-icon" [size]="20"></svg>
+          <span>Tổng quan</span>
+        </a>
+      </li>
+
+      <li>
+        <a routerLink="/admin/students" routerLinkActive="active" class="nav-item">
+          <svg lucideUsers class="nav-icon" [size]="20"></svg>
+          <span>Quản lý sinh viên</span>
+        </a>
+      </li>
+
+      <li>
+        <a routerLink="/admin/courses" routerLinkActive="active" class="nav-item">
+          <svg lucideGraduationCap class="nav-icon" [size]="20"></svg>
+          <span>Lớp học phần</span>
+        </a>
+      </li>
+    </ul>
+
+    <!-- Quick Switch to Student View -->
+    <div class="nav-divider"></div>
+    <ul class="nav-menu secondary-nav">
+      <li>
+        <a routerLink="/student/home" class="nav-item switch-item" title="Chuyển sang màn hình sinh viên">
+          <svg lucideArrowRightLeft class="nav-icon" [size]="18"></svg>
+          <span>Giao diện Sinh viên</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+
+  <!-- Logout Button at Bottom -->
+  <div class="sidebar-footer">
+    <button type="button" class="logout-btn" (click)="onLogout()">
+      <svg lucideLogOut class="logout-icon" [size]="18"></svg>
+      <span>Đăng xuất</span>
+    </button>
+  </div>
+</aside>

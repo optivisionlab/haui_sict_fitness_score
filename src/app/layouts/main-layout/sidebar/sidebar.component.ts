@@ -7,7 +7,8 @@ import {
   LucideBell,
   LucideUser,
   LucideChartNoAxesColumn,
-  LucideLogOut
+  LucideLogOut,
+  LucideShieldCheck
 } from '@lucide/angular';
 
 interface NavItem {
@@ -29,7 +30,8 @@ interface NavItem {
     LucideBell,
     LucideUser,
     LucideChartNoAxesColumn,
-    LucideLogOut
+    LucideLogOut,
+    LucideShieldCheck
   ],
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.scss'

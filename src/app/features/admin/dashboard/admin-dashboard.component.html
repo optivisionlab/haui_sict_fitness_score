@@ -1,0 +1,194 @@
+<div class="admin-dashboard-page">
+  <div class="page-header-row">
+    <div>
+      <h1 class="page-title">Tổng quan Hệ thống Quản trị</h1>
+      <p class="page-subtitle">Theo dõi tổng hợp tiến độ rèn luyện thể lực và điều kiện dự thi của sinh viên</p>
+    </div>
+    <div class="header-actions">
+      <a routerLink="/admin/students" class="btn btn-primary">
+        <span>Quản lý danh sách sinh viên</span>
+        <svg lucideArrowRight [size]="16"></svg>
+      </a>
+    </div>
+  </div>
+
+  <!-- KPI Cards Row -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon-box blue">
+        <svg lucideUsers [size]="22"></svg>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ kpis().totalStudents }}</div>
+        <div class="kpi-label">Tổng số sinh viên theo dõi</div>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon-box green">
+        <svg lucideGraduationCap [size]="22"></svg>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ kpis().totalClasses }}</div>
+        <div class="kpi-label">Lớp học phần thể lực</div>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon-box teal">
+        <svg lucideCheckCircle2 [size]="22"></svg>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ kpis().eligibleRate }}%</div>
+        <div class="kpi-label">Tỷ lệ đủ điều kiện dự thi</div>
+      </div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon-box red">
+        <svg lucideAlertTriangle [size]="22"></svg>
+      </div>
+      <div class="kpi-content">
+        <div class="kpi-value">{{ kpis().pendingReviewCount }}</div>
+        <div class="kpi-label">Cần đôn đốc / Chưa đủ ĐK</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: BẢNG TIẾN ĐỘ CÁC LỚP HỌC PHẦN -->
+  <div class="card section-card">
+    <div class="section-card-header">
+      <div>
+        <h2 class="section-title">Tiến độ Các Lớp Học Phần Rèn Luyện</h2>
+        <p class="section-desc">Theo dõi chỉ số hoàn thành và tỷ lệ đạt điều kiện thi của từng lớp học phần</p>
+      </div>
+      <a routerLink="/admin/courses" class="btn-link">Xem tất cả lớp</a>
+    </div>
+
+    <div class="table-container custom-scrollbar">
+      <table class="grades-table">
+        <thead>
+          <tr>
+            <th class="text-left">Học phần</th>
+            <th class="text-left">Lớp học phần</th>
+            <th class="text-left">Giảng viên</th>
+            <th class="text-center">Sĩ số</th>
+            <th class="text-center">Đủ điều kiện thi</th>
+            <th class="text-center">Tỷ lệ đạt</th>
+            <th class="text-center">Hạn chốt điểm TX</th>
+            <th class="text-center">Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of paginatedClasses(); track item.id; let odd = $odd) {
+            <tr [class.odd-row]="odd">
+              <td class="text-left font-medium">
+                <div class="subject-name-cell">{{ item.subjectName }}</div>
+                <div class="subject-code-sub">{{ item.subjectCode }}</div>
+              </td>
+              <td class="text-left text-muted font-mono">{{ item.classCode }}</td>
+              <td class="text-left text-muted">{{ item.teacher }}</td>
+              <td class="text-center font-medium">{{ item.totalStudents }} SV</td>
+              <td class="text-center">
+                <span class="badge badge-success">{{ item.eligibleCount }} / {{ item.totalStudents }}</span>
+              </td>
+              <td class="text-center font-bold text-success">
+                {{ Math.round((item.eligibleCount / item.totalStudents) * 100) }}%
+              </td>
+              <td class="text-center text-muted">{{ item.regularGradeDeadline }}</td>
+              <td class="text-center">
+                @if (item.status === 'ongoing') {
+                  <span class="badge badge-processing">Đang diễn ra</span>
+                } @else if (item.status === 'completed') {
+                  <span class="badge badge-good">Đã hoàn thành</span>
+                } @else {
+                  <span class="badge badge-muted">Sắp mở</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Phân trang Bảng 1 tái sử dụng app-pagination -->
+    <app-pagination
+      [(currentPage)]="classPage"
+      [totalItems]="classes().length"
+      [pageSize]="classPageSize()"
+      (pageChange)="setClassPage($event)">
+    </app-pagination>
+  </div>
+
+  <!-- SECTION 2: BẢNG SINH VIÊN CẦN CHÚ Ý / CHƯA ĐỦ ĐK THI -->
+  <div class="card section-card">
+    <div class="section-card-header">
+      <div>
+        <h2 class="section-title">Sinh Viên Cần Chú Ý & Cập Nhật Điều Kiện Thi</h2>
+        <p class="section-desc">Danh sách sinh viên có nguy cơ không đủ điều kiện dự thi cần theo dõi và hỗ trợ</p>
+      </div>
+      <a routerLink="/admin/students" class="btn-link">Xem đầy đủ sinh viên</a>
+    </div>
+
+    <div class="table-container custom-scrollbar">
+      <table class="grades-table">
+        <thead>
+          <tr>
+            <th class="text-left">Mã SV</th>
+            <th class="text-left">Họ và tên</th>
+            <th class="text-left">Lớp sinh hoạt</th>
+            <th class="text-left">Học phần</th>
+            <th class="text-center">LiveClass</th>
+            <th class="text-center">Bài luyện tập</th>
+            <th class="text-center">TX/GK</th>
+            <th class="text-center">Điều kiện dự thi</th>
+            <th class="text-left">Ghi chú / Cảnh báo</th>
+            <th class="text-center">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (stu of paginatedAlertStudents(); track stu.id; let odd = $odd) {
+            <tr [class.odd-row]="odd">
+              <td class="text-left font-mono font-medium">{{ stu.studentCode }}</td>
+              <td class="text-left font-medium">{{ stu.fullName }}</td>
+              <td class="text-left text-muted">{{ stu.majorClass }}</td>
+              <td class="text-left text-muted">{{ stu.subjectName }}</td>
+              <td class="text-center font-medium">{{ stu.liveClassCompleted }}/{{ stu.liveClassTotal }}</td>
+              <td class="text-center font-medium">{{ stu.practiceCompleted }}/{{ stu.practiceTotal }}</td>
+              <td class="text-center font-medium">{{ stu.testCompleted }}/{{ stu.testTotal }}</td>
+              <td class="text-center">
+                @if (stu.examCondition === 'ineligible') {
+                  <span class="badge badge-danger">Không đủ ĐK</span>
+                } @else if (stu.examCondition === 'pending') {
+                  <span class="badge badge-warning">Cần bổ sung</span>
+                }
+              </td>
+              <td class="text-left text-muted text-sm alert-note">
+                {{ stu.examConditionNote || 'Chưa đạt chỉ tiêu yêu cầu' }}
+              </td>
+              <td class="text-center">
+                <a routerLink="/admin/students" class="btn-link">
+                  Chi tiết
+                </a>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="10" class="empty-state">
+                Tất cả sinh viên đều đã đủ điều kiện dự thi!
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Phân trang Bảng 2 tái sử dụng app-pagination -->
+    <app-pagination
+      [(currentPage)]="alertPage"
+      [totalItems]="alertStudents().length"
+      [pageSize]="alertPageSize()"
+      (pageChange)="setAlertPage($event)">
+    </app-pagination>
+  </div>
+</div>
