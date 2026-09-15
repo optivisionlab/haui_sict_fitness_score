@@ -1,24 +1,25 @@
 // Design Tokens & SCSS Variables
 
-$primary-bg: #f4fbf7;
+$primary-bg: #f8fafc;
 $sidebar-bg: rgba(255, 255, 255, 0.96);
 $card-bg: #ffffff;
-$text-main: #14351a;
-$text-muted: #4a6b52;
-$border-color: #d8e8dc;
-$border-color-light: rgba(216, 232, 220, 0.85);
+$text-main: #0f172a;
+$text-muted: #64748b;
+$border-color: #e2e8f0;
+$border-color-light: rgba(226, 232, 240, 0.85);
 
-$accent-black: #14351a;
-$accent-blue: #2e7d32;
-$accent-blue-hover: #1b5e20;
-$accent-blue-light: #e8f5e9;
+$accent-black: #0f172a;
+$accent-blue: #2563eb;
+$accent-blue-hover: #1d4ed8;
+$accent-blue-light: #eff6ff;
+$accent-blue-soft: #f0f7ff;
 $accent-red: #ef4444;
 $accent-red-hover: #dc2626;
 $accent-red-light: #fee2e2;
-$accent-teal: #15803d;
-$accent-teal-light: #dcfce7;
-$accent-green: #2e7d32;
-$accent-green-light: #e8f5e9;
+$accent-teal: #0284c7;
+$accent-teal-light: #e0f2fe;
+$accent-green: #16a34a;
+$accent-green-light: #dcfce7;
 
 $radius-sm: 6px;
 $radius-md: 8px;
@@ -45,6 +46,7 @@ $font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI'
   --accent-blue: #{$accent-blue};
   --accent-blue-hover: #{$accent-blue-hover};
   --accent-blue-light: #{$accent-blue-light};
+  --accent-blue-soft: #{$accent-blue-soft};
   --accent-red: #{$accent-red};
   --accent-red-hover: #{$accent-red-hover};
   --accent-red-light: #{$accent-red-light};

@@ -1,8 +1,11 @@
-import { Component, signal, computed } from '@angular/core';
+import { Component, signal, computed, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { LucideArrowLeft } from '@lucide/angular';
 import { SearchInputComponent, PaginationComponent, SelectComponent, SelectOption } from '@shared/components';
+import { environment } from '../../../../environments/environment';
+import { ApiResponse } from '../../../core/models/auth.model';
 import { GradeSubject } from './models/grade.model';
 
 @Component({
@@ -19,7 +22,9 @@ import { GradeSubject } from './models/grade.model';
   templateUrl: './grades.component.html',
   styleUrl: './grades.component.scss'
 })
-export class GradesComponent {
+export class GradesComponent implements OnInit {
+  private http = inject(HttpClient);
+
   // Views: 'list' or 'detail'
   activeView = signal<'list' | 'detail'>('list');
   selectedSubject = signal<GradeSubject | null>(null);
@@ -46,144 +51,51 @@ export class GradesComponent {
   currentPage = signal<number>(1);
   pageSize = signal<number>(4);
 
-  // Mock Data
-  subjects = signal<GradeSubject[]>([
-    {
-      id: 'sub-1',
-      name: 'Ngữ âm - Âm vị học',
-      classCode: '20254FL6071_TX002',
-      startDate: '26/07/2026',
-      regularGradeDeadline: '20/09/2026',
-      liveClassCompleted: 2,
-      practiceCompleted: 28,
-      testCompleted: '',
-      examCondition: 'eligible',
-      status: 'active',
-      weeklyDetails: [
-        { week: 'Tuần 1', period: '26/07/2026 - 02/08/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 2', period: '03/08/2026 - 09/08/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 3', period: '10/08/2026 - 16/08/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 4', period: '17/08/2026 - 23/08/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 5', period: '24/08/2026 - 30/08/2026', practiceCompleted: 28, liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 6', period: '31/08/2026 - 06/09/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 7', period: '07/09/2026 - 13/09/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 8', period: '14/09/2026 - 20/09/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' }
-      ],
-      summary: {
-        period: '26/07/2026 - 20/09/2026',
-        practiceCompleted: '28/28',
-        liveClassCompleted: '2/2',
-        testCompleted: '0/0',
-        examCondition: 'Đủ điều kiện'
-      }
-    },
-    {
-      id: 'sub-2',
-      name: 'Biên dịch tiếng Anh Du lịch-Thương mại 2',
-      classCode: '20254FL6081_TX002',
-      startDate: '26/07/2026',
-      regularGradeDeadline: '20/09/2026',
-      liveClassCompleted: 2,
-      practiceCompleted: 20,
-      testCompleted: '',
-      examCondition: null,
-      status: 'active',
-      weeklyDetails: [
-        { week: 'Tuần 1', period: '26/07/2026 - 02/08/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 2', period: '03/08/2026 - 09/08/2026', practiceCompleted: 10, liveClassCompleted: 1, testCompleted: '', examCondition: '' },
-        { week: 'Tuần 3', period: '10/08/2026 - 16/08/2026', practiceCompleted: 10, liveClassCompleted: 1, testCompleted: '', examCondition: '' },
-        { week: 'Tuần 4', period: '17/08/2026 - 23/08/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 5', period: '24/08/2026 - 30/08/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 6', period: '31/08/2026 - 06/09/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 7', period: '07/09/2026 - 13/09/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 8', period: '14/09/2026 - 20/09/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' }
-      ],
-      summary: {
-        period: '26/07/2026 - 20/09/2026',
-        practiceCompleted: '20/28',
-        liveClassCompleted: '2/2',
-        testCompleted: '0/0',
-        examCondition: ''
-      }
-    },
-    {
-      id: 'sub-3',
-      name: 'Phiên dịch tiếng Anh Du lịch-Thương mại 2',
-      classCode: '20254FL6082_TX002',
-      startDate: '26/07/2026',
-      regularGradeDeadline: '20/09/2026',
-      liveClassCompleted: 2,
-      practiceCompleted: 10,
-      testCompleted: '',
-      examCondition: null,
-      status: 'active',
-      weeklyDetails: [
-        { week: 'Tuần 1', period: '26/07/2026 - 02/08/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 2', period: '03/08/2026 - 09/08/2026', practiceCompleted: '', liveClassCompleted: 1, testCompleted: '', examCondition: '' },
-        { week: 'Tuần 3', period: '10/08/2026 - 16/08/2026', practiceCompleted: 10, liveClassCompleted: 1, testCompleted: '', examCondition: '' },
-        { week: 'Tuần 4', period: '17/08/2026 - 23/08/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 5', period: '24/08/2026 - 30/08/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 6', period: '31/08/2026 - 06/09/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 7', period: '07/09/2026 - 13/09/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' },
-        { week: 'Tuần 8', period: '14/09/2026 - 20/09/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' }
-      ],
-      summary: {
-        period: '26/07/2026 - 20/09/2026',
-        practiceCompleted: '10/28',
-        liveClassCompleted: '2/2',
-        testCompleted: '0/0',
-        examCondition: ''
-      }
-    },
-    {
-      id: 'sub-4',
-      name: 'Tiếng Anh chuyên ngành Công nghệ thông tin',
-      classCode: '20254IT6011_TX001',
-      startDate: '01/06/2026',
-      regularGradeDeadline: '15/08/2026',
-      liveClassCompleted: 4,
-      practiceCompleted: 35,
-      testCompleted: 2,
-      examCondition: 'eligible',
-      status: 'completed',
-      weeklyDetails: [
-        { week: 'Tuần 1', period: '01/06/2026 - 08/06/2026', practiceCompleted: 5, liveClassCompleted: 1, testCompleted: '', examCondition: '' },
-        { week: 'Tuần 2', period: '09/06/2026 - 16/06/2026', practiceCompleted: 10, liveClassCompleted: 1, testCompleted: '', examCondition: '' },
-        { week: 'Tuần 3', period: '17/06/2026 - 24/06/2026', practiceCompleted: 10, liveClassCompleted: 1, testCompleted: 1, examCondition: '' },
-        { week: 'Tuần 4', period: '25/06/2026 - 02/07/2026', practiceCompleted: 10, liveClassCompleted: 1, testCompleted: 1, examCondition: '' }
-      ],
-      summary: {
-        period: '01/06/2026 - 15/08/2026',
-        practiceCompleted: '35/35',
-        liveClassCompleted: '4/4',
-        testCompleted: '2/2',
-        examCondition: 'Đủ điều kiện'
-      }
-    },
-    {
-      id: 'sub-5',
-      name: 'Kỹ năng giao tiếp trong môi trường quốc tế',
-      classCode: '20254FL6090_TX003',
-      startDate: '01/06/2026',
-      regularGradeDeadline: '15/08/2026',
-      liveClassCompleted: 1,
-      practiceCompleted: 8,
-      testCompleted: 0,
-      examCondition: 'ineligible',
-      status: 'completed',
-      weeklyDetails: [
-        { week: 'Tuần 1', period: '01/06/2026 - 08/06/2026', practiceCompleted: 8, liveClassCompleted: 1, testCompleted: '', examCondition: '' },
-        { week: 'Tuần 2', period: '09/06/2026 - 16/06/2026', practiceCompleted: '', liveClassCompleted: '', testCompleted: '', examCondition: '' }
-      ],
-      summary: {
-        period: '01/06/2026 - 15/08/2026',
-        practiceCompleted: '8/30',
-        liveClassCompleted: '1/4',
-        testCompleted: '0/2',
-        examCondition: 'Không đủ điều kiện'
-      }
-    }
-  ]);
+  // Subjects list from database API
+  subjects = signal<GradeSubject[]>([]);
+
+  ngOnInit(): void {
+    this.http.get<ApiResponse<any>>(`${environment.apiUrl}/enrollments/my-courses`).subscribe({
+      next: (res) => {
+        const items = res?.data?.items || [];
+        if (items.length > 0) {
+          const mapped: GradeSubject[] = items.map((e: any, idx: number) => {
+            const isEligible = (e.grades?.attendanceScore ?? 0) >= 5.0 && (e.grades?.processScore === null || e.grades?.processScore >= 4.0);
+            return {
+              id: e.courseId || `sub-${idx}`,
+              name: e.courseName || 'Giáo dục Thể chất',
+              classCode: e.courseId.substring(0, 10).toUpperCase(),
+              startDate: '01/09/2026',
+              regularGradeDeadline: '20/11/2026',
+              regularScore: e.grades?.processScore ?? e.grades?.attendanceScore ?? null,
+              score: e.grades?.finalScore ?? null,
+              letterGrade: e.grades?.letterGrade ?? null,
+              liveClassCompleted: 15,
+              practiceCompleted: Math.round(e.progressPercent || 0),
+              testCompleted: e.grades?.examScore ? 'Đã thi' : 'Chưa thi',
+              examCondition: isEligible ? 'eligible' : 'ineligible',
+              status: e.status === 'active' ? 'active' : 'completed',
+              weeklyDetails: [
+                { week: 'Tuần 1', period: '01/09 - 07/09', practiceCompleted: 100, liveClassCompleted: 1, testCompleted: '', examCondition: '' },
+                { week: 'Tuần 2', period: '08/09 - 14/09', practiceCompleted: 100, liveClassCompleted: 1, testCompleted: '', examCondition: '' },
+                { week: 'Tuần 3', period: '15/09 - 21/09', practiceCompleted: 80, liveClassCompleted: 1, testCompleted: '', examCondition: '' },
+                { week: 'Tuần 4', period: '22/09 - 28/09', practiceCompleted: 90, liveClassCompleted: 1, testCompleted: '', examCondition: '' }
+              ],
+              summary: {
+                period: '01/09/2026 - 20/11/2026',
+                practiceCompleted: `${Math.round(e.progressPercent || 0)}%`,
+                liveClassCompleted: '15/15',
+                testCompleted: e.grades?.examScore ? '1/1' : '0/1',
+                examCondition: isEligible ? 'Đủ điều kiện' : 'Không đủ điều kiện'
+              }
+            };
+          });
+          this.subjects.set(mapped);
+        }
+      },
+      error: () => {}
+    });
+  }
 
   // Filtered subjects
   filteredSubjects = computed(() => {
@@ -231,5 +143,18 @@ export class GradesComponent {
 
   onFilterChange(): void {
     this.currentPage.set(1);
+  }
+
+  getGradeClass(grade?: string | null): string {
+    if (!grade) return '';
+    const first = grade.charAt(0).toUpperCase();
+    switch (first) {
+      case 'A': return 'grade-a';
+      case 'B': return 'grade-b';
+      case 'C': return 'grade-c';
+      case 'D': return 'grade-d';
+      case 'F': return 'grade-f';
+      default: return '';
+    }
   }
 }

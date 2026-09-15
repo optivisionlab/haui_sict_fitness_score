@@ -24,13 +24,13 @@
   width: 38px;
   height: 38px;
   background-color: #ffffff;
-  border: 1px solid rgba(76, 175, 80, 0.2);
+  border: 1px solid rgba(37, 99, 235, 0.2);
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 3px;
-  box-shadow: 0 2px 6px rgba(46, 125, 50, 0.08);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08);
 
   .brand-logo {
     width: 100%;
@@ -44,7 +44,7 @@
   font-size: 1.12rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #2e7d32;
+  color: #2563eb;
 }
 
 .sidebar-nav {
@@ -69,7 +69,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #385e40;
+  color: #334155;
   text-decoration: none;
   font-size: 0.92rem;
   font-weight: 500;
@@ -77,28 +77,28 @@
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
   .nav-icon {
-    color: #62886b;
+    color: #64748b;
     flex-shrink: 0;
     transition: color 0.2s ease;
   }
 
   &:hover:not(.active) {
-    background-color: #f0fdf4;
-    color: #1b5e20;
+    background-color: #eff6ff;
+    color: #1d4ed8;
 
     .nav-icon {
-      color: #2e7d32;
+      color: #2563eb;
     }
   }
 
   &.active {
-    background: linear-gradient(135deg, rgba(67, 160, 71, 0.14) 0%, rgba(46, 125, 50, 0.08) 100%);
-    color: #1b5e20;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(59, 130, 246, 0.06) 100%);
+    color: #1d4ed8;
     font-weight: 600;
-    border-left: 3px solid #2e7d32;
+    border-left: 3px solid #2563eb;
 
     .nav-icon {
-      color: #2e7d32;
+      color: #2563eb;
     }
   }
 }
@@ -138,3 +138,126 @@
     transform: scale(0.98);
   }
 }
+
+// Modal Xác Nhận Đăng Xuất Styling
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.logout-confirm-card {
+  background: #ffffff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 380px;
+  padding: 28px 24px 22px;
+  text-align: center;
+  box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.18), 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  animation: modalScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.confirm-icon-wrapper {
+  width: 56px;
+  height: 56px;
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+  border-radius: 50%;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.12);
+}
+
+.confirm-title {
+  font-size: 1.18rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+
+.confirm-desc {
+  font-size: 0.9rem;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0 0 24px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+
+  button {
+    flex: 1;
+    padding: 11px 16px;
+    border-radius: 10px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn-cancel {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+
+    &:hover {
+      background: #e2e8f0;
+      color: #1e293b;
+    }
+  }
+
+  .btn-confirm-logout {
+    background: #ef4444;
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+
+    &:hover {
+      background: #dc2626;
+      box-shadow: 0 6px 16px rgba(220, 38, 38, 0.35);
+      transform: translateY(-1px);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
+  }
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+

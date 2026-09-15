@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -24,6 +24,8 @@ import {
 } from '@lucide/angular';
 import { SelectComponent } from '@shared/components';
 import { StudentProfile } from './models/profile.model';
+
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-profile',
@@ -56,33 +58,40 @@ import { StudentProfile } from './models/profile.model';
   styleUrl: './profile.component.scss'
 })
 export class ProfileComponent {
+  private authService = inject(AuthService);
+
   // Tabs: 'info' | 'security'
   activeTab = signal<'info' | 'security'>('info');
 
   // Profile data
-  profile = signal<StudentProfile>({
-    id: '1',
-    studentId: 'SV2026001',
-    fullName: 'Nguyễn Văn A',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=250&auto=format&fit=crop&q=80',
-    email: 'nguyenvana.sv@optivisionlab.edu.vn',
-    personalEmail: 'nguyenvana.personal@gmail.com',
-    phone: '0987 654 321',
-    birthDate: '2003-05-15',
-    gender: 'male',
-    idCardNumber: '001203009988',
-    ethnicity: 'Kinh',
-    address: 'Số 298 Đ. Cầu Diễn, P. Minh Khai, Q. Bắc Từ Liêm, Hà Nội',
-    hometown: 'Thái Bình',
-    faculty: 'Công nghệ Thông tin & Thị giác máy tính',
-    major: 'Kỹ thuật Phần mềm & Trí tuệ nhân tạo',
-    classCode: 'CNTT2-K17',
-    cohort: 'K17 (2021 - 2025)',
-    status: 'Đang học',
-    academicYear: 'Năm thứ 4',
-    gpa: 3.68,
-    creditsEarned: 128
-  });
+  profile = signal<StudentProfile>(this.getInitialProfile());
+
+  private getInitialProfile(): StudentProfile {
+    const user = this.authService.currentUser();
+    return {
+      id: user?.id || '1',
+      studentId: user?.userCode || user?.user_code || 'Chưa cập nhật',
+      fullName: user?.name || 'Sinh viên',
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=250&auto=format&fit=crop&q=80',
+      email: user?.email || '',
+      personalEmail: '',
+      phone: user?.phoneNumber || user?.phone_number || '',
+      birthDate: user?.dateOfBirth || user?.date_of_birth || '',
+      gender: 'male',
+      idCardNumber: '',
+      ethnicity: 'Kinh',
+      address: '',
+      hometown: '',
+      faculty: 'Giáo dục Thể chất',
+      major: 'Thể thao & Sức khỏe',
+      classCode: '',
+      cohort: '',
+      status: user?.userStatus === 'active' ? 'Đang học' : (user?.userStatus || 'Đang học'),
+      academicYear: '',
+      gpa: 0,
+      creditsEarned: 0
+    };
+  }
 
   // Editable form state
   editForm = {

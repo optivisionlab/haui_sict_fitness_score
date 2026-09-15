@@ -26,13 +26,12 @@ export interface ActiveCourseSummary {
 
 export interface ScheduleItem {
   id: string;
+  dayOfWeek: string;
+  date: string;
+  sessionPeriod: string;
   subjectName: string;
-  subjectCode: string;
-  room: string;
-  timeSlot: string;
-  period: string;
   instructor: string;
-  status: 'upcoming' | 'ongoing' | 'completed';
+  room: string;
 }
 
 export interface AssignmentTask {

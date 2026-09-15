@@ -43,11 +43,11 @@
   }
 
   &:focus {
-    border-color: var(--accent-blue, #2e7d32);
-    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
+    border-color: var(--accent-blue, #2563eb);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 
     ~ .search-icon {
-      color: var(--accent-blue, #2e7d32);
+      color: var(--accent-blue, #2563eb);
     }
   }
 

@@ -8,11 +8,14 @@ import {
 } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
+import { DotLottie } from '@lottiefiles/dotlottie-web';
+import { PickleballComponent } from '../sports/pickleball/pickleball.component';
+import { RunningComponent } from '../sports/running/running.component';
 
 @Component({
   selector: 'app-intro',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, PickleballComponent, RunningComponent],
   templateUrl: './intro.component.html',
   styleUrl: './intro.component.scss'
 })
@@ -20,6 +23,13 @@ export class IntroComponent implements AfterViewInit, OnDestroy {
   private router = inject(Router);
   private elRef = inject(ElementRef);
   private platformId = inject(PLATFORM_ID);
+  private dotLottie?: DotLottie;
+
+  activeSportTab: 'pickleball' | 'running' = 'pickleball';
+
+  setSportTab(tab: 'pickleball' | 'running'): void {
+    this.activeSportTab = tab;
+  }
 
   private revealObserver?: IntersectionObserver;
   private countObserver?: IntersectionObserver;
@@ -73,20 +83,26 @@ export class IntroComponent implements AfterViewInit, OnDestroy {
       countEls.forEach((el: Element) => this.countObserver?.observe(el));
     }
 
-    // 3. Hero score bars grow animation
-    const bars = host.querySelectorAll('[data-grow]');
-    bars.forEach((bar: Element, i: number) => {
-      const target = bar.getAttribute('data-grow') + '%';
-      const barEl = bar as HTMLElement;
-      if (reduceMotion) {
-        barEl.style.height = target;
-        return;
+    // 3. DotLottie Runner Animation
+    const canvas = host.querySelector('#heroLottieCanvas') as HTMLCanvasElement | null;
+    if (canvas) {
+      try {
+        DotLottie.setWasmUrl('assets/lottie/dotlottie-player.wasm');
+        this.dotLottie = new DotLottie({
+          canvas,
+          src: 'https://lottie.host/4db68bbd-31f6-4cd8-84eb-189de081159a/IGmMCqhzpt.lottie',
+          loop: true,
+          autoplay: true,
+          speed: 1,
+          renderConfig: {
+            autoResize: true,
+            devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2)
+          }
+        });
+      } catch (err) {
+        console.warn('DotLottie failed to initialize:', err);
       }
-      const t = setTimeout(() => {
-        barEl.style.height = target;
-      }, 350 + i * 140);
-      this.timeouts.push(t);
-    });
+    }
   }
 
   private animateCount(el: HTMLElement): void {
@@ -142,5 +158,10 @@ export class IntroComponent implements AfterViewInit, OnDestroy {
     this.revealObserver?.disconnect();
     this.countObserver?.disconnect();
     this.timeouts.forEach((t) => clearTimeout(t));
+    if (this.dotLottie) {
+      try {
+        this.dotLottie.destroy();
+      } catch {}
+    }
   }
 }

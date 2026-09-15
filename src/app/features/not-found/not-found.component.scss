@@ -11,10 +11,10 @@
   // Chuyển màu xanh lá sinh thái Eco Wellness đồng bộ với Login
   background: linear-gradient(
     135deg,
-    #a8e6cf 0%,
-    #c8e6c9 35%,
-    #dcedc8 70%,
-    #f0fdf4 100%
+    #bfdbfe 0%,
+    #93c5fd 35%,
+    #dbeafe 70%,
+    #eff6ff 100%
   );
 }
 
@@ -30,7 +30,7 @@
   &.orb-1 {
     width: 500px;
     height: 500px;
-    background: radial-gradient(circle, #ffffff 0%, #c8e6c9 60%, transparent 80%);
+    background: radial-gradient(circle, #ffffff 0%, #93c5fd 60%, transparent 80%);
     top: -120px;
     left: -80px;
   }
@@ -38,7 +38,7 @@
   &.orb-2 {
     width: 600px;
     height: 600px;
-    background: radial-gradient(circle, #a8e6cf 0%, #81c784 55%, transparent 80%);
+    background: radial-gradient(circle, #bfdbfe 0%, #60a5fa 55%, transparent 80%);
     bottom: -120px;
     right: -80px;
     animation-delay: -5s;
@@ -48,7 +48,7 @@
   &.orb-3 {
     width: 420px;
     height: 420px;
-    background: radial-gradient(circle, #dcedc8 0%, #4caf50 60%, transparent 80%);
+    background: radial-gradient(circle, #dbeafe 0%, #2563eb 60%, transparent 80%);
     top: 35%;
     left: 55%;
     animation-delay: -8s;
@@ -94,8 +94,8 @@
 
   // Soft dimensional drop shadow matching the Eco Wellness theme
   text-shadow:
-    0 12px 30px rgba(46, 125, 50, 0.35),
-    0 24px 50px rgba(76, 175, 80, 0.22),
+    0 12px 30px rgba(37, 99, 235, 0.35),
+    0 24px 50px rgba(59, 130, 246, 0.22),
     0 3px 6px rgba(0, 0, 0, 0.06);
 
   animation: subtle-float 6s ease-in-out infinite;
@@ -110,7 +110,7 @@
   letter-spacing: -0.02em;
 
   text-shadow:
-    0 6px 18px rgba(46, 125, 50, 0.3),
+    0 6px 18px rgba(37, 99, 235, 0.3),
     0 2px 4px rgba(0, 0, 0, 0.05);
 
   animation: subtle-float 6s ease-in-out infinite 0.2s;
@@ -152,7 +152,7 @@
   border: 1px solid rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 8px 20px -4px rgba(46, 125, 50, 0.15), 0 2px 6px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 8px 20px -4px rgba(37, 99, 235, 0.15), 0 2px 6px rgba(0, 0, 0, 0.04);
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -165,7 +165,7 @@
     background: #ffffff;
     border-color: #ffffff;
     transform: translateY(-2px);
-    box-shadow: 0 12px 25px -4px rgba(46, 125, 50, 0.22);
+    box-shadow: 0 12px 25px -4px rgba(37, 99, 235, 0.22);
     color: #0f172a;
 
     svg {

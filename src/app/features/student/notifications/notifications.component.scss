@@ -1,7 +1,7 @@
-$primary-green: #2e7d32;
-$primary-green-hover: #1b5e20;
-$primary-green-light: #e8f5e9;
-$primary-green-soft: #f0fdf4;
+$primary-green: #2563eb;
+$primary-green-hover: #1d4ed8;
+$primary-green-light: #eff6ff;
+$primary-green-soft: #f0f7ff;
 
 .notifications-page {
   width: 100%;
@@ -18,7 +18,7 @@ $primary-green-soft: #f0fdf4;
   .page-title {
     font-size: 1.4rem;
     font-weight: 700;
-    color: var(--text-main, #14351a);
+    color: var(--text-main, #0f172a);
     margin: 0;
   }
 
@@ -26,20 +26,20 @@ $primary-green-soft: #f0fdf4;
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 16px;
-    background-color: #ffffff;
-    border: 1px solid rgba(76, 175, 80, 0.35);
-    color: $primary-green;
+    padding: 7px 14px;
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #2563eb;
     font-size: 0.85rem;
     font-weight: 600;
     border-radius: var(--radius-sm, 6px);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
 
     &:hover {
-      background-color: $primary-green-soft;
-      border-color: $primary-green;
-      color: $primary-green-hover;
+      background-color: #dbeafe;
+      border-color: #93c5fd;
+      color: #1d4ed8;
     }
   }
 }
@@ -47,8 +47,8 @@ $primary-green-soft: #f0fdf4;
 .card {
   background: var(--card-bg, #ffffff);
   border-radius: var(--radius-lg, 12px);
-  border: 1px solid rgba(76, 175, 80, 0.18);
-  box-shadow: 0 4px 20px rgba(46, 125, 50, 0.05);
+  border: 1px solid #d1d5db;
+  box-shadow: none;
   padding: 24px;
 }
 
@@ -69,13 +69,12 @@ $primary-green-soft: #f0fdf4;
   margin-right: 0;
   background: none;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   font-family: inherit;
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: var(--text-muted, #4a6b52);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #64748b;
   cursor: pointer;
-  border-bottom: none;
   outline: none;
   display: inline-flex;
   align-items: center;
@@ -83,15 +82,14 @@ $primary-green-soft: #f0fdf4;
   transition: all 0.15s ease;
 
   &:hover:not(.active) {
-    background-color: rgba(46, 125, 50, 0.06);
-    color: var(--text-main, #14351a);
+    background-color: #f1f5f9;
+    color: #0f172a;
   }
 
   &.active {
-    background-color: #e8f5e9;
-    color: $primary-green;
-    border-color: rgba(46, 125, 50, 0.2);
-    border-bottom: none;
+    background-color: #eff6ff;
+    color: #2563eb;
+    border-color: #bfdbfe;
     font-weight: 700;
   }
 
@@ -120,52 +118,58 @@ $primary-green-soft: #f0fdf4;
 .notification-card {
   display: flex;
   gap: 16px;
-  padding: 18px 20px;
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 10px;
+  padding: 16px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   background-color: #ffffff;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 
   &:hover {
-    background-color: #fafdfb;
-    border-color: rgba(76, 175, 80, 0.4);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    background-color: #f8fafc;
+    border-color: #cbd5e1;
   }
 
   &.unread {
-    background-color: #f6fcf8;
-    border-left: 3.5px solid $primary-green;
-    border-color: rgba(76, 175, 80, 0.35);
+    background-color: #f8faff;
+    border-left: 4px solid #2563eb;
+    border-color: #bfdbfe;
 
-    &:hover {
-      background-color: #eef8f1;
+    .notif-title {
+      font-weight: 700;
+      color: #0f172a;
     }
   }
 }
 
 .notif-icon-box {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
 
   &.course {
-    background-color: #e8f5e9;
-    color: $primary-green;
+    background-color: #eff6ff;
+    color: #2563eb;
+    border-color: #dbeafe;
   }
 
   &.exam {
-    background-color: #fef3c7;
+    background-color: #fffbeb;
     color: #d97706;
+    border-color: #fef3c7;
   }
 
   &.system {
-    background-color: #e0f2fe;
-    color: #0284c7;
+    background-color: #f0fdfa;
+    color: #0d9488;
+    border-color: #ccfbf1;
   }
 }
 
@@ -189,16 +193,17 @@ $primary-green-soft: #f0fdf4;
   flex-wrap: wrap;
 
   .notif-title {
-    font-size: 1.02rem;
-    font-weight: 700;
-    color: var(--text-main, #14351a);
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: #0f172a;
     margin: 0;
     line-height: 1.35;
   }
 
   .unread-tag {
-    background-color: #dcfce7;
-    color: #15803d;
+    background-color: #ecfdf5;
+    color: #059669;
+    border: 1px solid #a7f3d0;
     font-size: 0.7rem;
     font-weight: 700;
     padding: 2px 7px;
@@ -215,8 +220,8 @@ $primary-green-soft: #f0fdf4;
 }
 
 .notif-message {
-  font-size: 0.9rem;
-  color: #334155;
+  font-size: 0.88rem;
+  color: #374151;
   line-height: 1.5;
   margin: 0 0 12px 0;
 }
@@ -230,10 +235,10 @@ $primary-green-soft: #f0fdf4;
 
   .notif-sender {
     font-size: 0.82rem;
-    color: var(--text-muted, #4a6b52);
+    color: #64748b;
 
     strong {
-      color: var(--text-main, #14351a);
+      color: #0f172a;
     }
   }
 
@@ -248,25 +253,27 @@ $primary-green-soft: #f0fdf4;
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 5px 10px;
-    border: 1px solid var(--border-color, #cbd5e1);
-    background-color: #ffffff;
-    color: var(--text-main, #14351a);
-    border-radius: 6px;
+    padding: 4px 10px;
+    border: 1px solid #bfdbfe;
+    background-color: #eff6ff;
+    color: #2563eb;
+    border-radius: 4px;
     font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s ease;
 
     &:hover {
-      background-color: $primary-green-soft;
-      border-color: $primary-green;
-      color: $primary-green-hover;
+      background-color: #dbeafe;
+      border-color: #93c5fd;
+      color: #1d4ed8;
     }
 
     &.delete {
+      background-color: #ffffff;
+      border-color: #e2e8f0;
       color: #94a3b8;
-      padding: 5px 8px;
+      padding: 4px 8px;
 
       &:hover {
         background-color: #fee2e2;
@@ -280,7 +287,7 @@ $primary-green-soft: #f0fdf4;
 .empty-state {
   text-align: center;
   padding: 48px 16px;
-  color: var(--text-muted, #4a6b52);
+  color: var(--text-muted, #64748b);
   font-style: italic;
 }
 

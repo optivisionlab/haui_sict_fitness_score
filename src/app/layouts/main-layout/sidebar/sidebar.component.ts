@@ -1,6 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { filter, map } from 'rxjs/operators';
 import {
   LucideHome,
   LucideGraduationCap,
@@ -8,15 +10,9 @@ import {
   LucideUser,
   LucideChartNoAxesColumn,
   LucideLogOut,
-  LucideShieldCheck
+  LucideBookOpen
 } from '@lucide/angular';
-
-interface NavItem {
-  label: string;
-  route: string;
-  icon: any;
-  extraMarginTop?: boolean;
-}
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -31,23 +27,41 @@ interface NavItem {
     LucideUser,
     LucideChartNoAxesColumn,
     LucideLogOut,
-    LucideShieldCheck
+    LucideBookOpen
   ],
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.scss'
 })
 export class SidebarComponent {
-  navItems = [
-    { label: 'Trang chủ', route: '/student/home', icon: 'home' },
-    { label: 'Khóa học của tôi', route: '/student/courses', icon: 'courses' },
-    { label: 'Thông báo', route: '/student/notifications', icon: 'notifications' },
-    { label: 'Thông tin cá nhân', route: '/student/profile', icon: 'profile' },
-    { label: 'Kết quả học tập', route: '/student/grades', icon: 'grades', extraMarginTop: true },
-  ];
+  private router = inject(Router);
+  private authService = inject(AuthService);
 
-  constructor(private router: Router) {}
+  showLogoutConfirm = signal<boolean>(false);
+
+  // Detect current route
+  private currentUrl = toSignal(
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map(e => e.urlAfterRedirects)
+    ),
+    { initialValue: this.router.url }
+  );
+
+  isTeacher = computed(() => {
+    const url = this.currentUrl();
+    return url.startsWith('/teacher');
+  });
 
   onLogout(): void {
-    this.router.navigate(['/login']);
+    this.showLogoutConfirm.set(true);
+  }
+
+  cancelLogout(): void {
+    this.showLogoutConfirm.set(false);
+  }
+
+  confirmLogout(): void {
+    this.showLogoutConfirm.set(false);
+    this.authService.logout();
   }
 }

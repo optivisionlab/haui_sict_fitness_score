@@ -1,7 +1,7 @@
-$primary-green: #2e7d32;
-$primary-green-hover: #1b5e20;
-$primary-green-light: #e8f5e9;
-$primary-green-soft: #f0fdf4;
+$primary-green: #2563eb;
+$primary-green-hover: #1d4ed8;
+$primary-green-light: #eff6ff;
+$primary-green-soft: #f0f7ff;
 
 .custom-select-container {
   display: flex;
@@ -14,7 +14,7 @@ $primary-green-soft: #f0fdf4;
 .select-label {
   font-size: 0.75rem;
   font-weight: 500;
-  color: var(--text-muted, #4a6b52);
+  color: var(--text-muted, #64748b);
 }
 
 .select-wrapper {
@@ -32,7 +32,7 @@ $primary-green-soft: #f0fdf4;
   gap: 8px;
   font-size: 0.875rem;
   font-family: inherit;
-  color: var(--text-main, #14351a);
+  color: var(--text-main, #0f172a);
   background-color: #ffffff;
   border: 1px solid var(--border-color, #cbd5e1);
   border-radius: var(--radius-sm, 6px);
@@ -47,7 +47,7 @@ $primary-green-soft: #f0fdf4;
   &.active,
   &:focus {
     border-color: $primary-green;
-    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 
     .chevron-icon {
       color: $primary-green;
@@ -76,7 +76,7 @@ $primary-green-soft: #f0fdf4;
   }
 }
 
-/* --- Xổ xuống: Menu danh sách màu xanh lá sang trọng --- */
+/* --- Xổ xuống: Menu danh sách màu xanh nước biển sang trọng --- */
 .dropdown-menu {
   position: absolute;
   top: calc(100% + 4px);
@@ -84,10 +84,10 @@ $primary-green-soft: #f0fdf4;
   width: 100%;
   min-width: 150px;
   background-color: #ffffff;
-  border: 1.5px solid rgba(76, 175, 80, 0.25);
+  border: 1.5px solid rgba(37, 99, 235, 0.2);
   border-radius: 8px;
   box-shadow:
-    0 12px 28px -4px rgba(46, 125, 50, 0.16),
+    0 12px 28px -4px rgba(37, 99, 235, 0.15),
     0 4px 10px rgba(0, 0, 0, 0.04);
   padding: 4px;
   z-index: 100;
@@ -121,11 +121,11 @@ $primary-green-soft: #f0fdf4;
     border-radius: 4px;
   }
   &::-webkit-scrollbar-thumb {
-    background: #c2e0c9;
+    background: #cbd5e1;
     border-radius: 4px;
 
     &:hover {
-      background: #a3d4ad;
+      background: #94a3b8;
     }
   }
 }
@@ -138,7 +138,7 @@ $primary-green-soft: #f0fdf4;
   border-radius: 6px;
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-main, #14351a);
+  color: var(--text-main, #0f172a);
   cursor: pointer;
   transition: all 0.15s ease;
 
@@ -147,7 +147,7 @@ $primary-green-soft: #f0fdf4;
     color: $primary-green-hover;
   }
 
-  /* Mục đang được chọn - hiển thị nền xanh lá mát mắt */
+  /* Mục đang được chọn - hiển thị nền xanh dương nhạt */
   &.selected {
     background-color: $primary-green-light;
     color: $primary-green-hover;

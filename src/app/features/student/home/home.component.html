@@ -1,16 +1,12 @@
 <div class="home-page">
-  <!-- 1. BANNER CHÀO MỪNG SINH VIÊN (HERO BANNER) -->
+  <!-- 1. LỜI CHÀO (GREETING BANNER) -->
   <div class="welcome-banner">
     <div class="banner-content">
-      <div class="badge-pill">
-        <svg lucideSparkles [size]="14"></svg>
-        <span>OptiVisionLab AI Education</span>
-      </div>
       <h1 class="banner-title">
         {{ greeting() }}, <span class="highlight">{{ student().fullName }}</span>! 👋
       </h1>
       <p class="banner-desc">
-        Chào mừng bạn đến với hệ thống đánh giá thể chất qua thị giác máy tính AI. Theo dõi tiến độ học tập và thực hiện các bài kiểm tra kỹ thuật tại đây.
+        Chúc bạn một ngày học tập hứng khởi và đạt nhiều kết quả xuất sắc.
       </p>
       <div class="banner-meta">
         <span class="meta-item">
@@ -22,216 +18,87 @@
         <span class="meta-dot">•</span>
         <span class="meta-item">{{ student().semester }}</span>
       </div>
-      <div class="banner-actions">
-        <button type="button" class="btn-primary" (click)="navigateToCourse('')">
-          <svg lucidePlay [size]="15"></svg>
-          <span>Khóa học của tôi</span>
-        </button>
-        <button type="button" class="btn-banner-secondary" (click)="navigateToNotifications()">
-          <svg lucideBell [size]="15"></svg>
-          <span>Xem thông báo</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Trang trí góc phải: Thông tin tổng quan khóa học đang diễn ra -->
-    <div class="banner-graphic">
-      <div class="glow-orb"></div>
-      <div class="graphic-card">
-        <div class="graphic-icon">
-          <svg lucideBookOpen [size]="26"></svg>
-        </div>
-        <div class="graphic-info">
-          <span class="graphic-score">{{ activeCourses().length }}</span>
-          <span class="graphic-label">Môn học đang theo học</span>
-        </div>
-        <div class="status-indicator">
-          <span class="pulse-dot"></span>
-          Đang trong học kỳ
-        </div>
-      </div>
     </div>
   </div>
 
-  <!-- 2. KHUNG NỘI DUNG CHÍNH (2 CỘT RESPONSIVE) -->
+  <!-- 2. NỘI DUNG CHÍNH: LỊCH HỌC VÀ THÔNG BÁO MỚI -->
   <div class="dashboard-main-grid">
-    <!-- CỘT TRÁI (LỚN): THÔNG TIN MÔN HỌC & TIẾN ĐỘ HỌC TẬP -->
-    <div class="main-left-col">
-      <div class="card section-card">
-        <div class="card-header-row">
-          <div class="header-title-wrap">
-            <div class="header-icon-box">
-              <svg lucideBookOpen [size]="19"></svg>
+    <!-- KHỐI 1: LỊCH HỌC -->
+    <div class="card section-card schedule-section">
+      <div class="card-header-row">
+        <div class="header-title-wrap">
+          <div class="header-icon-box schedule-box">
+            <svg lucideCalendar [size]="19"></svg>
+          </div>
+          <h2 class="card-title">Lịch học</h2>
+        </div>
+      </div>
+
+      <div class="schedule-timeline-list">
+        @for (item of todaySchedule(); track item.id; let last = $last) {
+          <div class="timeline-row">
+            <!-- Cột thứ & ngày bên trái -->
+            <div class="timeline-date-col">
+              <span class="day-of-week">{{ item.dayOfWeek }}</span>
+              <span class="date-label">{{ item.date }}</span>
             </div>
-            <div>
-              <h2 class="card-title">Môn học & Tiến độ học tập</h2>
-              <p class="card-subtitle">Thông tin chi tiết tiến độ các môn học bạn đang tham gia</p>
+
+            <!-- Trục timeline chấm & đường kẻ -->
+            <div class="timeline-axis">
+              <div class="timeline-dot"></div>
+              @if (!last) {
+                <div class="timeline-line"></div>
+              }
+            </div>
+
+            <!-- Thẻ học phần bên phải theo thiết kế ảnh mẫu -->
+            <div class="schedule-simple-card">
+              <div class="card-session">{{ item.sessionPeriod }}</div>
+              <h4 class="card-subject">{{ item.subjectName }}</h4>
+              <div class="card-instructor">{{ item.instructor }}</div>
+              <div class="card-room">{{ item.room }}</div>
             </div>
           </div>
-          <button type="button" class="btn-link-action" (click)="navigateToCourse('')">
-            <span>Xem tất cả môn học</span>
-            <svg lucideChevronRight [size]="16"></svg>
-          </button>
-        </div>
-
-        <div class="courses-list-wrap">
-          @for (course of activeCourses(); track course.id) {
-            <div class="course-item" (click)="navigateToCourse(course.id)">
-              <div class="course-thumb">
-                <img [src]="course.coverImage" [alt]="course.title" />
-                <span class="course-category-tag">{{ course.category }}</span>
-              </div>
-
-              <div class="course-info">
-                <div class="course-code-row">
-                  <span class="course-code">{{ course.code }}</span>
-                  <span class="course-instructor">• GV: {{ course.instructor }}</span>
-                </div>
-                <h3 class="course-title">{{ course.title }}</h3>
-                <p class="course-lesson-now">
-                  <svg lucideFileText [size]="14"></svg>
-                  <span>{{ course.currentLesson }}</span>
-                </p>
-
-                <!-- Thanh tiến độ xanh lá -->
-                <div class="progress-container">
-                  <div class="progress-bar-bg">
-                    <div class="progress-bar-fill" [style.width.%]="course.progress"></div>
-                  </div>
-                  <div class="progress-text-row">
-                    <span class="progress-lessons">Đã hoàn thành {{ course.completedLessons }}/{{ course.totalLessons }} bài kiểm tra</span>
-                    <span class="progress-percent font-bold">{{ course.progress }}%</span>
-                  </div>
-                </div>
-              </div>
-
-              <button type="button" class="course-action-circle" title="Vào môn học">
-                <svg lucideChevronRight [size]="18"></svg>
-              </button>
-            </div>
-          }
-        </div>
+        }
       </div>
     </div>
 
-    <!-- CỘT PHẢI (BỔ TRỢ): LỊCH HỌC HÔM NAY, THÔNG BÁO MỚI & LỐI TẮT -->
-    <div class="main-right-col">
-      <!-- LỊCH HỌC HÔM NAY -->
-      <div class="card section-card">
-        <div class="card-header-row">
-          <div class="header-title-wrap">
-            <div class="header-icon-box schedule-box">
-              <svg lucideCalendar [size]="19"></svg>
-            </div>
-            <div>
-              <h2 class="card-title">Lịch học hôm nay</h2>
-              <p class="card-subtitle">Thời khóa biểu thực hành AI</p>
-            </div>
+    <!-- KHỐI 2: THÔNG BÁO MỚI -->
+    <div class="card section-card">
+      <div class="card-header-row">
+        <div class="header-title-wrap">
+          <div class="header-icon-box notif-box">
+            <svg lucideBell [size]="19"></svg>
           </div>
+          <h2 class="card-title">Thông báo mới</h2>
         </div>
-
-        <div class="schedule-timeline">
-          @for (item of todaySchedule(); track item.id) {
-            <div class="timeline-item" [ngClass]="item.status">
-              <div class="time-col">
-                <span class="time-slot">{{ item.timeSlot }}</span>
-                <span class="period-text">{{ item.period }}</span>
-              </div>
-
-              <div class="timeline-divider">
-                <div class="timeline-dot"></div>
-                <div class="timeline-line"></div>
-              </div>
-
-              <div class="subject-card">
-                <div class="subject-header">
-                  <span class="subject-code">{{ item.subjectCode }}</span>
-                  <span class="status-pill" [ngClass]="item.status">
-                    @if (item.status === 'ongoing') {
-                      <span class="pulse-dot"></span>
-                      Đang diễn ra
-                    } @else if (item.status === 'completed') {
-                      Đã xong
-                    } @else {
-                      Sắp tới
-                    }
-                  </span>
-                </div>
-                <h4 class="subject-name">{{ item.subjectName }}</h4>
-                <div class="subject-meta">
-                  <span class="meta-room">
-                    <svg lucideMapPin [size]="13"></svg>
-                    {{ item.room }}
-                  </span>
-                  <span class="meta-inst">• {{ item.instructor }}</span>
-                </div>
-              </div>
-            </div>
-          }
-        </div>
+        <button type="button" class="btn-link-action" (click)="navigateToNotifications()">
+          <span>Xem tất cả</span>
+          <svg lucideChevronRight [size]="15"></svg>
+        </button>
       </div>
 
-      <!-- THÔNG BÁO MỚI NHẤT -->
-      <div class="card section-card">
-        <div class="card-header-row">
-          <div class="header-title-wrap">
-            <div class="header-icon-box notif-box">
-              <svg lucideBell [size]="19"></svg>
-            </div>
-            <div>
-              <h2 class="card-title">Thông báo mới</h2>
-              <p class="card-subtitle">Cập nhật lịch học & tin tức</p>
-            </div>
-          </div>
-          <button type="button" class="btn-link-action" (click)="navigateToNotifications()">
-            <span>Xem tất cả</span>
-            <svg lucideChevronRight [size]="15"></svg>
-          </button>
-        </div>
-
-        <div class="recent-notifs-list">
-          @for (notif of recentNotifications(); track notif.id) {
-            <div class="recent-notif-item" (click)="navigateToNotifications()">
-              <div class="notif-icon-circle" [ngClass]="notif.type">
-                @if (notif.type === 'course') {
-                  <svg lucideGraduationCap [size]="15"></svg>
-                } @else if (notif.type === 'exam') {
-                  <svg lucideAlertCircle [size]="15"></svg>
-                } @else {
-                  <svg lucideInfo [size]="15"></svg>
-                }
-              </div>
-              <div class="notif-text-col">
-                <h5 class="notif-item-title">{{ notif.title }}</h5>
-                <span class="notif-item-time">{{ notif.time }}</span>
-              </div>
-              @if (!notif.read) {
-                <span class="unread-dot"></span>
+      <div class="recent-notifs-list">
+        @for (notif of recentNotifications(); track notif.id) {
+          <div class="recent-notif-item" (click)="navigateToNotifications()">
+            <div class="notif-icon-circle" [ngClass]="notif.type">
+              @if (notif.type === 'course') {
+                <svg lucideGraduationCap [size]="15"></svg>
+              } @else if (notif.type === 'exam') {
+                <svg lucideAlertCircle [size]="15"></svg>
+              } @else {
+                <svg lucideInfo [size]="15"></svg>
               }
             </div>
-          }
-        </div>
-      </div>
-
-      <!-- LỐI TẮT NHANH -->
-      <div class="card section-card quick-links-card">
-        <h3 class="quick-title">Lối tắt thao tác nhanh</h3>
-        <div class="quick-links-grid">
-          <button type="button" class="quick-link-btn" (click)="navigateToCourse('')">
-            <svg lucideBookOpen [size]="18"></svg>
-            <span>Khóa học của tôi</span>
-          </button>
-
-          <button type="button" class="quick-link-btn" (click)="navigateToProfile()">
-            <svg lucideGraduationCap [size]="18"></svg>
-            <span>Hồ sơ cá nhân</span>
-          </button>
-
-          <button type="button" class="quick-link-btn" (click)="navigateToNotifications()">
-            <svg lucideBell [size]="18"></svg>
-            <span>Thông báo</span>
-          </button>
-        </div>
+            <div class="notif-text-col">
+              <h5 class="notif-item-title">{{ notif.title }}</h5>
+              <span class="notif-item-time">{{ notif.time }}</span>
+            </div>
+            @if (!notif.read) {
+              <span class="unread-dot"></span>
+            }
+          </div>
+        }
       </div>
     </div>
   </div>

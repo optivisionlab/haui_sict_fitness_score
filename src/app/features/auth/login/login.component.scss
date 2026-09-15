@@ -8,7 +8,7 @@
   justify-content: center;
   padding: 30px 20px;
   overflow: hidden;
-  background: linear-gradient(135deg, #a8e6cf 0%, #dcedc8 50%, #f0fdf4 100%);
+  background: linear-gradient(135deg, #bfdbfe 0%, #dbeafe 50%, #eff6ff 100%);
   font-family: inherit;
   user-select: none;
 }
@@ -31,8 +31,8 @@
   top: -40px;
   pointer-events: none;
   border-radius: 0 100% 0 100%;
-  background: radial-gradient(ellipse at 40% 40%, #81c784 0%, #4caf50 60%, #388e3c 100%);
-  filter: drop-shadow(0 4px 8px rgba(46, 125, 50, 0.18));
+  background: radial-gradient(ellipse at 40% 40%, #93c5fd 0%, #3b82f6 60%, #1d4ed8 100%);
+  filter: drop-shadow(0 4px 8px rgba(37, 99, 235, 0.18));
   will-change: transform, opacity;
 
   // Staggered Falling Leaves Configurations
@@ -127,19 +127,24 @@
     transform: translateX(0) rotate(15deg) rotateX(0deg) rotateY(0deg);
     opacity: 0;
   }
+
   10% {
     opacity: 0.7;
   }
+
   25% {
     transform: translateX(35px) rotate(85deg) rotateX(45deg) rotateY(20deg);
   }
+
   50% {
     transform: translateX(-25px) rotate(190deg) rotateX(15deg) rotateY(60deg);
   }
+
   75% {
     transform: translateX(40px) rotate(290deg) rotateX(60deg) rotateY(30deg);
     opacity: 0.7;
   }
+
   100% {
     top: 108vh;
     transform: translateX(-15px) rotate(390deg) rotateX(0deg) rotateY(0deg);
@@ -154,19 +159,24 @@
     transform: translateX(0) rotate(-20deg) rotateX(0deg) rotateY(0deg);
     opacity: 0;
   }
+
   12% {
     opacity: 0.65;
   }
+
   30% {
     transform: translateX(-40px) rotate(-90deg) rotateX(30deg) rotateY(45deg);
   }
+
   55% {
     transform: translateX(30px) rotate(-180deg) rotateX(50deg) rotateY(20deg);
   }
+
   80% {
     transform: translateX(-30px) rotate(-270deg) rotateX(25deg) rotateY(55deg);
     opacity: 0.6;
   }
+
   100% {
     top: 108vh;
     transform: translateX(20px) rotate(-370deg) rotateX(0deg) rotateY(0deg);
@@ -181,19 +191,24 @@
     transform: translateX(0) rotate(40deg) rotateX(10deg);
     opacity: 0;
   }
+
   15% {
     opacity: 0.75;
   }
+
   35% {
     transform: translateX(50px) rotate(130deg) rotateX(50deg) rotateY(40deg);
   }
+
   65% {
     transform: translateX(-40px) rotate(220deg) rotateX(20deg) rotateY(65deg);
   }
+
   85% {
     transform: translateX(25px) rotate(310deg) rotateX(45deg) rotateY(25deg);
     opacity: 0.65;
   }
+
   100% {
     top: 108vh;
     transform: translateX(-20px) rotate(410deg) rotateX(0deg) rotateY(0deg);
@@ -214,13 +229,13 @@
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(76, 175, 80, 0.22);
+  border: 1px solid rgba(37, 99, 235, 0.22);
   border-radius: 32px;
   padding: 44px 36px;
   position: relative;
   overflow: hidden;
   box-shadow:
-    0 20px 40px rgba(76, 175, 80, 0.15),
+    0 20px 40px rgba(37, 99, 235, 0.15),
     0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
@@ -231,15 +246,22 @@
   left: 0;
   right: 0;
   height: 6px;
-  background: linear-gradient(90deg, #4caf50, #8bc34a, #cddc39, #8bc34a, #4caf50);
+  background: linear-gradient(90deg, #3b82f6, #60a5fa, #93c5fd, #60a5fa, #3b82f6);
   background-size: 200% 100%;
   animation: organicFlow 4s ease-in-out infinite;
   border-radius: 32px 32px 0 0;
 }
 
 @keyframes organicFlow {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
 }
 
 // Mindful Header
@@ -248,7 +270,7 @@
   margin-bottom: 34px;
 
   h1 {
-    color: #2e7d32;
+    color: #2563eb;
     font-size: 1.85rem;
     font-weight: 700;
     margin-bottom: 6px;
@@ -256,7 +278,7 @@
   }
 
   p {
-    color: #66bb6a;
+    color: #2563eb;
     font-size: 14px;
     font-weight: 500;
     line-height: 1.4;
@@ -271,7 +293,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #4caf50;
+  color: #2563eb;
 
   .brand-logo {
     width: 64px;
@@ -282,7 +304,7 @@
     border-radius: 14px;
     mix-blend-mode: multiply;
     animation: zenBreath 4s ease-in-out infinite;
-    filter: drop-shadow(0 4px 10px rgba(46, 125, 50, 0.18));
+    filter: drop-shadow(0 4px 10px rgba(37, 99, 235, 0.18));
   }
 
   svg {
@@ -293,8 +315,15 @@
 }
 
 @keyframes zenBreath {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.06); }
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.06);
+  }
 }
 
 .zen-glow {
@@ -303,14 +332,23 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: radial-gradient(circle, rgba(76, 175, 80, 0.25) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.25) 0%, transparent 70%);
   border-radius: 50%;
   animation: zenGlow 3s ease-in-out infinite;
 }
 
 @keyframes zenGlow {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50% { transform: scale(1.25); opacity: 0.9; }
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+
+  50% {
+    transform: scale(1.25);
+    opacity: 0.9;
+  }
 }
 
 // Form & Fields
@@ -329,8 +367,8 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(76, 175, 80, 0.05);
-    border: 1.5px solid rgba(76, 175, 80, 0.22);
+    background: rgba(37, 99, 235, 0.05);
+    border: 1.5px solid rgba(37, 99, 235, 0.22);
     border-radius: 20px;
     transition: all 0.3s ease;
   }
@@ -340,7 +378,7 @@
     background: transparent;
     border: none;
     padding: 16px 50px 16px 20px;
-    color: #2e7d32;
+    color: #2563eb;
     font-size: 15px;
     font-weight: 500;
     outline: none;
@@ -352,18 +390,18 @@
       color: transparent;
     }
 
-    &:focus ~ .field-nature {
-      border-color: #4caf50;
-      background: rgba(76, 175, 80, 0.1);
-      box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+    &:focus~.field-nature {
+      border-color: #2563eb;
+      background: rgba(37, 99, 235, 0.1);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
     }
 
-    &:focus + label,
-    &:not(:placeholder-shown) + label {
+    &:focus+label,
+    &:not(:placeholder-shown)+label {
       top: 0;
       font-size: 12px;
       font-weight: 600;
-      color: #4caf50;
+      color: #2563eb;
       transform: translateY(-50%);
     }
   }
@@ -373,7 +411,7 @@
     left: 20px;
     top: 50%;
     transform: translateY(-50%);
-    color: #81c784;
+    color: #60a5fa;
     font-size: 15px;
     font-weight: 500;
     pointer-events: none;
@@ -389,6 +427,7 @@
       border-color: #ef4444;
       background: rgba(239, 68, 68, 0.04);
     }
+
     label {
       color: #ef4444;
     }
@@ -414,15 +453,15 @@
 .leaf-sprout {
   width: 100%;
   height: 100%;
-  background: #4caf50;
+  background: #2563eb;
   border-radius: 0 100% 0 100%;
   opacity: 0;
   transform: scale(0) rotate(45deg);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.organic-field input:focus ~ .growth-indicator .leaf-sprout,
-.organic-field input:not(:placeholder-shown) ~ .growth-indicator .leaf-sprout {
+.organic-field input:focus~.growth-indicator .leaf-sprout,
+.organic-field input:not(:placeholder-shown)~.growth-indicator .leaf-sprout {
   opacity: 1;
   transform: scale(1) rotate(45deg);
 }
@@ -436,7 +475,7 @@
   background: transparent;
   border: none;
   cursor: pointer;
-  color: #4caf50;
+  color: #2563eb;
   width: 32px;
   height: 32px;
   border-radius: 8px;
@@ -447,15 +486,15 @@
   justify-content: center;
 
   .toggle-icon {
-    color: #4caf50;
+    color: #2563eb;
     transition: all 0.2s ease;
   }
 
   &:hover {
-    background: rgba(76, 175, 80, 0.12);
+    background: rgba(37, 99, 235, 0.12);
 
     .toggle-icon {
-      color: #2e7d32;
+      color: #2563eb;
       transform: scale(1.08);
     }
   }
@@ -498,10 +537,10 @@
     height: 0;
     pointer-events: none;
 
-    &:checked + .checkbox-square {
-      background: linear-gradient(135deg, #4caf50, #43a047);
-      border-color: #4caf50;
-      box-shadow: 0 2px 8px rgba(76, 175, 80, 0.35);
+    &:checked+.checkbox-square {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      border-color: #2563eb;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
 
       .check-mark {
         opacity: 1;
@@ -509,14 +548,14 @@
       }
     }
 
-    &:focus-visible + .checkbox-square {
-      outline: 2px solid #4caf50;
+    &:focus-visible+.checkbox-square {
+      outline: 2px solid #2563eb;
       outline-offset: 2px;
     }
   }
 
   &:hover .checkbox-square {
-    border-color: #4caf50;
+    border-color: #2563eb;
   }
 }
 
@@ -525,7 +564,7 @@
   height: 19px;
   margin-right: 10px;
   background: rgba(255, 255, 255, 0.9);
-  border: 1.8px solid rgba(76, 175, 80, 0.45);
+  border: 1.8px solid rgba(37, 99, 235, 0.45);
   border-radius: 5px;
   display: flex;
   align-items: center;
@@ -542,17 +581,17 @@
 
 .checkbox-text {
   font-size: 14px;
-  color: #2e7d32;
+  color: #2563eb;
   font-weight: 500;
   transition: color 0.2s ease;
 }
 
 .green-checkbox:hover .checkbox-text {
-  color: #1b5e20;
+  color: #1d4ed8;
 }
 
 .healing-link {
-  color: #4caf50;
+  color: #2563eb;
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
@@ -566,12 +605,13 @@
     left: 0;
     width: 0;
     height: 2px;
-    background: linear-gradient(90deg, #4caf50, #8bc34a);
+    background: linear-gradient(90deg, #2563eb, #3b82f6);
     transition: width 0.3s ease;
   }
 
   &:hover {
-    color: #2e7d32;
+    color: #2563eb;
+
     &::after {
       width: 100%;
     }
@@ -602,13 +642,13 @@
   .button-earth {
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, #4caf50, #66bb6a, #8bc34a);
+    background: linear-gradient(135deg, #1d4ed8, #2563eb, #3b82f6);
     border-radius: 20px;
     transition: all 0.3s ease;
   }
 
   &:hover:not(:disabled) .button-earth {
-    background: linear-gradient(135deg, #388e3c, #4caf50, #66bb6a);
+    background: linear-gradient(135deg, #1e40af, #1d4ed8, #2563eb);
     transform: scale(1.02);
   }
 
@@ -635,6 +675,7 @@
     .button-text {
       opacity: 0;
     }
+
     .button-growth {
       opacity: 1;
     }
@@ -643,7 +684,7 @@
   .button-aura {
     position: absolute;
     inset: -3px;
-    background: linear-gradient(135deg, #4caf50, #8bc34a);
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
     border-radius: 23px;
     opacity: 0;
     filter: blur(12px);
@@ -664,15 +705,129 @@
   border-radius: 50%;
   animation: organicGrow 1.5s ease-in-out infinite;
 
-  &.circle-2 { animation-delay: 0.2s; }
-  &.circle-3 { animation-delay: 0.4s; }
+  &.circle-2 {
+    animation-delay: 0.2s;
+  }
+
+  &.circle-3 {
+    animation-delay: 0.4s;
+  }
 }
 
 @keyframes organicGrow {
-  0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
-  40% { transform: scale(1.25); opacity: 1; }
+
+  0%,
+  80%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+
+  40% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
 }
 
+
+// Role Tabs Switcher
+.role-tabs {
+  display: flex;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  gap: 4px;
+  position: relative;
+  z-index: 2;
+
+  .role-tab-btn {
+    flex: 1;
+    padding: 9px 14px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    border-radius: 9px;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover:not(.active) {
+      color: #1e293b;
+    }
+
+    &.active {
+      background: #ffffff;
+      color: #2563eb;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      font-weight: 700;
+    }
+  }
+}
+
+// Success & Error Banner Styling
+.server-success-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  font-weight: 600;
+  margin-bottom: 16px;
+  animation: fadeIn 0.25s ease;
+
+  .success-icon {
+    flex-shrink: 0;
+    color: #16a34a;
+  }
+}
+
+.server-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  margin-bottom: 16px;
+  animation: fadeIn 0.25s ease;
+
+  .error-icon {
+    flex-shrink: 0;
+    color: #ef4444;
+  }
+}
+
+.gentle-error {
+  display: block;
+  font-size: 0.78rem;
+  color: #ef4444;
+  margin-top: 4px;
+  padding-left: 2px;
+  font-weight: 500;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 // Responsive
 @media (max-width: 480px) {

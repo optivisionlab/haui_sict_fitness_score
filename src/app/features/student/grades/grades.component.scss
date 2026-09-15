@@ -1,5 +1,5 @@
-$grade-primary: #2e7d32;
-$grade-primary-hover: #1b5e20;
+$grade-primary: #2563eb;
+$grade-primary-hover: #1d4ed8;
 
 .grades-page {
   width: 100%;
@@ -8,9 +8,9 @@ $grade-primary-hover: #1b5e20;
 .grades-card {
   background: var(--card-bg, #ffffff);
   border-radius: var(--radius-lg, 12px);
-  border: 1px solid rgba(76, 175, 80, 0.18);
-  box-shadow: 0 4px 20px rgba(46, 125, 50, 0.05);
-  padding: 28px 32px;
+  border: 1px solid #d1d5db;
+  box-shadow: none;
+  padding: 24px 28px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -60,8 +60,8 @@ $grade-primary-hover: #1b5e20;
 /* --- Table Container & Scrollbar --- */
 .table-container {
   overflow-x: auto;
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: var(--radius-md, 8px);
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
   width: 100%;
 }
 
@@ -69,10 +69,12 @@ $grade-primary-hover: #1b5e20;
   &::-webkit-scrollbar {
     height: 7px;
   }
+
   &::-webkit-scrollbar-track {
     background: #f1f5f9;
     border-radius: 4px;
   }
+
   &::-webkit-scrollbar-thumb {
     background: #cbd5e1;
     border-radius: 4px;
@@ -91,37 +93,35 @@ $grade-primary-hover: #1b5e20;
   white-space: nowrap;
 
   thead {
-    background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
-    color: #ffffff;
+    background: #f8fafc;
+    border-bottom: 2px solid #cbd5e1;
 
     th {
-      padding: 14px 18px;
+      padding: 12px 16px;
       font-weight: 600;
       font-size: 0.8125rem;
+      color: #334155;
       letter-spacing: 0.01em;
+      border-right: 1px solid #e2e8f0;
 
-      &.border-col {
-        border-right: 1px solid rgba(255, 255, 255, 0.2);
-
-        &:last-child {
-          border-right: none;
-        }
+      &:last-child {
+        border-right: none;
       }
     }
   }
 
   tbody {
     tr {
-      border-bottom: 1px solid var(--border-color, #e2e8f0);
+      border-bottom: 1px solid #e5e7eb;
       background-color: #ffffff;
       transition: background-color 0.15s ease;
 
       &.odd-row {
-        background-color: #f9fdfa;
+        background-color: #fcfdfe;
       }
 
       &:hover {
-        background-color: #eef8f1;
+        background-color: #f8fafc;
       }
 
       &:last-child {
@@ -130,10 +130,15 @@ $grade-primary-hover: #1b5e20;
     }
 
     td {
-      padding: 14px 18px;
+      padding: 12px 16px;
       font-size: 0.875rem;
-      color: var(--text-main, #0f172a);
+      color: #1f2937;
       vertical-align: middle;
+      border-right: 1px solid #f1f5f9;
+
+      &:last-child {
+        border-right: none;
+      }
     }
   }
 
@@ -141,29 +146,57 @@ $grade-primary-hover: #1b5e20;
   .col-subject {
     min-width: 220px;
   }
+
   .col-class {
     min-width: 160px;
   }
-  .col-date {
-    min-width: 110px;
+
+  .col-score-regular {
+    min-width: 140px;
   }
-  .col-deadline {
-    min-width: 130px;
+
+  .col-score-num {
+    min-width: 170px;
   }
-  .col-liveclass {
-    min-width: 130px;
+
+  .col-score-letter {
+    min-width: 150px;
   }
-  .col-practice {
-    min-width: 120px;
-  }
-  .col-test {
-    min-width: 110px;
-  }
+
   .col-condition {
     min-width: 130px;
   }
+
   .col-action {
     min-width: 100px;
+  }
+
+  .score-val {
+    font-weight: 600;
+    color: #111827;
+    font-size: 0.9375rem;
+  }
+
+  .grade-letter-text {
+    font-weight: 600;
+    color: #111827;
+    font-size: 0.9375rem;
+  }
+
+  .condition-text {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #374151;
+
+    &.eligible {
+      color: #16a34a;
+      font-weight: 600;
+    }
+
+    &.ineligible {
+      color: #dc2626;
+      font-weight: 600;
+    }
   }
 
   .text-left {
@@ -179,75 +212,63 @@ $grade-primary-hover: #1b5e20;
   }
 
   .text-muted {
-    color: var(--text-muted, #64748b);
+    color: #64748b;
   }
 
   .subject-name {
-    color: $grade-primary;
+    color: #2563eb;
     font-weight: 600;
     cursor: pointer;
 
     &:hover {
       text-decoration: underline;
-      color: $grade-primary-hover;
+      color: #1d4ed8;
     }
   }
 
   .btn-link {
-    background: none;
-    border: none;
-    color: $grade-primary;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #2563eb;
     font-weight: 600;
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: var(--radius-sm, 4px);
-    font-size: 0.875rem;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.82rem;
     transition: all 0.15s ease;
 
     &:hover {
-      text-decoration: underline;
-      color: $grade-primary-hover;
-      background-color: rgba(46, 125, 50, 0.08);
+      background-color: #dbeafe;
+      border-color: #93c5fd;
+      color: #1d4ed8;
     }
   }
 
   .summary-row {
-    background-color: #f1f5f9 !important;
-    border-top: 2px solid var(--border-color, #cbd5e1);
+    background-color: #f8fafc !important;
+    border-top: 2px solid #cbd5e1;
     font-weight: 700;
 
     td {
-      padding: 16px 18px;
-      color: var(--text-main, #0f172a);
+      padding: 14px 16px;
+      color: #0f172a;
     }
   }
 
   .empty-state {
     text-align: center;
     padding: 40px 16px;
-    color: var(--text-muted, #64748b);
+    color: #64748b;
     font-style: italic;
   }
 }
 
-/* --- Badges --- */
-.badge {
-  display: inline-block;
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  border-radius: var(--radius-pill, 9999px);
-  line-height: 1.2;
+.font-bold {
+  font-weight: 700;
+}
 
-  &.badge-success {
-    background-color: #dcfce7;
-    color: #15803d;
-  }
-
-  &.badge-danger {
-    background-color: #fee2e2;
-    color: #b91c1c;
-  }
+.font-medium {
+  font-weight: 500;
 }
 
 /* --- View Detail --- */
@@ -263,16 +284,16 @@ $grade-primary-hover: #1b5e20;
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    border: 1px solid var(--border-color, #e2e8f0);
-    background: #ffffff;
-    color: var(--text-main, #334155);
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    color: #2563eb;
     cursor: pointer;
     transition: all 0.15s ease;
 
     &:hover {
-      background-color: #f1f5f9;
-      color: var(--text-main, #0f172a);
-      border-color: #cbd5e1;
+      background-color: #dbeafe;
+      color: #1d4ed8;
+      border-color: #93c5fd;
     }
   }
 
