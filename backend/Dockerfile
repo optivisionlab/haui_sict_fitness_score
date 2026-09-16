@@ -6,10 +6,10 @@ FROM python:3.11-slim AS builder
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Install build tools needed for compiling C extensions (psycopg2, argon2, etc.)
+# Install build tools needed for compiling native Python extensions.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    build-essential gcc libpq-dev \
+    build-essential gcc \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -31,11 +31,6 @@ FROM python:3.11-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
-
-# Only the minimal runtime library needed by psycopg2
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpq5 \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy the pre-built virtualenv from builder
 COPY --from=builder /opt/venv /opt/venv

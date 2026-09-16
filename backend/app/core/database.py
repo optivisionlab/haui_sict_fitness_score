@@ -1,47 +1,51 @@
-"""Database engine, session management, and initialization."""
+"""Small, explicit PyMongo repository used by the API routers."""
+
+from __future__ import annotations
 
 import logging
+from datetime import datetime
+from typing import Any
 
-from sqlalchemy.exc import OperationalError
-from sqlalchemy_utils import create_database, database_exists
-from sqlmodel import Session, SQLModel, create_engine
+from bson import ObjectId
+from pymongo import ASCENDING, MongoClient
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+client = MongoClient(settings.MONGODB_URI, serverSelectionTimeoutMS=3000)
+database = client[settings.MONGODB_DB]
 
 
-def _make_engine(url: str):
-    return create_engine(url, pool_pre_ping=True)
+def object_id(value: str) -> ObjectId:
+    if not ObjectId.is_valid(value):
+        raise ValueError("Invalid MongoDB identifier")
+    return ObjectId(value)
 
 
-engine = _make_engine(settings.DATABASE_URL)
+def clean(document: dict[str, Any] | None) -> dict[str, Any] | None:
+    if document is None:
+        return None
+    document = dict(document)
+    identifier = document.pop("_id", None)
+    document["id"] = str(identifier) if identifier is not None else document.get("id")
+    return document
+
+
+def collection(name: str):
+    return database[name]
 
 
 def get_db():
-    """FastAPI dependency that yields a SQLModel session."""
-    with Session(engine) as session:
-        yield session
+    return database
 
 
-def init_db(auto_create: bool = True) -> None:
-    """Initialize DB: optionally create the database, then create all tables."""
-    global engine
+def init_db() -> None:
+    database.users.create_index("email", unique=True, sparse=True)
+    database.users.create_index("username", unique=True, sparse=True)
+    database.sports.create_index("code", unique=True)
+    database.enrollments.create_index([("courseId", ASCENDING), ("userId", ASCENDING)], unique=True)
+    logger.info("MongoDB indexes initialized for %s", settings.MONGODB_DB)
 
-    if auto_create:
-        try:
-            if not database_exists(settings.DATABASE_URL):
-                logger.info("Database not found; creating: %s", settings.DATABASE_URL)
-                create_database(settings.DATABASE_URL)
-                logger.info("Database created successfully")
-                engine = _make_engine(settings.DATABASE_URL)
-        except Exception:
-            logger.exception("Failed to create database with sqlalchemy-utils")
 
-    try:
-        with engine.connect() as conn:
-            pass
-    except OperationalError:
-        logger.exception("Operational error connecting to DB; tables may not be created")
-
-    SQLModel.metadata.create_all(engine)
+def now() -> datetime:
+    return datetime.utcnow()
