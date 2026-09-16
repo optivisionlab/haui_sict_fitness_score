@@ -1,52 +1,156 @@
-version: '3.8'
-
 services:
+  # frontend:
+  #   image: cuongcuong/frontend_image:v0.0.2
+  #   container_name: frontend_cont
+  #   restart: unless-stopped
+  #   env_file:
+  #     - ./frontend/.env
+  #   ports:
+  #     - "3333:3000"
+  #   networks:
+  #     - app-network
+  #   depends_on:
+  #     backend:
+  #       condition: service_started
+  #   environment:
+  #     NODE_ENV: production
+
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:3000"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 10s
+
+  # # --------------------------------------------------------------------------
+  # # Backend API
+  # # --------------------------------------------------------------------------
+
+  # backend:
+  #   image: cuongcuong/backend_image:v0.0.4
+  #   container_name: backend_cont
+  #   restart: unless-stopped
+  #   env_file:
+  #     - ./backend/.env
+  #   environment:
+  #     MONGODB_URI: mongodb://mongodb:27017
+  #     MONGODB_DB: haui_fitness_score
+  #   ports:
+  #     - "8888:8888"
+  #   networks:
+  #     - app-network
+  #   depends_on:
+  #     mongodb:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #     minio:
+  #       condition: service_started
+
+
   # --------------------------------------------------------------------------
-  # Frontend (Next.js)
+  # MongoDB
   # --------------------------------------------------------------------------
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    image: frontend_image:v0.0.1
-    container_name: frontend_cont
+
+  mongodb:
+    image: mongo:7
+    container_name: fitness-mongodb
     restart: unless-stopped
-    env_file:
-      - ./frontend/.env
+    environment:
+      MONGO_INITDB_DATABASE: haui_fitness_score
     ports:
-      - "3000:3000"
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
     networks:
       - app-network
-    depends_on:
-      - backend
-    environment:
-      NODE_ENV: production
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--quiet",
+          "--eval",
+          "db.adminCommand('ping').ok"
+        ]
+      interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
       start_period: 10s
 
+
   # --------------------------------------------------------------------------
-  # Backend API
+  # Redis
   # --------------------------------------------------------------------------
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    image: backend_image:v0.0.1
-    container_name: backend_cont
+
+  redis:
+    image: redis:7
+    container_name: fitness-redis
     restart: unless-stopped
-    env_file:
-      - ./backend/.env
+    command:
+      - redis-server
+      - --requirepass
+      - "optivisionlab"
+      - --notify-keyspace-events
+      - "KEA"
     ports:
-      - "8888:8888"
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
     networks:
       - app-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-a",
+          "optivisionlab",
+          "ping"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  # --------------------------------------------------------------------------
+  # MinIO
+  # --------------------------------------------------------------------------
+
+  minio:
+    image: minio/minio:latest
+    container_name: fitness-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: "password123"
+    command:
+      - server
+      - /data
+      - --console-address
+      - ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - app-network
+
+# ----------------------------------------------------------------------------
+# Volumes
+# ----------------------------------------------------------------------------
+
+volumes:
+  mongodb_data:
+  redis_data:
+  minio_data:
+
+
 # ----------------------------------------------------------------------------
 # Networks
 # ----------------------------------------------------------------------------
+
 networks:
   app-network:
     driver: bridge

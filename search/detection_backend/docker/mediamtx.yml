@@ -1,0 +1,32 @@
+logLevel: info
+
+writeQueueSize: 1024
+
+hls: yes
+
+hlsAddress: :8888
+hlsAlwaysRemux: no
+hlsVariant: lowLatency
+hlsSegmentCount: 7
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 50M
+hlsDirectory: ''
+hlsMuxerCloseAfter: 60s
+
+paths:
+  cam1:
+    source: publisher
+    sourceOnDemand: no
+
+  cam2:
+    source: publisher
+    sourceOnDemand: no
+
+  cam3:
+    source: publisher
+    sourceOnDemand: no
+
+  cam4:
+    source: publisher
+    sourceOnDemand: no
