@@ -20,7 +20,8 @@ export interface User {
 }
 
 export interface LoginRequest {
-  email: string;
+  email?: string;
+  username?: string;
   password: string;
 }
 

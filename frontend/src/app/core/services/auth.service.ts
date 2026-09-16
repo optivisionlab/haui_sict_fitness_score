@@ -24,8 +24,13 @@ export class AuthService {
    * Đăng nhập với email và mật khẩu
    */
   login(credentials: LoginRequest): Observable<LoginResponse> {
+    const payload = {
+      username: credentials.username || credentials.email,
+      email: credentials.email || credentials.username,
+      password: credentials.password
+    };
     return this.http
-      .post<ApiResponse<LoginResponse>>(`${environment.apiUrl}/auth/login`, credentials)
+      .post<ApiResponse<LoginResponse>>(`${environment.apiUrl}/auth/login`, payload)
       .pipe(
         map((response) => {
           // Backend có ResponseWrapperMiddleware bọc dữ liệu trong response.data

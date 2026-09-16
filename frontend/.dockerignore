@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+.github
+.vscode
+.editorconfig
+.prettierrc
+README.md
+npm-debug.log
+*.spec.ts
+

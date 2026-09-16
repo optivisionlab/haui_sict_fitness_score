@@ -1,15 +1,32 @@
 services:
-  
-  # --------------------------------------------------------------------------
-  # Backend API
-  # --------------------------------------------------------------------------
 
+  # --------------------------------------------------------------------------
+  # Frontend Application (Angular 21 + Nginx)
+  # --------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: fitness_frontend:local
+    container_name: fitness-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks:
+      - app-network
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # --------------------------------------------------------------------------
+  # Backend API (FastAPI + PyMongo)
+  # --------------------------------------------------------------------------
   backend:
-    build: 
-      context: ./backend      # Đường dẫn tới thư mục chứa code và Dockerfile
-      dockerfile: Dockerfile  # Tên file Dockerfile (mặc định)
-    image: backend_image:local # Đặt tên cho image sau khi build xong ở máy bạn
-    container_name: backend_cont
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: fitness_backend:local
+    container_name: fitness-backend
     restart: unless-stopped
     env_file:
       - ./backend/.env
@@ -18,6 +35,8 @@ services:
       MONGODB_DB: haui_fitness_score
     ports:
       - "8888:8888"
+    volumes:
+      - uploads_data:/backend/uploads
     networks:
       - app-network
     depends_on:
@@ -27,12 +46,22 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
-
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8888/health')"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # --------------------------------------------------------------------------
-  # MongoDB
+  # MongoDB Database
   # --------------------------------------------------------------------------
-
   mongodb:
     image: mongo:7
     container_name: fitness-mongodb
@@ -59,11 +88,9 @@ services:
       retries: 5
       start_period: 10s
 
-
   # --------------------------------------------------------------------------
-  # Redis
+  # Redis Cache & PubSub
   # --------------------------------------------------------------------------
-
   redis:
     image: redis:7
     container_name: fitness-redis
@@ -93,11 +120,9 @@ services:
       timeout: 5s
       retries: 5
 
-
   # --------------------------------------------------------------------------
-  # MinIO
+  # MinIO Object Storage
   # --------------------------------------------------------------------------
-
   minio:
     image: minio/minio:latest
     container_name: fitness-minio
@@ -119,19 +144,17 @@ services:
       - app-network
 
 # ----------------------------------------------------------------------------
-# Volumes
+# Persistent Volumes
 # ----------------------------------------------------------------------------
-
 volumes:
   mongodb_data:
   redis_data:
   minio_data:
-
+  uploads_data:
 
 # ----------------------------------------------------------------------------
 # Networks
 # ----------------------------------------------------------------------------
-
 networks:
   app-network:
     driver: bridge

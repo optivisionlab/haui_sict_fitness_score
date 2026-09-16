@@ -51,7 +51,7 @@ EXPOSE 8888
 
 # Health check - verify the /health endpoint responds
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8888/health')" || exit 1
 
 # Default command: production-grade uvicorn (no --reload)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8888", "--workers", "2", "--log-level", "info"]

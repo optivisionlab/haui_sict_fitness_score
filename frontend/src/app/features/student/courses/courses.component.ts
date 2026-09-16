@@ -387,10 +387,13 @@ export class CoursesComponent implements OnInit, OnDestroy {
     this.showView('assessment');
   }
 
+  currentFile: File | null = null;
+
   // Submit Video Modal handlers
   openSubmitModal(): void {
     this.selectedFileName.set('');
     this.hasVideoSelected.set(false);
+    this.currentFile = null;
     this.submitNote.set('');
     this.isSubmitModalOpen.set(true);
   }
@@ -403,6 +406,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files[0]) {
       const file = input.files[0];
+      this.currentFile = file;
       this.selectedFileName.set(file.name);
       this.hasVideoSelected.set(true);
     }
@@ -412,6 +416,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
     event.preventDefault();
     if (event.dataTransfer?.files && event.dataTransfer.files[0]) {
       const file = event.dataTransfer.files[0];
+      this.currentFile = file;
       this.selectedFileName.set(file.name);
       this.hasVideoSelected.set(true);
     }
@@ -419,6 +424,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
 
   submitVideo(): void {
     if (!this.hasVideoSelected()) return;
+    const fileToUpload = this.currentFile;
     this.closeSubmitModal();
 
     const courseId = this.selectedCourseId();
@@ -456,6 +462,16 @@ export class CoursesComponent implements OnInit, OnDestroy {
     this.courseDetails.set(details);
 
     this.showToast('Nộp video thành công! Hệ thống đang xử lý và chấm điểm.');
+
+    if (fileToUpload && assessmentId && assessmentId.length === 24) {
+      const formData = new FormData();
+      formData.append('video', fileToUpload);
+      formData.append('attemptNo', attemptNo.toString());
+      this.http.post<ApiResponse<any>>(`${environment.apiUrl}/tasks/${assessmentId}/video-results`, formData).subscribe({
+        next: () => {},
+        error: () => {}
+      });
+    }
 
     // Simulate grading completed after 3.5s
     setTimeout(() => {

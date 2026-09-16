@@ -48,7 +48,20 @@ def list_docs(name: str, query: dict[str, Any], page: int, page_size: int) -> di
 
 
 def public_user(user: dict[str, Any]) -> dict[str, Any]:
-    return {"id": str(user.get("_id", user.get("id"))), "name": user.get("name", user.get("fullName", user.get("username", ""))), "email": user.get("email"), "role": user.get("role", "student"), "studentCode": user.get("studentCode")}
+    user_id = str(user.get("_id", user.get("id")))
+    code = user.get("studentCode") or user.get("userCode") or user.get("username", "")
+    return {
+        "id": user_id,
+        "name": user.get("name", user.get("fullName", user.get("username", ""))),
+        "email": user.get("email", ""),
+        "role": user.get("role", "student"),
+        "studentCode": code,
+        "userCode": code,
+        "phoneNumber": user.get("phoneNumber", user.get("phone", "")),
+        "dateOfBirth": user.get("dateOfBirth", user.get("birthDate", "")),
+        "userStatus": user.get("status", "active"),
+        "status": user.get("status", "active"),
+    }
 
 
 def validate_task(mode: str, camera_id: str | None) -> None:
@@ -62,14 +75,17 @@ def validate_task(mode: str, camera_id: str | None) -> None:
 
 @router.post("/auth/login", tags=["Auth"])
 def login(payload: LoginRequest):
-    user = collection("users").find_one({"$or": [{"username": payload.username}, {"email": payload.username}]})
+    identifier = payload.username or payload.email
+    if not identifier:
+        raise HTTPException(422, "Username or email is required")
+    user = collection("users").find_one({"$or": [{"username": identifier}, {"email": identifier}]})
     if not user or not verify_password(payload.password, user.get("passwordHash", user.get("password", ""))):
         raise HTTPException(401, "Invalid username or password")
     if user.get("status", "active") != "active":
         raise HTTPException(403, "User account is inactive")
     user_id = str(user["_id"])
     token = create_access_token({"sub": user_id})
-    return envelope({"accessToken": token, "tokenType": "bearer", "user": public_user(user)}, "Login successful")
+    return envelope({"accessToken": token, "access_token": token, "tokenType": "bearer", "token_type": "bearer", "user": public_user(user)}, "Login successful")
 
 
 @router.get("/auth/me", tags=["Auth"])
@@ -251,6 +267,87 @@ def remove_enrollment(course_id: str, user_id: str, _: dict = Depends(admin_or_t
     result = collection("enrollments").delete_one({"courseId": course_id, "userId": user_id})
     if not result.deleted_count: raise HTTPException(404, "Enrollment not found")
     collection("courses").update_one({"_id": object_id(course_id)}, {"$inc": {"studentTotal": -1}}); return {"message": "Student removed successfully"}
+
+
+@router.get("/enrollments/my-courses", tags=["Enrollment"])
+def my_courses(user: dict = Depends(get_current_user)):
+    user_id = user["id"]
+    rows = []
+    for enrollment in collection("enrollments").find({"userId": user_id}):
+        try:
+            course = clean(collection("courses").find_one({"_id": object_id(enrollment["courseId"])}))
+        except ValueError:
+            course = None
+        if course:
+            rows.append({
+                "id": str(course["id"]),
+                "courseId": str(course["id"]),
+                "courseName": course.get("name"),
+                "teacherName": course.get("teacherName"),
+                "status": enrollment.get("status", "active"),
+                "progressPercent": enrollment.get("progressPercent", 0),
+                "examDate": course.get("examDate"),
+                "grades": enrollment.get("grades", {}),
+            })
+    return envelope({"items": rows, "total": len(rows)})
+
+
+@router.get("/teacher/courses", tags=["Teacher"])
+def get_teacher_courses(user: dict = Depends(admin_or_teacher)):
+    query = {}
+    if user.get("role") == "teacher":
+        query = {"teacherId": user["id"]}
+    courses = [clean(c) for c in collection("courses").find(query)]
+    if not courses and user.get("role") == "teacher":
+        courses = [clean(c) for c in collection("courses").find({})]
+    for c in courses:
+        c["allowPracticeSubmission"] = True
+        c["allowExamSubmission"] = True
+        c["isGradeLocked"] = False
+        c["studentTotal"] = collection("enrollments").count_documents({"courseId": str(c["id"])})
+    return envelope(courses)
+
+
+@router.get("/teacher/courses/{course_id}/gradebook", tags=["Teacher"])
+def get_teacher_gradebook(course_id: str, _: dict = Depends(admin_or_teacher)):
+    course = doc("courses", course_id)
+    tasks = [clean(t) for t in collection("tasks").find({"courseId": course_id})]
+    enrollments = [clean(e) for e in collection("enrollments").find({"courseId": course_id})]
+    students = []
+    for e in enrollments:
+        try:
+            u = clean(collection("users").find_one({"_id": object_id(e["userId"])}))
+        except ValueError:
+            u = None
+        if u:
+            user_submissions = {}
+            for t in tasks:
+                t_id = str(t["id"])
+                sub = collection("video_results").find_one({"taskId": t_id, "userId": e["userId"]}, sort=[("submittedAt", -1)])
+                if sub:
+                    sub_clean = clean(sub)
+                    user_submissions[t_id] = {
+                        "videoUrl": sub_clean.get("videoUrl"),
+                        "aiScore": sub_clean.get("aiScore"),
+                        "teacherScore": sub_clean.get("finalScore"),
+                        "teacherComment": sub_clean.get("teacherComment"),
+                        "submittedAt": sub_clean.get("submittedAt"),
+                        "metrics": sub_clean.get("metrics", {}),
+                    }
+            students.append({
+                "userId": e["userId"],
+                "studentCode": u.get("studentCode") or u.get("userCode") or u.get("username"),
+                "studentName": u.get("name", u.get("username", "")),
+                "progressPercent": e.get("progressPercent", 0),
+                "taskScores": e.get("taskScores", {}),
+                "grades": e.get("grades", {}),
+                "submissions": user_submissions,
+            })
+    return envelope({
+        "course": course,
+        "taskList": tasks,
+        "students": students,
+    })
 
 
 @router.get("/students/{user_id}/courses", tags=["Enrollment"])
