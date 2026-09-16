@@ -1,0 +1,105 @@
+<div class="home-page">
+  <!-- 1. LỜI CHÀO (GREETING BANNER) -->
+  <div class="welcome-banner">
+    <div class="banner-content">
+      <h1 class="banner-title">
+        {{ greeting() }}, <span class="highlight">{{ student().fullName }}</span>! 👋
+      </h1>
+      <p class="banner-desc">
+        Chúc bạn một ngày học tập hứng khởi và đạt nhiều kết quả xuất sắc.
+      </p>
+      <div class="banner-meta">
+        <span class="meta-item">
+          <svg lucideGraduationCap [size]="15"></svg>
+          Mã SV: {{ student().studentId }}
+        </span>
+        <span class="meta-dot">•</span>
+        <span class="meta-item">{{ student().classCode }}</span>
+        <span class="meta-dot">•</span>
+        <span class="meta-item">{{ student().semester }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. NỘI DUNG CHÍNH: LỊCH HỌC VÀ THÔNG BÁO MỚI -->
+  <div class="dashboard-main-grid">
+    <!-- KHỐI 1: LỊCH HỌC -->
+    <div class="card section-card schedule-section">
+      <div class="card-header-row">
+        <div class="header-title-wrap">
+          <div class="header-icon-box schedule-box">
+            <svg lucideCalendar [size]="19"></svg>
+          </div>
+          <h2 class="card-title">Lịch học</h2>
+        </div>
+      </div>
+
+      <div class="schedule-timeline-list">
+        @for (item of todaySchedule(); track item.id; let last = $last) {
+          <div class="timeline-row">
+            <!-- Cột thứ & ngày bên trái -->
+            <div class="timeline-date-col">
+              <span class="day-of-week">{{ item.dayOfWeek }}</span>
+              <span class="date-label">{{ item.date }}</span>
+            </div>
+
+            <!-- Trục timeline chấm & đường kẻ -->
+            <div class="timeline-axis">
+              <div class="timeline-dot"></div>
+              @if (!last) {
+                <div class="timeline-line"></div>
+              }
+            </div>
+
+            <!-- Thẻ học phần bên phải theo thiết kế ảnh mẫu -->
+            <div class="schedule-simple-card">
+              <div class="card-session">{{ item.sessionPeriod }}</div>
+              <h4 class="card-subject">{{ item.subjectName }}</h4>
+              <div class="card-instructor">{{ item.instructor }}</div>
+              <div class="card-room">{{ item.room }}</div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- KHỐI 2: THÔNG BÁO MỚI -->
+    <div class="card section-card">
+      <div class="card-header-row">
+        <div class="header-title-wrap">
+          <div class="header-icon-box notif-box">
+            <svg lucideBell [size]="19"></svg>
+          </div>
+          <h2 class="card-title">Thông báo mới</h2>
+        </div>
+        <button type="button" class="btn-link-action" (click)="navigateToNotifications()">
+          <span>Xem tất cả</span>
+          <svg lucideChevronRight [size]="15"></svg>
+        </button>
+      </div>
+
+      <div class="recent-notifs-list">
+        @for (notif of recentNotifications(); track notif.id) {
+          <div class="recent-notif-item" (click)="navigateToNotifications()">
+            <div class="notif-icon-circle" [ngClass]="notif.type">
+              @if (notif.type === 'course') {
+                <svg lucideGraduationCap [size]="15"></svg>
+              } @else if (notif.type === 'exam') {
+                <svg lucideAlertCircle [size]="15"></svg>
+              } @else {
+                <svg lucideInfo [size]="15"></svg>
+              }
+            </div>
+            <div class="notif-text-col">
+              <h5 class="notif-item-title">{{ notif.title }}</h5>
+              <span class="notif-item-time">{{ notif.time }}</span>
+            </div>
+            @if (!notif.read) {
+              <span class="unread-dot"></span>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>

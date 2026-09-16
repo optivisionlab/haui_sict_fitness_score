@@ -1,0 +1,236 @@
+.teacher-notifications-page {
+  padding-bottom: 40px;
+}
+
+.page-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #2563eb;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background-color: #dbeafe;
+      border-color: #93c5fd;
+      color: #1d4ed8;
+    }
+  }
+}
+
+.page-subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-top: -12px;
+}
+
+.search-box-wrap {
+  max-width: 460px;
+  margin-bottom: 20px;
+}
+
+/* Tabs */
+.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  white-space: nowrap;
+
+  .tab-btn {
+    padding: 8px 16px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover:not(.active) {
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+
+    &.active {
+      background-color: #eff6ff;
+      color: #2563eb;
+      border-color: #bfdbfe;
+      font-weight: 700;
+    }
+  }
+}
+
+.notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color-light);
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: #f9fafb;
+    border-color: #cbd5e1;
+  }
+
+  &.unread {
+    background: #f8faff;
+    border-left: 4px solid #2563eb;
+    border-color: #bfdbfe;
+
+    .item-title {
+      font-weight: 700;
+      color: #0f172a;
+    }
+  }
+
+  .item-icon-box {
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: #f0fdfa;
+    color: #0d9488;
+    border: 1px solid #ccfbf1;
+
+    &.submission {
+      background: #eff6ff;
+      color: #2563eb;
+      border-color: #dbeafe;
+    }
+
+    &.class {
+      background: #fffbeb;
+      color: #d97706;
+      border-color: #fef3c7;
+    }
+  }
+
+  .item-body {
+    flex: 1;
+
+    .item-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+
+      .item-title {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #0f172a;
+      }
+
+      .class-tag {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #2563eb;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        padding: 2px 7px;
+        border-radius: 4px;
+      }
+
+      .item-time {
+        margin-left: auto;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+    }
+
+    .item-desc {
+      font-size: 0.88rem;
+      color: #475569;
+      line-height: 1.5;
+    }
+
+    .item-link-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #2563eb;
+      margin-top: 6px;
+
+      &:hover {
+        text-decoration: underline;
+        color: #1d4ed8;
+      }
+    }
+  }
+
+  .item-actions {
+    .btn-icon-action {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+
+      &:hover {
+        background: #fee2e2;
+        color: #dc2626;
+      }
+    }
+  }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 50px 20px;
+  color: var(--text-muted);
+
+  svg {
+    color: #cbd5e1;
+    margin-bottom: 12px;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 4px;
+  }
+
+  p {
+    font-size: 0.88rem;
+  }
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}

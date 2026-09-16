@@ -1,0 +1,139 @@
+<div class="teacher-notifications-page">
+  <!-- Breadcrumb -->
+  <div class="breadcrumb">
+    <span>Cổng Giảng viên</span>
+    <span class="separator">/</span>
+    <span class="current">Thông báo</span>
+  </div>
+
+  <div class="page-header-row">
+    <div>
+      <h1 class="page-title">Thông báo & Cảnh báo Học phần</h1>
+      <p class="page-subtitle">Cập nhật nhanh tiến độ nộp bài của sinh viên, cảnh báo hạn chốt điểm và thông báo từ Bộ môn GDTC.</p>
+    </div>
+
+    @if (unreadCount() > 0) {
+      <button type="button" class="btn btn-secondary" (click)="markAllAsRead()">
+        <svg lucideCheckCheck [size]="16"></svg>
+        <span>Đánh dấu tất cả đã đọc</span>
+      </button>
+    }
+  </div>
+
+  <div class="card">
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'all'"
+        (click)="setTab('all')">
+        Tất cả thông báo
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'unread'"
+        (click)="setTab('unread')">
+        Chưa đọc ({{ unreadCount() }})
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'submission'"
+        (click)="setTab('submission')">
+        Nộp bài & AI chấm
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'class'"
+        (click)="setTab('class')">
+        Lớp học phần & Chốt điểm
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'system'"
+        (click)="setTab('system')">
+        Hệ thống
+      </button>
+    </div>
+
+    <!-- Filter search -->
+    <div class="search-box-wrap">
+      <app-search-input
+        placeholder="Tìm kiếm nội dung thông báo, mã lớp..."
+        [(value)]="searchKeyword">
+      </app-search-input>
+    </div>
+
+    <!-- Notifications List -->
+    <div class="notifications-list">
+      @for (item of paginatedNotifications(); track item.id) {
+        <div
+          class="notification-item"
+          [class.unread]="!item.read"
+          (click)="onNotificationClick(item)">
+          <div class="item-icon-box" [ngClass]="item.type">
+            @if (item.type === 'submission') {
+              <svg lucideFileCheck [size]="20"></svg>
+            } @else if (item.type === 'class') {
+              <svg lucideUsers [size]="20"></svg>
+            } @else {
+              <svg lucideBell [size]="20"></svg>
+            }
+          </div>
+
+          <div class="item-body">
+            <div class="item-header">
+              <h4 class="item-title">{{ item.title }}</h4>
+              @if (item.classCode) {
+                <span class="class-tag">{{ item.classCode }}</span>
+              }
+              <span class="item-time">
+                <svg lucideClock [size]="13"></svg> {{ item.time }}
+              </span>
+            </div>
+            <p class="item-desc">{{ item.message }}</p>
+
+            @if (item.link) {
+              <div class="item-link-hint">
+                <span>Xem lớp học phần</span>
+                <svg lucideArrowRight [size]="14"></svg>
+              </div>
+            }
+          </div>
+
+          <div class="item-actions">
+            <button
+              type="button"
+              class="btn-icon-action"
+              title="Xóa thông báo"
+              (click)="deleteNotification($event, item.id)">
+              <svg lucideTrash2 [size]="16"></svg>
+            </button>
+          </div>
+        </div>
+      } @empty {
+        <div class="empty-state">
+          <svg lucideBell [size]="44"></svg>
+          <h3>Không có thông báo nào</h3>
+          <p>Tất cả thông báo đã được xử lý hoặc không tìm thấy kết quả phù hợp.</p>
+        </div>
+      }
+    </div>
+
+    <!-- Pagination -->
+    @if (filteredNotifications().length > pageSize()) {
+      <div class="pagination-container">
+        <app-pagination
+          [currentPage]="currentPage()"
+          [totalItems]="filteredNotifications().length"
+          [pageSize]="pageSize()"
+          (pageChange)="setPage($event)">
+        </app-pagination>
+      </div>
+    }
+  </div>
+</div>

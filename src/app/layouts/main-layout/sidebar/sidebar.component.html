@@ -1,0 +1,100 @@
+<aside class="sidebar">
+  <!-- Brand / Logo -->
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <img src="assets/images/logo_blue.png" alt="OptiVisionLab Logo" class="brand-logo" />
+    </div>
+    <div class="sidebar-brand">OptiVisionLab</div>
+  </div>
+
+  <!-- Navigation Menu -->
+  <nav class="sidebar-nav">
+    <ul class="nav-menu">
+      @if (isTeacher()) {
+        <!-- TEACHER MENU ITEMS -->
+        <li>
+          <a routerLink="/teacher/classes" routerLinkActive="active" class="nav-item">
+            <svg lucideBookOpen class="nav-icon" [size]="20"></svg>
+            <span>Lớp học phần</span>
+          </a>
+        </li>
+
+        <li>
+          <a routerLink="/teacher/notifications" routerLinkActive="active" class="nav-item">
+            <svg lucideBell class="nav-icon" [size]="20"></svg>
+            <span>Thông báo</span>
+          </a>
+        </li>
+
+        <li>
+          <a routerLink="/teacher/profile" routerLinkActive="active" class="nav-item">
+            <svg lucideUser class="nav-icon" [size]="20"></svg>
+            <span>Hồ sơ giảng viên</span>
+          </a>
+        </li>
+      } @else {
+        <!-- STUDENT MENU ITEMS -->
+        <li>
+          <a routerLink="/student/home" routerLinkActive="active" class="nav-item">
+            <svg lucideHome class="nav-icon" [size]="20"></svg>
+            <span>Trang chủ</span>
+          </a>
+        </li>
+
+        <li>
+          <a routerLink="/student/courses" routerLinkActive="active" class="nav-item">
+            <svg lucideGraduationCap class="nav-icon" [size]="20"></svg>
+            <span>Khóa học của tôi</span>
+          </a>
+        </li>
+
+        <li>
+          <a routerLink="/student/notifications" routerLinkActive="active" class="nav-item">
+            <svg lucideBell class="nav-icon" [size]="20"></svg>
+            <span>Thông báo</span>
+          </a>
+        </li>
+
+        <li>
+          <a routerLink="/student/profile" routerLinkActive="active" class="nav-item">
+            <svg lucideUser class="nav-icon" [size]="20"></svg>
+            <span>Thông tin cá nhân</span>
+          </a>
+        </li>
+
+        <li class="nav-item-spaced">
+          <a routerLink="/student/grades" routerLinkActive="active" class="nav-item">
+            <svg lucideChartNoAxesColumn class="nav-icon" [size]="20"></svg>
+            <span>Kết quả học tập</span>
+          </a>
+        </li>
+      }
+    </ul>
+  </nav>
+
+  <!-- Logout Button at Bottom -->
+  <div class="sidebar-footer">
+    <button type="button" class="logout-btn" (click)="onLogout()">
+      <svg lucideLogOut class="logout-icon" [size]="18"></svg>
+      <span>Đăng xuất</span>
+    </button>
+  </div>
+</aside>
+
+<!-- Modal Xác Nhận Đăng Xuất -->
+@if (showLogoutConfirm()) {
+  <div class="modal-overlay" (click)="cancelLogout()">
+    <div class="logout-confirm-card" (click)="$event.stopPropagation()">
+      <div class="confirm-icon-wrapper">
+        <svg lucideLogOut [size]="28"></svg>
+      </div>
+      <h3 class="confirm-title">Xác nhận đăng xuất</h3>
+      <p class="confirm-desc">Bạn có chắc chắn muốn kết thúc phiên làm việc và đăng xuất khỏi hệ thống không?</p>
+      <div class="confirm-actions">
+        <button type="button" class="btn-cancel" (click)="cancelLogout()">Hủy</button>
+        <button type="button" class="btn-confirm-logout" (click)="confirmLogout()">Đăng xuất</button>
+      </div>
+    </div>
+  </div>
+}
+

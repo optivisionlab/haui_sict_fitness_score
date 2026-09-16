@@ -1,0 +1,141 @@
+<div class="notifications-page">
+  <div class="header-row">
+    <h1 class="page-title">Thông báo</h1>
+    @if (notificationService.unreadCount() > 0) {
+      <button type="button" class="btn-mark-all" (click)="markAllAsRead()">
+        <svg lucideCheckCheck [size]="16"></svg>
+        <span>Đánh dấu tất cả đã đọc</span>
+      </button>
+    }
+  </div>
+
+  <div class="card">
+    <!-- Filter Tabs -->
+    <div class="tab-bar">
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'all'"
+        (click)="setTab('all')">
+        Tất cả
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'unread'"
+        (click)="setTab('unread')">
+        Chưa đọc
+        @if (notificationService.unreadCount() > 0) {
+          <span class="tab-badge">{{ notificationService.unreadCount() }}</span>
+        }
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'course'"
+        (click)="setTab('course')">
+        Khóa học
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'exam'"
+        (click)="setTab('exam')">
+        Lịch thi & Kiểm tra
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'system'"
+        (click)="setTab('system')">
+        Hệ thống
+      </button>
+    </div>
+
+    <!-- Search Input -->
+    <div class="search-bar-wrap">
+      <app-search-input
+        placeholder="Tìm kiếm thông báo theo tiêu đề, người gửi..."
+        [(value)]="searchKeyword">
+      </app-search-input>
+    </div>
+
+    <!-- Notifications List -->
+    <div class="notifications-list">
+      @for (item of paginatedNotifications(); track item.id) {
+        <div
+          class="notification-card"
+          [class.unread]="!item.read"
+          (click)="onNotificationClick(item)">
+          <!-- Icon Box -->
+          <div class="notif-icon-box" [ngClass]="item.type">
+            @if (item.type === 'course') {
+              <svg lucideGraduationCap [size]="20"></svg>
+            } @else if (item.type === 'exam') {
+              <svg lucideAlertCircle [size]="20"></svg>
+            } @else {
+              <svg lucideInfo [size]="20"></svg>
+            }
+          </div>
+
+          <!-- Body -->
+          <div class="notif-body">
+            <div class="notif-title-row">
+              <div class="title-with-badge">
+                <h3 class="notif-title">{{ item.title }}</h3>
+                @if (!item.read) {
+                  <span class="unread-tag">Mới</span>
+                }
+              </div>
+              <span class="notif-time">{{ item.time }}</span>
+            </div>
+
+            <p class="notif-message">{{ item.message }}</p>
+
+            <div class="notif-footer-row">
+              @if (item.sender) {
+                <span class="notif-sender">Từ: <strong>{{ item.sender }}</strong></span>
+              }
+
+              <div class="notif-actions" (click)="$event.stopPropagation()">
+                @if (!item.read) {
+                  <button
+                    type="button"
+                    class="action-icon-btn"
+                    title="Đánh dấu đã đọc"
+                    (click)="markAsRead($event, item)">
+                    <svg lucideCheck [size]="16"></svg>
+                    <span>Đã đọc</span>
+                  </button>
+                }
+                <button
+                  type="button"
+                  class="action-icon-btn delete"
+                  title="Xóa thông báo"
+                  (click)="deleteNotification($event, item)">
+                  <svg lucideTrash2 [size]="16"></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      } @empty {
+        <div class="empty-state">
+          Không tìm thấy thông báo nào phù hợp.
+        </div>
+      }
+    </div>
+
+    <!-- Pagination -->
+    @if (filteredNotifications().length > 0) {
+      <div class="pagination-wrap">
+        <app-pagination
+          [(currentPage)]="currentPage"
+          [totalItems]="filteredNotifications().length"
+          [pageSize]="pageSize()"
+          (pageChange)="setPage($event)">
+        </app-pagination>
+      </div>
+    }
+  </div>
+</div>
