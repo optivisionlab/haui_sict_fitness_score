@@ -16,12 +16,12 @@
     "module": "preserve",
     "baseUrl": "./",
     "paths": {
-      "@core/*": ["src/app/core/*"],
-      "@shared/*": ["src/app/shared/*"],
-      "@features/*": ["src/app/features/*"],
-      "@layouts/*": ["src/app/layouts/*"],
-      "@env/*": ["src/environments/*"],
-      "@styles/*": ["src/styles/*"]
+      "@core/*": ["frontend/src/app/core/*"],
+      "@shared/*": ["frontend/src/app/shared/*"],
+      "@features/*": ["frontend/src/app/features/*"],
+      "@layouts/*": ["frontend/src/app/layouts/*"],
+      "@env/*": ["frontend/src/environments/*"],
+      "@styles/*": ["frontend/src/styles/*"]
     }
   },
   "angularCompilerOptions": {
