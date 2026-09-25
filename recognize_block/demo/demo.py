@@ -241,8 +241,8 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
         cap = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     else:
-        cap = cv2.VideoCapture(video_path)
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        cap = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
+        # cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
 
     if not cap.isOpened():
