@@ -50,13 +50,18 @@ class SetUpEvaluate:
             end
 
             local cam_id = ARGV[1]
-            local last_cam = ARGV[2]
-            local last_time = ARGV[3]
-            local img_url = ARGV[4]
-            local n = tonumber(ARGV[5])
+            local last_time = ARGV[2]
+            local img_url = ARGV[3]
+            local n = tonumber(ARGV[4])
 
-            -- dedup same cam
-            if last_cam == cam_id then
+            local redis_last_cam = redis.call('HGET', key, 'last_cam') or ''
+
+            if redis_last_cam == cam_id then
+                return {0, tonumber(redis.call('HGET', key, 'lap') or '0')}
+            end
+
+            local current_flag = tonumber(redis.call('HGET', key, 'flag_' .. cam_id) or '0')
+            if current_flag == 1 then
                 return {0, tonumber(redis.call('HGET', key, 'lap') or '0')}
             end
 
@@ -71,7 +76,7 @@ class SetUpEvaluate:
 
             -- check all flags
             for i = 1, n do
-                local field = ARGV[i + 5]
+                local field = ARGV[i + 4]
                 if tonumber(redis.call('HGET', key, field) or '0') ~= 1 then
                     local lap_now = tonumber(redis.call('HGET', key, 'lap') or '0')
                     return {1, lap_now}
@@ -83,7 +88,7 @@ class SetUpEvaluate:
             redis.call('HSET', key, 'lap', lap)
 
             for i = 1, n do
-                redis.call('HSET', key, ARGV[i + 5], 0)
+                redis.call('HSET', key, ARGV[i + 4], 0)
             end
 
             return {2, lap}
@@ -155,8 +160,8 @@ class SetUpEvaluate:
         if not self.test_mode and not self.redis_client.exists(key_user):
             return (-2, -1)
 
-        # vẫn đọc last_cam ở Python để truyền vào script cho rule dedup
-        last_cam = _decode(self.redis_client.hget(key_user, "last_cam")) or ""
+        # Không đọc last_cam ở Python nữa.
+        # last_cam = _decode(self.redis_client.hget(key_user, "last_cam")) or ""
 
         img_url = ""
         if self.cfg.upload_each_checkin and copy_frame is not None:
@@ -176,7 +181,7 @@ class SetUpEvaluate:
             keys=[key_user],
             args=[
                 cam_id,
-                str(last_cam),
+                # str(last_cam),
                 self._to_redis_datetime_str_from_ms(ts_ms),
                 img_url,
                 str(len(flag_fields)),
@@ -199,28 +204,3 @@ class SetUpEvaluate:
             logger.info("User {} completed lap {}", user_id, lap)
 
         return status, lap
-
-    def check_lap_1_user(self, user_id) -> bool:
-        user_id = str(user_id)
-        key_user = f"user:{user_id}:data"
-        flag_fields = [f"flag_{c}" for c in self.id_run_process]
-
-        # Atomic finalize in Redis: only increment lap when all flags are set,
-        # and reset flags in the same operation to avoid race conditions.
-        result = int(
-            self._lap_script(
-                keys=[key_user],
-                args=[str(len(flag_fields)), *flag_fields],
-            )
-        )
-
-        if result <= 0:
-            return False
-
-        logger.info("User {} completed lap {}", user_id, result)
-        return True
-
-
-class GlobalEvaluator(SetUpEvaluate):
-    """Backward-compatible evaluator. Extend here if you want DB writes."""
-    pass

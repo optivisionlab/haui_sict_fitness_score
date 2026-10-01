@@ -100,7 +100,7 @@ async def send_tracking_to_api(
     collection_name="face",
     *,
     cam_id=None,
-    similarity_threshold: float = 0.6,
+    similarity_threshold: float = 0.55,
     crop_mode: str = "union",  # "union" | "none"
 ):
     if not ids or frame is None:

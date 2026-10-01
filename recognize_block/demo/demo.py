@@ -47,6 +47,7 @@ from datetime import datetime
 import asyncio
 import csv
 from pathlib import Path
+import threading
 
 # ================== CONFIG ==================
 MODEL_PATH = YOLO_MODEL_PATH
@@ -238,8 +239,11 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
 
     if mode == "rtsp":
         cap = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     else:
         cap = cv2.VideoCapture(video_path)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
 
     if not cap.isOpened():
         logger.error(f"[Producer-{cid}] Cannot open video {video_path}")
@@ -248,12 +252,9 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
     video_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     logger.info(f"[Producer-{cid}] Video FPS = {video_fps}")
 
-    frame_interval = 1.0 / video_fps
-    TARGET_DETECT_FPS = video_fps
-    frame_step = max(1, int(round(video_fps / TARGET_DETECT_FPS)))
-
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
     call_zone = [
         int(w * CALL_ZONE_X1_RATIO),
         int(h * CALL_ZONE_Y1_RATIO),
@@ -261,18 +262,52 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
         int(h * CALL_ZONE_Y2_RATIO),
     ]
 
-    frame_count = 0
-    next_frame_time = time.time()
+    latest_frame_data = {
+        "frame_id": -1,
+        "frame": None,
+        "captured_at_ms": 0,
+    }
 
-    # per-track state for this camera only
-    # {
-    #   track_id: {
-    #       "last_seen_ts": float,
-    #       "last_sent_ts": float,
-    #       "retry_count": int,
-    #       "best_sent_area": int,
-    #   }
-    # }
+    latest_lock = threading.Lock()
+    stop_event = threading.Event()
+
+    def camera_reader_loop():
+        frame_id = 0
+        frame_interval = 1.0 / video_fps if video_fps > 0 else 1.0 / 30.0
+
+        while not stop_event.is_set():
+            read_start = time.time()
+
+            ret, frame = cap.read()
+
+            if not ret:
+                logger.warning(f"[Producer-{cid}] camera read failed or end of stream")
+                stop_event.set()
+                break
+
+            captured_at_ms = int(time.time() * 1000)
+
+            with latest_lock:
+                latest_frame_data["frame_id"] = frame_id
+                latest_frame_data["frame"] = frame
+                latest_frame_data["captured_at_ms"] = captured_at_ms
+
+            frame_id += 1
+
+            # Với video file thì sleep để giả lập realtime.
+            # Với RTSP thật thì có thể bỏ sleep, nhưng giữ cũng không ảnh hưởng nhiều.
+            if mode != "rtsp":
+                elapsed = time.time() - read_start
+                sleep_time = frame_interval - elapsed
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+
+    reader_thread = threading.Thread(
+        target=camera_reader_loop,
+        daemon=True,
+    )
+    reader_thread.start()
+
     track_states = {}
 
     def box_area(box):
@@ -285,6 +320,7 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
             for track_id, state in track_states.items()
             if now_ts - state["last_seen_ts"] > TRACK_MEMORY_TTL_SEC
         ]
+
         for track_id in expired_track_ids:
             track_states.pop(track_id, None)
 
@@ -293,162 +329,177 @@ def tracker_producer_worker(cid, video_path, start_barrier, mode="rtsp"):
                 f"[Producer-{cid}] cleaned {len(expired_track_ids)} expired track(s): {expired_track_ids}"
             )
 
+    last_processed_frame_id = -1
+
     try:
-        while True:
-            now = time.time()
+        while not stop_event.is_set():
+            with latest_lock:
+                frame_id = latest_frame_data["frame_id"]
+                frame = latest_frame_data["frame"].copy() if latest_frame_data["frame"] is not None else None
+                frame_start_ms = latest_frame_data["captured_at_ms"]
 
-            if now < next_frame_time:
-                time.sleep(next_frame_time - now)
+            if frame is None:
+                time.sleep(0.001)
+                continue
 
-            next_frame_time += frame_interval
+            if frame_id == last_processed_frame_id:
+                time.sleep(0.001)
+                continue
 
-            ret, frame = cap.read()
+            last_processed_frame_id = frame_id
 
-            if not ret:
-                logger.info(f"[Producer-{cid}] End of video")
-                break
-
-            frame_start_perf = time.perf_counter()
-            frame_start_ms = time.time_ns() // 1_000_000
             frame_status = "no_person_or_not_sent"
+            # frame_process_start = time.perf_counter()
 
-            if frame_count % frame_step == 0:
-                t0 = time.perf_counter()
-                track_ids, boxes, _ = tracker.detect_frame(
-                    frame,
-                    call_zone_xyxy=call_zone,
-                    min_overlap_ratio=CALL_ZONE_MIN_OVERLAP_RATIO,
-                )
-                detect_time = time.perf_counter() - t0
+            t0 = time.perf_counter()
+            track_ids, boxes, _ = tracker.detect_frame(
+                frame,
+                call_zone_xyxy=call_zone,
+                min_overlap_ratio=CALL_ZONE_MIN_OVERLAP_RATIO,
+            )
+            detect_time = time.perf_counter() - t0
 
-                logger.info(
-                    f"[Producer-{cid}] frame={frame_count}, "
-                    f"detect_time={detect_time:.3f}s, track_ids={len(track_ids)}"
-                )
+            logger.info(
+                f"[Producer-{cid}] frame={frame_id}, "
+                f"detect_time={detect_time:.3f}s, track_ids={len(track_ids)}"
+            )
 
-                now_seen_ts = time.time()
-                cleanup_track_states(now_seen_ts)
+            now_seen_ts = time.time()
+            cleanup_track_states(now_seen_ts)
 
-                send_track_ids = []
-                send_boxes = []
+            send_track_ids = []
+            send_boxes = []
 
-                for track_id, box in zip(track_ids, boxes):
-                    area = box_area(box)
+            for track_id, box in zip(track_ids, boxes):
+                area = box_area(box)
 
-                    state = track_states.get(track_id)
-                    if state is None:
-                        state = {
-                            "last_seen_ts": now_seen_ts,
-                            "last_sent_ts": 0.0,
-                            "retry_count": 0,
-                            "best_sent_area": 0,
-                        }
-                        track_states[track_id] = state
+                state = track_states.get(track_id)
+                if state is None:
+                    state = {
+                        "last_seen_ts": now_seen_ts,
+                        "last_sent_ts": 0.0,
+                        "retry_count": 0,
+                        "best_sent_area": 0,
+                    }
+                    track_states[track_id] = state
 
-                    state["last_seen_ts"] = now_seen_ts
+                state["last_seen_ts"] = now_seen_ts
 
-                    # bbox còn quá nhỏ thì chưa gửi, chờ frame sau tốt hơn
-                    if area < MIN_SEARCH_BOX_AREA:
-                        logger.debug(
-                            f"[Producer-{cid}] skip small box track_id={track_id}, area={area}, frame={frame_count}"
-                        )
-                        continue
-
-                    should_send = False
-
-                    # lần đầu đủ điều kiện -> gửi
-                    if state["retry_count"] == 0:
-                        should_send = True
-                    else:
-                        enough_wait = (now_seen_ts - state["last_sent_ts"]) >= TRACK_RETRY_INTERVAL_SEC
-                        improved_enough = area >= max(
-                            MIN_SEARCH_BOX_AREA,
-                            int(state["best_sent_area"] * TRACK_RETRY_GROWTH_FACTOR),
-                        )
-                        under_retry_limit = state["retry_count"] < TRACK_MAX_RETRY
-
-                        if enough_wait and improved_enough and under_retry_limit:
-                            should_send = True
-
-                    if not should_send:
-                        logger.debug(
-                            f"[Producer-{cid}] hold track_id={track_id}, frame={frame_count}, "
-                            f"area={area}, retry_count={state['retry_count']}, "
-                            f"best_sent_area={state['best_sent_area']}"
-                        )
-                        continue
-
-                    send_track_ids.append(track_id)
-                    send_boxes.append(box)
-
-                logger.info(
-                    f"[Producer-{cid}] frame={frame_count}, raw_track_ids={track_ids}, send_track_ids={send_track_ids}"
-                )
-
-                if send_track_ids:
-                    captured_at_ms = time.time_ns() // 1_000_000
-
-                    headers = [
-                        ("frame_start_ms", str(frame_start_ms).encode()),
-                        ("timestamp_ms", str(captured_at_ms).encode()),
-                        ("frame_id", str(frame_count).encode()),
-                        ("person_ids", json.dumps(send_track_ids).encode()),
-                        ("bboxes", json.dumps(send_boxes).encode()),
-                    ]
-
-                    logger.warning(
-                        f"[Producer-{cid}] WILL_ENQUEUE frame={frame_count}, send_track_ids={send_track_ids}"
+                if area < MIN_SEARCH_BOX_AREA:
+                    logger.debug(
+                        f"[Producer-{cid}] skip small box track_id={track_id}, "
+                        f"area={area}, frame={frame_id}"
                     )
+                    continue
 
-                    sent = producer.send_frame(cid, frame, headers=headers)
+                should_send = False
 
-                    if sent:
-                        frame_status = "sent_to_kafka"
-                    else:
-                        frame_status = "send_failed"
-                    logger.warning(
-                        f"[Producer-{cid}] ENQUEUE_RESULT frame={frame_count}, sent={sent}"
-                    )
-
-                    if not sent:
-                        logger.warning(f"[Producer-{cid}] failed to enqueue frame={frame_count}")
-                    else:
-                        sent_track_id_set = set(send_track_ids)
-                        for track_id, box in zip(track_ids, boxes):
-                            if track_id not in sent_track_id_set:
-                                continue
-
-                            state = track_states.get(track_id)
-                            if state is None:
-                                continue
-
-                            area = box_area(box)
-                            state["last_sent_ts"] = now_seen_ts
-                            state["retry_count"] += 1
-                            state["best_sent_area"] = max(state["best_sent_area"], area)
+                if state["retry_count"] == 0:
+                    should_send = True
                 else:
-                    logger.debug(f"[Producer-{cid}] no eligible track to send at frame={frame_count}")
-            producer_time_sec = time.perf_counter() - frame_start_perf
+                    # Nếu bạn đã bỏ TRACK_RETRY_INTERVAL_SEC và TRACK_MAX_RETRY,
+                    # có thể đổi block này thành: should_send = True
+                    enough_wait = (
+                        now_seen_ts - state["last_sent_ts"]
+                    ) >= TRACK_RETRY_INTERVAL_SEC
+
+                    under_retry_limit = state["retry_count"] < TRACK_MAX_RETRY
+
+                    # if enough_wait and under_retry_limit:
+                    should_send = True
+
+                if not should_send:
+                    logger.debug(
+                        f"[Producer-{cid}] hold track_id={track_id}, frame={frame_id}, "
+                        f"area={area}, retry_count={state['retry_count']}, "
+                        f"best_sent_area={state['best_sent_area']}"
+                    )
+                    continue
+
+                send_track_ids.append(track_id)
+                send_boxes.append(box)
+
+            logger.info(
+                f"[Producer-{cid}] frame={frame_id}, "
+                f"raw_track_ids={track_ids}, send_track_ids={send_track_ids}"
+            )
+
+            if send_track_ids:
+                captured_at_ms = int(time.time() * 1000)
+
+                headers = [
+                    ("frame_start_ms", str(frame_start_ms).encode()),
+                    ("timestamp_ms", str(captured_at_ms).encode()),
+                    ("frame_id", str(frame_id).encode()),
+                    ("person_ids", json.dumps(send_track_ids).encode()),
+                    ("bboxes", json.dumps(send_boxes).encode()),
+                ]
+
+                logger.warning(
+                    f"[Producer-{cid}] WILL_ENQUEUE frame={frame_id}, "
+                    f"send_track_ids={send_track_ids}"
+                )
+
+                sent = producer.send_frame(cid, frame, headers=headers)
+
+                if sent:
+                    frame_status = "sent_to_kafka"
+
+                    sent_track_id_set = set(send_track_ids)
+                    for track_id, box in zip(track_ids, boxes):
+                        if track_id not in sent_track_id_set:
+                            continue
+
+                        state = track_states.get(track_id)
+                        if state is None:
+                            continue
+
+                        area = box_area(box)
+                        state["last_sent_ts"] = now_seen_ts
+                        state["retry_count"] += 1
+                        state["best_sent_area"] = max(state["best_sent_area"], area)
+                else:
+                    frame_status = "send_failed"
+                    logger.warning(f"[Producer-{cid}] failed to enqueue frame={frame_id}")
+
+                logger.warning(
+                    f"[Producer-{cid}] ENQUEUE_RESULT frame={frame_id}, sent={sent}"
+                )
+            else:
+                logger.debug(f"[Producer-{cid}] no eligible track to send at frame={frame_id}")
+
+            frame_end_ms = int(time.time() * 1000)
+            time_ms = frame_end_ms - frame_start_ms if frame_start_ms > 0 else -1
 
             append_csv_row(
                 csv_path=f"producer_{cid}_frames.csv",
                 header=[
                     "frame_id",
-                    "producer_time_sec",
+                    "start_ms",
+                    "end_ms",
+                    "time_ms",
                     "status",
                 ],
                 row=[
-                    frame_count,
-                    round(producer_time_sec, 6),
+                    frame_id,
+                    frame_start_ms,
+                    frame_end_ms,
+                    time_ms,
                     frame_status,
                 ],
             )
-            frame_count += 1
 
     except Exception as e:
         logger.exception(f"[Producer-{cid}] crashed: {e}")
 
     finally:
+        stop_event.set()
+
+        try:
+            reader_thread.join(timeout=2)
+        except Exception:
+            logger.exception(f"[Producer-{cid}] failed to join reader thread")
+
         cap.release()
         producer.flush(5)
         logger.info(f"[Producer-{cid}] finished")
@@ -471,7 +522,7 @@ async def consumer_worker(cid: int):
         topic,
         group_id=f"group-{topic}",
         # Realtime mode: allow parallel processing but keep safe-commit ordering.
-        worker_concurrency=2,
+        worker_concurrency=1,
         max_pending_messages=10,
         drop_oldest_on_full=DROP_OLDEST_FRAME,
         stats_file_path=f'cam_{cid}_consumer_stats.txt',
@@ -573,14 +624,6 @@ async def consumer_worker(cid: int):
     await consumer.start(handle_frame)
 
 
-def consumer_worker_entry(cid: int, start_barrier):
-    try:
-        _wait_start_barrier(cid, start_barrier, "Consumer")
-        asyncio.run(consumer_worker(cid))
-    except Exception:
-        logger.exception(f"[Consumer-{cid}] crashed before start")
-
-
 # async consumer entry point for multiprocessing
 def consumer_worker_entry(cid: int, start_barrier):
     try:
@@ -614,7 +657,7 @@ def main():
     for cid in CAM_IDS:
         p = ctx.Process(
             target=tracker_producer_worker,
-            args=(cid, video_sources[str(cid)], start_barrier, "rtsp"),
+            args=(cid, video_sources[str(cid)], start_barrier, "camera"),
             daemon=False,
         )
         p.start()

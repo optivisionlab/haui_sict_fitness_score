@@ -22,9 +22,16 @@ import cv2
 
 class SimpleTracker:
     """
-    No real tracking yet:
-    - Detect only (YOLO.predict / YOLO()).
-    - Generate TEMP random ids ONLY for mapping in face-search response.
+        Wrapper xử lý YOLO tracking cho từng camera.
+
+        Nhiệm vụ:
+        - Gọi YOLO.track() để lấy person bbox và track_id ổn định theo thời gian.
+        - Lọc chỉ class person.
+        - Lọc thêm theo call_zone để chỉ giữ người nằm trong vùng hợp lệ.
+        - Trả về:
+            track_ids: danh sách ID tracking của từng người
+            boxes: bbox [x1, y1, x2, y2] tương ứng
+            frame: frame gốc
     """
 
     def __init__(self, detection_model, cam_id, tracker_config: Optional[str] = None):
@@ -42,6 +49,15 @@ class SimpleTracker:
 
     @staticmethod
     def _intersection_over_box(box_xyxy: List[int], zone_xyxy: List[int]) -> float:
+        """
+            Tính tỷ lệ diện tích bbox người nằm trong call zone.
+
+            Ví dụ:
+            - bbox người nằm 70% trong vùng hợp lệ -> return 0.7
+            - bbox nằm ngoài hoàn toàn -> return 0.0
+
+            Dùng để bỏ qua các người chưa đi vào vùng cần check-in/search.
+        """
         bx1, by1, bx2, by2 = box_xyxy
         zx1, zy1, zx2, zy2 = zone_xyxy
 
@@ -72,6 +88,7 @@ class SimpleTracker:
             persist=True,
             tracker=self.tracker_config,
             classes=[0],
+            half=True,
         )[0]
 
         track_ids: List[int] = []
@@ -135,19 +152,29 @@ class SimpleTracker:
     
     
 class APIHandler:
+    """
+        Xử lý frame đã đi qua Kafka ở phía consumer.
+
+        Nhiệm vụ:
+        - Nhận full frame + bbox + track_id.
+        - Lọc các track vừa search thành công trong TTL ngắn.
+        - Gọi search API để map track_id -> user_id.
+        - Ghi Redis để set flag camera và cộng lap nếu đủ điều kiện.
+    """
     def __init__(self, evaluator, collection_name=QDRANT_COLLECTION):
         self.evaluator = evaluator
         self.collection_name = collection_name
 
-        # cooldown per user to prevent double count (stored in milliseconds)
-        self._user_cooldown_until_ms: Dict[str, int] = {}
-        self.user_cooldown_ms = API_HANDLER_USER_COOLDOWN_MS  # 1s in milliseconds
+        # Cooldown theo từng user_id + cam_id, không phải toàn user
+        self._user_cam_cooldown_until_ms = {}
+        self.user_cooldown_ms = API_HANDLER_USER_COOLDOWN_MS
 
         # per-cam gate to reduce API spam (timestamps stored in milliseconds)
         self._cam_last_call_ts_ms: Dict[str, int] = {}
         self.cam_call_min_interval_ms = API_HANDLER_CAM_CALL_MIN_INTERVAL_MS  # milliseconds
 
-        self._successful_tracks: Dict[str, Set[int]] = defaultdict(set)
+        self._successful_tracks: Dict[str, Dict[int, float]] = defaultdict(dict)
+        self.success_track_ttl_sec = 0.5
         # line band (hysteresis) around the line to approximate "crossing"
         self.band_ratio = API_HANDLER_BAND_RATIO  # 6% of image height
 
@@ -173,6 +200,27 @@ class APIHandler:
             _, y_center, _, _ = box
         return y_center > y_line
 
+    def _is_success_track(self, cam_id, track_id):
+        cam_id = str(cam_id)
+        track_id = int(track_id)
+        expire_at = self._successful_tracks[cam_id].get(track_id)
+        if expire_at is None:
+            return False
+
+        if time.time() > expire_at:
+            self._successful_tracks[cam_id].pop(track_id, None)
+            return False
+
+        return True
+
+
+    def _mark_success_track(self, cam_id, track_id):
+        cam_id = str(cam_id)
+        track_id = int(track_id)
+
+        self._successful_tracks[cam_id][track_id] = time.time() + self.success_track_ttl_sec
+
+
     async def process(self, cam_id, frame, xyxy_boxes, ids, timestamp=None):
         cam_id = str(cam_id)
 
@@ -189,9 +237,9 @@ class APIHandler:
         pending_pairs = [
             (track_id, box)
             for track_id, box in incoming_pairs
-            if track_id not in self._successful_tracks[cam_id]
+            if not self._is_success_track(cam_id, track_id)
         ]
-
+        logger.info(f"Cam {cam_id} incoming tracks: {incoming_pairs}, pending tracks after filtering successful ones: {pending_pairs}")
         if not pending_pairs:
             logger.info(f"Skip search API for cam {cam_id}: all tracks already successful")
             return
@@ -251,10 +299,19 @@ class APIHandler:
                 return
 
             for track_id, user_id, box in detections:
-                until_ms = self._user_cooldown_until_ms.get(user_id, 0)
+                cooldown_key = (str(user_id), str(cam_id))
+                until_ms = self._user_cam_cooldown_until_ms.get(cooldown_key, 0)
+
                 if now_mono_ms < until_ms:
                     continue
-
+                self._mark_success_track(cam_id, track_id)
+                logger.info(
+                    "MARK_SUCCESS cam={} track={} user={} cache={}",
+                    cam_id,
+                    track_id,
+                    user_id,
+                    self._successful_tracks.get(str(cam_id), {}),
+                )
                 draw_frame = None
                 if self.evaluator.cfg.upload_each_checkin:
                     draw_frame = cv2.cvtColor(
@@ -267,7 +324,7 @@ class APIHandler:
                     cam_id,
                     copy_frame=draw_frame,
                 )
-
+                logger.info("Check-in result for user {} cam {}: status={} lap={}", user_id, cam_id, status, lap_value)
                 if status < 0:
                     logger.warning(
                         "Skip user {} cam {} due to invalid state/status={}",
@@ -277,22 +334,10 @@ class APIHandler:
                     )
                     continue
 
-                if status == 0:
-                    logger.debug("Duplicate same cam for user {} cam {}", user_id, cam_id)
-                    continue
-
-                # chỉ khi có match user thì mới coi track này là thành công
-                self._successful_tracks[cam_id].add(int(track_id))
-                logger.info(
-                    "Marked successful track cam_id={} track_id={} -> user_id={}",
-                    cam_id,
-                    track_id,
-                    user_id,
-                )
-
-                if status == 2:
-                    logger.info("✅ user {} completed a lap={} (cam={})", user_id, lap_value, cam_id)
-                    self._user_cooldown_until_ms[user_id] = now_mono_ms + self.user_cooldown_ms
-
+                if status >= 0:
+                    cooldown_key = (user_id, cam_id)
+                    self._user_cam_cooldown_until_ms[cooldown_key] = (
+                        now_mono_ms + self.user_cooldown_ms
+                    )
         except Exception as e:
             logger.exception(f"API search error: {e}")
