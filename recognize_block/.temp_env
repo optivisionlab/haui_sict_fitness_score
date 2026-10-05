@@ -1,0 +1,112 @@
+# =========================
+# CORE RUNTIME
+# =========================
+APP_ENV=dev
+TEST_MODE=true
+
+# =========================
+# SEARCH / QDRANT
+# =========================
+SEARCH_API_URL=http://xx.xxx.xxx.xxx:8000
+LINE_BEGIN_SEARCH=0.33
+SEARCH_API_CAMERA_URLS=1=http://xxx.xx.xxx.xx:1906,2=http://xxx.xx.xxx.xx:1907,3=http://xxx.xx.xxx.xx:1908,4=http://xxx.xx.xxx.xx:1909
+
+# =========================
+# KAFKA
+# =========================
+KAFKA_SERVERS=xxx.xx.xxx.xx:9098
+KAFKA_TOPIC_TEMPLATE=camera-{cid}
+
+# =========================
+# REDIS
+# =========================
+REDIS_HOST=xxx.xx.xxx.xx
+REDIS_PORT=6379
+REDIS_DB=0
+REDIS_PASSWORD=xxxx
+
+# =========================
+# MONGO
+# =========================
+# MONGO_URI=mongodb://xx.xxx.xxx.xxx:27017/
+# MONGO_DB=test
+# MONGO_FLAGS_COLLECTION=flags_db
+# MONGO_LAPS_COLLECTION=laps_db
+
+# =========================
+# POSTGRES  (chú ý: port của bạn trong demo là 5555)
+# =========================
+POSTGRE_USER=labelstudio
+POSTGRE_PASSWORD=xxxx
+POSTGRE_HOST=xxx.xx.xxx.xx
+POSTGRE_PORT=5555
+POSTGRE_DB=xxxx
+
+# =========================
+# MINIO
+# =========================
+MINIO_ENDPOINT=xx.xxx.xxx.xxx:9000
+MINIO_ACCESS_KEY=admin
+MINIO_SECRET_KEY=xxxx
+MINIO_BUCKET_NAME=xxxx
+
+# =========================
+# YOLO / TRACKING
+# =========================
+YOLO_MODEL_PATH=weights/yolo11n.pt
+BOTSORT_CONFIG=src/config/botsort.yaml
+# TRACKING_CONF=0.5
+# TRACKING_IOU=0.5
+PERSIST_TRACKING=true
+SHOW_TRACKING=true
+STREAM_TRACKING=true
+
+QDRANT_COLLECTION=face
+
+
+# =========================
+# EVAL
+# =========================
+EVAL_UPLOAD_EACH_CHECKIN=false
+EVAL_CHECKIN_COOLDOWN_MS=0
+EVAL_LAP_LOCK_SECONDS=0
+
+# =========================
+# DETECTION / API HANDLER
+# =========================
+TRACKING_CONF=0.8
+TRACKING_IOU=0.8
+SAVE_TRACKING=true
+API_HANDLER_USER_COOLDOWN_MS=0
+API_HANDLER_CAM_CALL_MIN_INTERVAL_MS=0
+API_HANDLER_BAND_RATIO=0
+SEARCH_API_CROP_MODE=none
+
+# =========================
+# SAVE DB API
+# =========================
+SAVE_DB_API_HOST=localhost
+SAVE_DB_API_PORT=8001
+
+# =========================
+# DEMO
+# =========================
+CAM_IDS=1,2,3,4
+# CAM_IDS=1
+CAMERA_SOURCE_URLS=1=rtsp://xx.x.xx.xx:8554/cam1,2=rtsp://xx.x.xx.xx:8554/cam2,3=rtsp://xx.x.xx.xx:8554/cam3,4=rtsp://xx.x.xx.xx:8554/cam4
+CAMERA_SOURCE_URLS=1=D:\haui_sict_fitness_score\data_test\0207.mp4,2=D:\haui_sict_fitness_score\data_test\0207(2).mp4,3=D:\haui_sict_fitness_score\data_test\0207(3).mp4,4=D:\haui_sict_fitness_score\data_test\0207(1).mp4
+# CAMERA_SOURCE_URLS=1=D:\haui_sict_fitness_score\data_test\0207(2).mp4
+START_BARRIER_TIMEOUT_SEC=30
+CALL_ZONE_X1_RATIO=0.2
+CALL_ZONE_Y1_RATIO=0.45
+CALL_ZONE_X2_RATIO=0.8
+CALL_ZONE_Y2_RATIO=1.0
+CALL_ZONE_MIN_OVERLAP_RATIO=0.5
+
+DROP_OLDEST_FRAME=true
+
+TRACK_MEMORY_TTL_SEC=20
+TRACK_RETRY_INTERVAL_SEC=0.3
+TRACK_MAX_RETRY=20
+TRACK_RETRY_GROWTH_FACTOR=1.03
+MIN_SEARCH_BOX_AREA=12000
