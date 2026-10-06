@@ -1,167 +1,128 @@
 import logging
-import time
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.utils import get_openapi
-from app.core.config import settings
-from app.core.database import init_db, engine
-from app.core.database import configure_redis_notifications
-import asyncio
-from app.core.redis_dispatcher import run_background
-from app.api.endpoints import api_router
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
 
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+from app.api import api_router
+from app.core import (
+    get_db,
+    settings,
+    setup_exception_handlers,
+    setup_middlewares,
 )
+
 logger = logging.getLogger(__name__)
 
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    version=settings.VERSION,
-    openapi_url="/openapi.json" if not settings.API_V1_STR else f"{settings.API_V1_STR}/openapi.json",
-)
 
-# Background dispatcher handles global Redis -> per-user republish
-_redis_dispatcher_task: asyncio.Task | None = None
-_redis_dispatcher_stop: asyncio.Event | None = None
-
-
-# Request logging middleware (logs method, path, status and duration)
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    start_time = time.time()
-    response = await call_next(request)
-    process_time = (time.time() - start_time) * 1000.0
-    logger.info(
-        "%s %s completed_in=%.2fms status_code=%s",
-        request.method,
-        request.url.path,
-        process_time,
-        response.status_code,
-    )
-    response.headers["X-Process-Time-ms"] = f"{process_time:.2f}"
-    return response
-
-
-# Set up CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# Include API router directly (fail fast if there is an import error)
-app.include_router(api_router, prefix=settings.API_V1_STR)
-
-
-@app.on_event("startup")
-async def on_startup():
-    # create DB tables if necessary
+def init_db_indexes():
     try:
-        init_db()
-    except Exception:
-        # don't crash startup on DB init problems here; surface later on real requests
-        logger.exception("Database initialization failed at startup")
+        database = get_db()
+        database.users.create_index("email", unique=True)
+        database.users.create_index("userCode", unique=True, sparse=True)
 
-    # Ensure Redis will emit keyspace/keyevent notifications required by our SSE
-    try:
-        configure_redis_notifications()
-    except Exception:
-        logger.exception("Failed to configure Redis keyspace notifications during startup")
-
-    # Start global Redis dispatcher as a background task. It listens for keyevents
-    # and republishes messages to per-user channels so SSE clients can subscribe
-    # to a small, dedicated channel.
-    try:
-        global _redis_dispatcher_task, _redis_dispatcher_stop
-        if _redis_dispatcher_task is None:
-            _redis_dispatcher_stop = asyncio.Event()
-            _redis_dispatcher_task = asyncio.create_task(run_background(_redis_dispatcher_stop))
-            logger.info("Started redis_dispatcher background task")
-    except Exception:
-        logger.exception("Failed to start redis dispatcher")
-
-    # Log all registered routes for visibility
-    try:
-        routes = [
-            f"{','.join(sorted(getattr(r, 'methods', []) or []))} {getattr(r, 'path', '')}"
-            for r in app.routes
-        ]
-        logger.info("Registered routes (%d):\n%s", len(routes), "\n".join(routes))
-    except Exception:
-        logger.debug("Failed to list routes on startup", exc_info=True)
-
-
-@app.get("/health", tags=["Health"])
-def health_check():
-    """Simple health check that verifies DB connectivity."""
-    try:
-        with engine.connect() as conn:
-            # lightweight check
-            conn.execute("SELECT 1")
-        return {"status": "ok"}
-    except Exception:
-        logger.exception("Health check failed")
-        raise HTTPException(status_code=503, detail="Service unavailable")
-
-
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-    openapi_schema = get_openapi(
-        title=settings.PROJECT_NAME,
-        version=settings.VERSION,
-        routes=app.routes,
-    )
-    # Add Bearer auth scheme for JWT tokens
-    openapi_schema.setdefault("components", {}).setdefault("securitySchemes", {})
-    openapi_schema["components"]["securitySchemes"]["bearerAuth"] = {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-    }
-    # Set global security requirement so docs use Bearer token input
-    openapi_schema.setdefault("security", [])
-    openapi_schema["security"].append({"bearerAuth": []})
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
-
-
-app.openapi = custom_openapi
-
-
-@app.get("/")
-def read_root():
-    return {"status": "ok", "project": settings.PROJECT_NAME}
-
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    """Stop the redis dispatcher background task cleanly."""
-    global _redis_dispatcher_task, _redis_dispatcher_stop
-    try:
-        if _redis_dispatcher_stop is not None:
-            _redis_dispatcher_stop.set()
-        if _redis_dispatcher_task is not None:
-            # give it a short timeout to exit
-            await asyncio.wait_for(_redis_dispatcher_task, timeout=3.0)
-    except asyncio.TimeoutError:
+        # Dọn dẹp index cũ dạng snake_case nếu có
         try:
-            _redis_dispatcher_task.cancel()
-        except Exception:
-            pass
-    except Exception:
-        logger.exception("Error while shutting down redis dispatcher")
+            for idx in database.enrollments.list_indexes():
+                if "user_id" in idx["name"] or "course_id" in idx["name"]:
+                    database.enrollments.drop_index(idx["name"])
+                    logger.info("Dropped stale index on enrollments: %s", idx["name"])
+        except Exception as drop_err:
+            logger.warning("Could not drop stale enrollments indexes: %s", drop_err)
+
+        # Tự động đồng bộ các trường snake_case sang camelCase nếu có dữ liệu cũ
+        try:
+            for doc in database.enrollments.find({"userId": {"$exists": False}, "user_id": {"$exists": True}}):
+                database.enrollments.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {"userId": doc["user_id"], "courseId": doc["course_id"]}}
+                )
+            for doc in database.users.find({"userCode": {"$exists": False}, "user_code": {"$exists": True}}):
+                database.users.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {"userCode": doc["user_code"]}}
+                )
+            for doc in database.tasks.find({"courseId": {"$exists": False}, "course_id": {"$exists": True}}):
+                update_fields = {"courseId": doc["course_id"]}
+                if doc.get("sport_id") is not None:
+                    update_fields["sportId"] = doc["sport_id"]
+                database.tasks.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": update_fields}
+                )
+            for doc in database.courses.find({"teacherId": {"$exists": False}, "teacher_id": {"$exists": True}}):
+                database.courses.update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {"teacherId": doc["teacher_id"]}}
+                )
+        except Exception as mig_err:
+            logger.warning("Could not migrate legacy fields: %s", mig_err)
+
+        database.enrollments.create_index([("userId", 1), ("status", 1)])
+        database.enrollments.create_index([("userId", 1), ("courseId", 1)], unique=True)
+        database.enrollments.create_index([("courseId", 1), ("studentCode", 1)])
+
+        database.courses.create_index([("teacherId", 1), ("status", 1)])
+        database.tasks.create_index([("courseId", 1), ("category", 1)])
+        database.sports.create_index("code", unique=True)
+
+        database.video_results.create_index([("taskId", 1), ("userId", 1), ("attemptNo", 1)], unique=True)
+        database.video_results.create_index([("taskId", 1), ("userId", 1), ("submittedAt", -1)])
+        database.video_results.create_index([("pending", 1), ("submittedAt", 1)])
+
+        database.live_results.create_index([("taskId", 1), ("userId", 1)])
+        database.live_results.create_index([("cameraId", 1), ("startedAt", -1)])
+
+        database.notifications.create_index([("userId", 1), ("isRead", 1), ("createdAt", -1)])
+    except Exception as e:
+        logger.warning("Could not initialize MongoDB indexes: %s", e)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db_indexes()
+    try:
+        from app.services.sport_service import sport_service
+        sport_service.sync_sports_from_definitions()
+    except Exception as e:
+        logger.warning("Could not auto-sync sport definitions: %s", e)
+    try:
+        from app.services.minio_service import minio_service
+        minio_service.ensure_bucket()
+    except Exception as e:
+        logger.warning("Could not ensure MinIO bucket: %s", e)
 
-if __name__ == "__main__":
-    import uvicorn
+    # Khởi động Kafka Producer & Consumer
+    try:
+        from app.services.kafka_producer import kafka_producer
+        from app.services.kafka_consumer import kafka_result_consumer
+        await kafka_producer.start()
+        await kafka_result_consumer.start()
+    except Exception as e:
+        logger.warning("Could not initialize Kafka services: %s", e)
 
-    uvicorn.run("app.main:app", host="0.0.0.0", port=2305, reload=True)
-    
+    yield
+
+    # Dừng Kafka Producer & Consumer khi tắt app
+    try:
+        from app.services.kafka_producer import kafka_producer
+        from app.services.kafka_consumer import kafka_result_consumer
+        await kafka_result_consumer.stop()
+        await kafka_producer.stop()
+    except Exception as e:
+        logger.warning("Error stopping Kafka services: %s", e)
+
+
+app = FastAPI(
+    title=settings.APP_TITLE,
+    version="1.0.0",
+    description="API Chấm điểm Thể dục & Quản lý Đào tạo thông minh",
+    lifespan=lifespan,
+)
+
+setup_middlewares(app)
+setup_exception_handlers(app)
+app.include_router(api_router)
+
+
+@app.get("/", tags=["Health"])
+def health_check():
+    return {"status": "ok", "app": settings.APP_TITLE}

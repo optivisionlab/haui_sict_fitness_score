@@ -1,0 +1,215 @@
+<div class="admin-sports-page">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Quản Lý Môn Học Thể Chất</h1>
+      <p class="page-subtitle">Khai báo danh mục bộ môn, quy định hình thức đánh giá và tiêu chuẩn đo lường</p>
+    </div>
+    <div>
+      <button type="button" class="btn btn-primary" (click)="openCreateModal()">
+        <svg lucidePlus [size]="18"></svg>
+        <span>Thêm môn học mới</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Search & Stats Bar -->
+  <div class="toolbar-row">
+    <div class="search-box">
+      <svg lucideSearch [size]="18" class="search-icon"></svg>
+      <input
+        type="text"
+        placeholder="Tìm kiếm môn học theo tên, mã môn..."
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event)"
+      />
+      @if (searchTerm()) {
+        <button type="button" class="clear-btn" (click)="searchTerm.set('')">
+          <svg lucideX [size]="16"></svg>
+        </button>
+      }
+    </div>
+    <div class="toolbar-stats">
+      <span>Tổng số môn: <strong>{{ sports().length }}</strong></span>
+    </div>
+  </div>
+
+  <!-- Sports List / Cards Grid -->
+  @if (isLoading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <span>Đang tải danh mục môn học...</span>
+    </div>
+  } @else if (filteredSports.length === 0) {
+    <div class="empty-state-card">
+      <div class="empty-icon">
+        <svg lucideTrophy [size]="48"></svg>
+      </div>
+      <h3>Không tìm thấy môn học nào</h3>
+      <p>Hãy thêm môn học mới để bắt đầu mở các lớp học phần thể chất cho sinh viên.</p>
+      <button type="button" class="btn btn-primary" (click)="openCreateModal()">
+        <svg lucidePlus [size]="18"></svg>
+        <span>Thêm môn ngay</span>
+      </button>
+    </div>
+  } @else {
+    <div class="sports-grid">
+      @for (sport of filteredSports; track sport.id) {
+        <div class="sport-card">
+          <div class="sport-card-top">
+            <div class="sport-badge-code">{{ sport.code }}</div>
+            <span class="mode-badge" [class.video]="sport.mode === 'video'">
+              @if (sport.mode === 'video') {
+                <svg lucideVideo [size]="14"></svg>
+                <span>Video AI</span>
+              } @else {
+                <svg lucideActivity [size]="14"></svg>
+                <span>Thực hành</span>
+              }
+            </span>
+          </div>
+
+          <div class="sport-card-content">
+            <div class="sport-icon-avatar">
+              <svg lucideTrophy [size]="28"></svg>
+            </div>
+            <h3 class="sport-name">{{ sport.name }}</h3>
+            
+            <div class="metrics-section">
+              <span class="metrics-label">Tiêu chí đo lường:</span>
+              <div class="metrics-tags">
+                @if (sport.scoring_config?.metrics_fields && sport.scoring_config?.metrics_fields?.length) {
+                  @for (m of sport.scoring_config?.metrics_fields; track m) {
+                    <span class="metric-tag">{{ m }}</span>
+                  }
+                } @else {
+                  <span class="no-metrics">Chưa thiết lập chỉ số chi tiết</span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <div class="sport-card-footer">
+            <button type="button" class="action-btn edit-btn" (click)="openEditModal(sport)" title="Chỉnh sửa môn">
+              <svg lucideEdit3 [size]="16"></svg>
+              <span>Sửa</span>
+            </button>
+            <button type="button" class="action-btn delete-btn" (click)="confirmDelete(sport)" title="Xóa môn">
+              <svg lucideTrash2 [size]="16"></svg>
+              <span>Xóa</span>
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- MODAL: THÊM / SỬA MÔN HỌC -->
+  @if (showModal()) {
+    <div class="modal-backdrop" (click)="closeModal()">
+      <div class="modal-dialog" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <div class="modal-icon">
+              <svg lucideTrophy [size]="20"></svg>
+            </div>
+            <h2>{{ isEditMode() ? 'Chỉnh Sửa Môn Học' : 'Thêm Môn Học Thể Chất Mới' }}</h2>
+          </div>
+          <button type="button" class="close-btn" (click)="closeModal()">
+            <svg lucideX [size]="20"></svg>
+          </button>
+        </div>
+
+        <form (submit)="onSubmitSport(); $event.preventDefault()">
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="sportCode">Mã môn học <span class="required">*</span></label>
+              <input
+                id="sportCode"
+                type="text"
+                class="form-control"
+                placeholder="VD: PICKLEBALL, BASKETBALL, RUNNING"
+                [(ngModel)]="formData.code"
+                name="sportCode"
+                required
+              />
+              <span class="help-text">Mã định danh viết hoa không dấu dùng trong hệ thống</span>
+            </div>
+
+            <div class="form-group">
+              <label for="sportName">Tên môn học <span class="required">*</span></label>
+              <input
+                id="sportName"
+                type="text"
+                class="form-control"
+                placeholder="VD: Pickleball cơ bản, Bóng rổ, Điền kinh"
+                [(ngModel)]="formData.name"
+                name="sportName"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="sportMode">Hình thức đánh giá điểm</label>
+              <select
+                id="sportMode"
+                class="form-control"
+                [(ngModel)]="formData.mode"
+                name="sportMode"
+              >
+                <option value="video">Tự động qua Video AI (Pose Estimation)</option>
+                <option value="camera">Chấm thi qua Camera giám sát sân trực tiếp</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="metricsInput">Các chỉ số đo lường (ngăn cách bằng dấu phẩy)</label>
+              <input
+                id="metricsInput"
+                type="text"
+                class="form-control"
+                placeholder="accuracy, form_score, posture, repetition_count"
+                [ngModel]="metricsInput()"
+                (ngModelChange)="metricsInput.set($event)"
+                name="metricsInput"
+              />
+              <span class="help-text">Các trường dữ liệu AI sẽ trích xuất để tính điểm kiểm tra</span>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeModal()">Hủy</button>
+            <button type="submit" class="btn btn-primary" [disabled]="isSubmitting()">
+              @if (isSubmitting()) {
+                <span class="spinner-sm"></span>
+                <span>Đang lưu...</span>
+              } @else {
+                <svg lucideCheckCircle2 [size]="18"></svg>
+                <span>{{ isEditMode() ? 'Lưu thay đổi' : 'Tạo môn học' }}</span>
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: XÁC NHẬN XÓA MÔN -->
+  @if (showDeleteModal()) {
+    <div class="modal-backdrop" (click)="cancelDelete()">
+      <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
+        <div class="delete-icon-wrapper">
+          <svg lucideAlertCircle [size]="32"></svg>
+        </div>
+        <h3 class="delete-title">Xác nhận xóa môn học</h3>
+        <p class="delete-desc">
+          Bạn có chắc chắn muốn xóa môn <strong>{{ sportToDelete()?.name }}</strong> (Mã: {{ sportToDelete()?.code }}) khỏi hệ thống không?
+        </p>
+        <div class="delete-actions">
+          <button type="button" class="btn btn-secondary" (click)="cancelDelete()">Hủy</button>
+          <button type="button" class="btn btn-danger" (click)="onExecuteDelete()">Xóa vĩnh viễn</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

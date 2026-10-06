@@ -1,0 +1,212 @@
+services:
+  # ─────────────────────────────────────────────────────────────
+  # 1. MinIO (S3 Compatible Object Storage)
+  #    - API: http://localhost:9000
+  #    - Web UI Console: http://localhost:9001
+  # ─────────────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: fitness_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    ports:
+      - "9000:9000"   # S3 API Endpoint
+      - "9001:9001"   # MinIO Console (Giao diện Web)
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. MongoDB
+  #    - Port: 27017
+  #    - Auth: admin / 123456
+  #    - Database: fitness_score
+  # ─────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:8.0
+    container_name: fitness_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: "123456"
+      MONGO_INITDB_DATABASE: fitness_score
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. Mongo Express (Giao diện Web trực quan quản lý MongoDB)
+  #    - Web UI: http://localhost:8081
+  # ─────────────────────────────────────────────────────────────
+  mongo-express:
+    image: mongo-express:latest
+    container_name: fitness_mongo_express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: "123456"
+      ME_CONFIG_MONGODB_URL: mongodb://admin:123456@mongodb:27017/?authSource=admin
+      ME_CONFIG_BASICAUTH: "false"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────────────────────
+  # 4. Redis (In-memory Cache & Key-value Store)
+  #    - Password khớp với REDIS_PASSWORD trong file .env
+  # ─────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: fitness_redis
+    restart: unless-stopped
+    command: >
+      redis-server 
+      --requirepass optivisionlab 
+      --notify-keyspace-events KEA
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "optivisionlab", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─────────────────────────────────────────────────────────────
+  # 5. Kafka Cluster (KRaft mode - không cần Zookeeper)
+  #    - Port 9092: Dành cho client bên ngoài Docker (FastAPI local)
+  #    - Port 9093: Dành cho client nội bộ Docker (Kafka UI, backend container)
+  # ─────────────────────────────────────────────────────────────
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: fitness_kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9093,EXTERNAL://:9092,CONTROLLER://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9093,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+  # ─────────────────────────────────────────────────────────────
+  # 6. Kafka UI (Giao diện trực quan quản lý cluster & topics)
+  #    - Web UI: http://localhost:8080
+  # ─────────────────────────────────────────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: fitness_kafka_ui
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      DYNAMIC_CONFIG_ENABLED: 'true'
+      KAFKA_CLUSTERS_0_NAME: fitness-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9093
+    depends_on:
+      - kafka
+
+  # ─────────────────────────────────────────────────────────────
+  # 7. Kafka Init (Tự động khởi tạo 3 topics cần thiết)
+  # ─────────────────────────────────────────────────────────────
+  kafka-init:
+    image: apache/kafka:3.7.0
+    container_name: fitness_kafka_init
+    depends_on:
+      - kafka
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      "
+      # Chờ broker sẵn sàng
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --list > /dev/null 2>&1
+      while [ $$? -ne 0 ]; do
+        echo 'Waiting for Kafka broker...'
+        sleep 2
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --list > /dev/null 2>&1
+      done
+
+      echo 'Kafka is ready. Creating topics...'
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic video-grading-jobs --partitions 3 --replication-factor 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic video-grading-results --partitions 3 --replication-factor 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic video-grading-dlq --partitions 1 --replication-factor 1
+
+      echo 'Topics created successfully:'
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --list
+      "
+
+  # ─────────────────────────────────────────────────────────────
+  # 8. Backend API (FastAPI Application)
+  # ─────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fitness_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URI=mongodb://admin:123456@mongodb:27017/fitness_score?authSource=admin
+      - MONGODB_DB=fitness_score
+      - SECRET_KEY=a8f12d9d8b4f5f3f4e7d81e4a2f9d8a3fbd7c23ac4e6b5e13e7d95b0a1e6d8c9
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=10080
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=optivisionlab
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=admin
+      - MINIO_SECRET_KEY=password123
+      - MINIO_BUCKET_NAME=videos
+      - MINIO_SECURE=False
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9093
+      - KAFKA_TOPIC_GRADING_JOBS=video-grading-jobs
+      - KAFKA_TOPIC_GRADING_RESULTS=video-grading-results
+      - KAFKA_TOPIC_GRADING_DLQ=video-grading-dlq
+      - KAFKA_CONSUMER_GROUP_BACKEND=backend-result-consumer
+      - CORS_ORIGINS=http://localhost:4200,http://127.0.0.1:4200
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
+
+volumes:
+  minio_data:
+  mongodb_data:
+  redis_data:
+  kafka_data:

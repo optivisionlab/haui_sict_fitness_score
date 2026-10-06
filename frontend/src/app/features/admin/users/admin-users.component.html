@@ -1,0 +1,293 @@
+<div class="admin-users-page">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Quản Lý Người Dùng</h1>
+      <p class="page-subtitle">Quản lý danh sách sinh viên, giảng viên và quản trị viên trong hệ thống</p>
+    </div>
+    <div>
+      <button type="button" class="btn btn-primary" (click)="openCreateModal()">
+        <svg lucideUserPlus [size]="18"></svg>
+        <span>Thêm tài khoản mới</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Role Tabs & Search Row -->
+  <div class="toolbar-section">
+    <div class="role-tabs">
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'all'"
+        (click)="onTabChange('all')"
+      >
+        <span>Tất cả</span>
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'student'"
+        (click)="onTabChange('student')"
+      >
+        <svg lucideGraduationCap [size]="16"></svg>
+        <span>Sinh viên</span>
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'teacher'"
+        (click)="onTabChange('teacher')"
+      >
+        <svg lucideUserCheck [size]="16"></svg>
+        <span>Giảng viên</span>
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'admin'"
+        (click)="onTabChange('admin')"
+      >
+        <svg lucideShield [size]="16"></svg>
+        <span>Quản trị viên</span>
+      </button>
+    </div>
+
+    <div class="search-box">
+      <svg lucideSearch [size]="18" class="search-icon"></svg>
+      <input
+        type="text"
+        placeholder="Tìm theo tên, email, mã tài khoản..."
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event)"
+      />
+      @if (searchTerm()) {
+        <button type="button" class="clear-btn" (click)="searchTerm.set('')">
+          <svg lucideX [size]="16"></svg>
+        </button>
+      }
+    </div>
+  </div>
+
+  <!-- Users Data Table Card -->
+  <div class="table-card">
+    @if (isLoading()) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <span>Đang tải danh sách người dùng...</span>
+      </div>
+    } @else if (filteredUsers.length === 0) {
+      <div class="empty-state">
+        <svg lucideUsers [size]="48"></svg>
+        <h3>Không tìm thấy người dùng phù hợp</h3>
+        <p>Thử tìm kiếm với từ khóa khác hoặc chuyển tab vai trò.</p>
+      </div>
+    } @else {
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Họ và tên</th>
+              <th>Mã định danh</th>
+              <th>Email</th>
+              <th>Vai trò</th>
+              <th>Số điện thoại</th>
+              <th>Trạng thái</th>
+              <th class="text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of filteredUsers; track u.id) {
+              <tr>
+                <td>
+                  <div class="user-cell">
+                    <div class="user-avatar" [ngClass]="u.role">
+                      @if (u.role === 'admin') {
+                        <svg lucideShield [size]="18"></svg>
+                      } @else if (u.role === 'teacher') {
+                        <svg lucideUserCheck [size]="18"></svg>
+                      } @else {
+                        <svg lucideGraduationCap [size]="18"></svg>
+                      }
+                    </div>
+                    <div class="user-info-text">
+                      <span class="user-name">{{ u.name }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <span class="code-badge">{{ u.user_code || u.userCode || '---' }}</span>
+                </td>
+                <td class="email-cell">{{ u.email }}</td>
+                <td>
+                  <span class="role-badge" [ngClass]="u.role">
+                    {{ getRoleLabel(u.role) }}
+                  </span>
+                </td>
+                <td>{{ u.phone_number || u.phoneNumber || '---' }}</td>
+                <td>
+                  <span class="status-pill active">Đang hoạt động</span>
+                </td>
+                <td class="text-right">
+                  <div class="action-buttons">
+                    <button type="button" class="btn-icon edit" (click)="openEditModal(u)" title="Chỉnh sửa">
+                      <svg lucideEdit3 [size]="16"></svg>
+                    </button>
+                    @if (u.role !== 'admin') {
+                      <button type="button" class="btn-icon delete" (click)="confirmDelete(u)" title="Xóa tài khoản">
+                        <svg lucideTrash2 [size]="16"></svg>
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+  <!-- MODAL: THÊM / SỬA TÀI KHOẢN -->
+  @if (showModal()) {
+    <div class="modal-backdrop" (click)="closeModal()">
+      <div class="modal-dialog" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <div class="modal-icon">
+              <svg lucideUserPlus [size]="20"></svg>
+            </div>
+            <h2>{{ isEditMode() ? 'Chỉnh Sửa Người Dùng' : 'Tạo Tài Khoản Mới' }}</h2>
+          </div>
+          <button type="button" class="close-btn" (click)="closeModal()">
+            <svg lucideX [size]="20"></svg>
+          </button>
+        </div>
+
+        <form (submit)="onSubmitUser(); $event.preventDefault()">
+          <div class="modal-body">
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="userName">Họ và tên <span class="required">*</span></label>
+                <input
+                  id="userName"
+                  type="text"
+                  class="form-control"
+                  placeholder="VD: Nguyễn Văn A"
+                  [(ngModel)]="userForm.name"
+                  name="userName"
+                  required
+                />
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="userCode">Mã tài khoản <span class="required">*</span></label>
+                <input
+                  id="userCode"
+                  type="text"
+                  class="form-control"
+                  placeholder="VD: SV001 hoặc GV001"
+                  [(ngModel)]="userForm.user_code"
+                  name="userCode"
+                  required
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="userEmail">Email <span class="required">*</span></label>
+              <input
+                id="userEmail"
+                type="email"
+                class="form-control"
+                placeholder="VD: user@example.com"
+                [(ngModel)]="userForm.email"
+                name="userEmail"
+                [disabled]="isEditMode()"
+                required
+              />
+              @if (isEditMode()) {
+                <span class="help-text">Email dùng làm tên đăng nhập chính, không thể thay đổi</span>
+              }
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="userRole">Vai trò hệ thống <span class="required">*</span></label>
+                <select
+                  id="userRole"
+                  class="form-control"
+                  [(ngModel)]="userForm.role"
+                  name="userRole"
+                >
+                  <option value="student">Sinh viên</option>
+                  <option value="teacher">Giảng viên thể chất</option>
+                  <option value="admin">Quản trị viên</option>
+                </select>
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="userPhone">Số điện thoại</label>
+                <input
+                  id="userPhone"
+                  type="text"
+                  class="form-control"
+                  placeholder="VD: 0987654321"
+                  [(ngModel)]="userForm.phone_number"
+                  name="userPhone"
+                />
+              </div>
+            </div>
+
+            @if (!isEditMode()) {
+              <div class="form-group">
+                <label for="userPassword">Mật khẩu khởi tạo <span class="required">*</span></label>
+                <input
+                  id="userPassword"
+                  type="password"
+                  class="form-control"
+                  placeholder="Tối thiểu 6 ký tự"
+                  [(ngModel)]="userForm.password"
+                  name="userPassword"
+                  required
+                />
+              </div>
+            }
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeModal()">Hủy</button>
+            <button type="submit" class="btn btn-primary" [disabled]="isSubmitting()">
+              @if (isSubmitting()) {
+                <span class="spinner-sm"></span>
+                <span>Đang xử lý...</span>
+              } @else {
+                <svg lucideCheckCircle2 [size]="18"></svg>
+                <span>{{ isEditMode() ? 'Lưu thay đổi' : 'Tạo tài khoản' }}</span>
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: XÁC NHẬN XÓA TÀI KHOẢN -->
+  @if (showDeleteModal()) {
+    <div class="modal-backdrop" (click)="cancelDelete()">
+      <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
+        <div class="delete-icon-wrapper">
+          <svg lucideAlertCircle [size]="32"></svg>
+        </div>
+        <h3 class="delete-title">Xác nhận xóa tài khoản</h3>
+        <p class="delete-desc">
+          Bạn có chắc chắn muốn xóa tài khoản <strong>{{ userToDelete()?.name }}</strong> ({{ userToDelete()?.email }})? Dữ liệu ghi danh và điểm thi liên quan sẽ bị ảnh hưởng.
+        </p>
+        <div class="delete-actions">
+          <button type="button" class="btn btn-secondary" (click)="cancelDelete()">Hủy</button>
+          <button type="button" class="btn btn-danger" (click)="onExecuteDelete()">Xóa vĩnh viễn</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

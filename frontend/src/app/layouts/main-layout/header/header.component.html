@@ -1,0 +1,16 @@
+<header class="header">
+  <div class="header-title">{{ displayTitle() }}</div>
+
+  <div class="header-actions">
+    <!-- User Profile pill -->
+    <div class="user-pill" [routerLink]="isTeacher() ? '/teacher/profile' : '/student/profile'" title="Xem thông tin cá nhân">
+      <div class="avatar">
+        <svg lucideUser [size]="16"></svg>
+      </div>
+      <div class="user-info">
+        <span class="user-name">{{ displayName() }}</span>
+        <span class="user-role">{{ displayRole() }}</span>
+      </div>
+    </div>
+  </div>
+</header>
