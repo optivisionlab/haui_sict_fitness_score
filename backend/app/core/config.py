@@ -11,6 +11,8 @@ class Settings:
     # MongoDB
     MONGODB_URI: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
     MONGODB_DB: str = os.getenv("MONGODB_DB", "fitness_score")
+    MONGODB_USERNAME: str | None = os.getenv("MONGODB_USERNAME")
+    MONGODB_PASSWORD: str | None = os.getenv("MONGODB_PASSWORD")
 
     # Auth
     SECRET_KEY: str = os.getenv("SECRET_KEY", "changeme")
@@ -27,6 +29,7 @@ class Settings:
 
     # MinIO
     MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+    MINIO_PUBLIC_ENDPOINT: str | None = os.getenv("MINIO_PUBLIC_ENDPOINT")
     MINIO_ACCESS_KEY: str = os.getenv("MINIO_ACCESS_KEY", "admin")
     MINIO_SECRET_KEY: str = os.getenv("MINIO_SECRET_KEY", "password123")
     MINIO_BUCKET_NAME: str = os.getenv("MINIO_BUCKET_NAME", "videos")

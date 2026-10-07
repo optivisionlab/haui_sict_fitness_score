@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 from aiokafka import AIOKafkaProducer
-
+import asyncio
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)

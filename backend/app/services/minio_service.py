@@ -19,6 +19,16 @@ class MinioService:
             secret_key=settings.MINIO_SECRET_KEY,
             secure=settings.MINIO_SECURE,
         )
+        self.public_client = (
+            Minio(
+                endpoint=settings.MINIO_PUBLIC_ENDPOINT,
+                access_key=settings.MINIO_ACCESS_KEY,
+                secret_key=settings.MINIO_SECRET_KEY,
+                secure=settings.MINIO_SECURE,
+            )
+            if settings.MINIO_PUBLIC_ENDPOINT
+            else self.client
+        )
         self.default_bucket = settings.MINIO_BUCKET_NAME
 
     def ensure_bucket(self, bucket_name: str | None = None) -> None:
@@ -83,7 +93,7 @@ class MinioService:
             clean_name = object_name
 
         try:
-            return self.client.presigned_get_object(
+            return self.public_client.presigned_get_object(
                 bucket_name=bucket,
                 object_name=clean_name,
                 expires=expires,

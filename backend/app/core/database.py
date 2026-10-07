@@ -9,7 +9,12 @@ from redis import asyncio as aioredis
 from app.core.config import settings
 
 # MongoDB
-_mongo_client = MongoClient(settings.MONGODB_URI, serverSelectionTimeoutMS=3000)
+_mongo_client = MongoClient(
+    settings.MONGODB_URI,
+    serverSelectionTimeoutMS=3000,
+    username=settings.MONGODB_USERNAME,
+    password=settings.MONGODB_PASSWORD,
+)
 db: Database = _mongo_client[settings.MONGODB_DB]
 
 
