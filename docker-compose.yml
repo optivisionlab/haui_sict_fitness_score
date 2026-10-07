@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${FRONTEND_PORT:-4200}:8080"
+      - "${FRONTEND_PORT:-4200}:8080"
     read_only: true
     tmpfs:
       - /tmp:size=32m,mode=1777
@@ -38,7 +38,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     environment:
       MONGODB_URI: "mongodb://mongodb:27017/${MONGODB_DB:-fitness_score}?authSource=admin"
       MONGODB_USERNAME: ${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME}
