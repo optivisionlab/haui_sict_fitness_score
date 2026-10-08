@@ -2,17 +2,23 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[3] / ".env")
 
 
 class Settings:
     APP_TITLE: str = "Lab Fitness API"
 
     # MongoDB
-    MONGODB_URI: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+    MONGODB_URI: str = os.getenv(
+        "MONGODB_URI", "mongodb://127.0.0.1:27018/?authSource=admin"
+    )
     MONGODB_DB: str = os.getenv("MONGODB_DB", "fitness_score")
-    MONGODB_USERNAME: str | None = os.getenv("MONGODB_USERNAME")
-    MONGODB_PASSWORD: str | None = os.getenv("MONGODB_PASSWORD")
+    MONGODB_USERNAME: str | None = os.getenv("MONGODB_USERNAME") or os.getenv(
+        "MONGO_ROOT_USERNAME"
+    )
+    MONGODB_PASSWORD: str | None = os.getenv("MONGODB_PASSWORD") or os.getenv(
+        "MONGO_ROOT_PASSWORD"
+    )
 
     # Auth
     SECRET_KEY: str = os.getenv("SECRET_KEY", "changeme")
@@ -20,8 +26,8 @@ class Settings:
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 10080))  # 7 days
 
     # Redis
-    REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
-    REDIS_PORT: int = int(os.getenv("REDIS_PORT", 6379))
+    REDIS_HOST: str = os.getenv("REDIS_HOST", "127.0.0.1")
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT", 6380))
     REDIS_DB: int = int(os.getenv("REDIS_DB", 0))
     REDIS_PASSWORD: str | None = os.getenv("REDIS_PASSWORD")
     REDIS_DECODE_RESPONSES: bool = os.getenv("REDIS_DECODE_RESPONSES", "True").lower() == "true"
@@ -30,8 +36,12 @@ class Settings:
     # MinIO
     MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")
     MINIO_PUBLIC_ENDPOINT: str | None = os.getenv("MINIO_PUBLIC_ENDPOINT")
-    MINIO_ACCESS_KEY: str = os.getenv("MINIO_ACCESS_KEY", "admin")
-    MINIO_SECRET_KEY: str = os.getenv("MINIO_SECRET_KEY", "password123")
+    MINIO_ACCESS_KEY: str = os.getenv(
+        "MINIO_ACCESS_KEY", os.getenv("MINIO_ROOT_USER", "admin")
+    )
+    MINIO_SECRET_KEY: str = os.getenv(
+        "MINIO_SECRET_KEY", os.getenv("MINIO_ROOT_PASSWORD", "password123")
+    )
     MINIO_BUCKET_NAME: str = os.getenv("MINIO_BUCKET_NAME", "videos")
     MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "False").lower() == "true"
 
