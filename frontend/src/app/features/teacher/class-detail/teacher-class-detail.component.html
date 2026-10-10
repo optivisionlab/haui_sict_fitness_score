@@ -1,0 +1,514 @@
+<div class="class-detail-page">
+
+  @if (currentDetail(); as cls) {
+    <!-- Breadcrumb & Back -->
+    <div class="header-nav">
+      <button type="button" class="btn btn-secondary btn-back" (click)="goBack()">
+        <svg lucideArrowLeft [size]="16"></svg>
+        <span>Danh sách lớp học phần</span>
+      </button>
+
+      <div class="breadcrumb">
+        <span>Lớp học phần</span>
+        <span class="separator">/</span>
+        <span class="current">{{ cls.code || 'Chưa có mã' }} - {{ cls.name }}</span>
+      </div>
+    </div>
+
+    <!-- CLASS OVERVIEW CARD & CONTROLS -->
+    <div class="card class-header-card">
+      <div class="header-main-info">
+        <div class="class-icon-badge">
+          <svg lucideActivity [size]="28"></svg>
+        </div>
+
+        <div class="class-title-block">
+          <div class="class-code-badge">{{ cls.code || 'Chưa có mã' }}</div>
+          <h1 class="class-heading">{{ cls.name }}</h1>
+          <div class="class-submeta">
+            <span>Sĩ số: <strong>{{ cls.student_total }}</strong> sinh viên</span>
+          </div>
+        </div>
+
+        <!-- Status Box -->
+        <div class="class-status-box">
+          @if (cls.is_grade_locked) {
+            <div class="finalized-tag">
+              <strong>ĐÃ CHỐT ĐIỂM</strong>
+              <small>{{ cls.grade_locked_at ? (cls.grade_locked_at | date:'dd/MM/yyyy HH:mm') : '' }}</small>
+            </div>
+          } @else {
+            <div class="in-progress-tag">
+              <span>Đang trong kỳ học</span>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- TEACHER ACTION TOOLBAR -->
+      <div class="teacher-actions-bar">
+        <div class="action-group-left">
+          <!-- 1. KHÓA TÍNH NĂNG LUYỆN TẬP -->
+          <div class="control-box">
+            <span class="control-title">
+              Luyện tập:
+              <strong [class.text-locked]="!cls.allow_practice_submission" [class.text-open]="cls.allow_practice_submission">
+                {{ !cls.allow_practice_submission ? 'Đã khóa' : 'Đang mở' }}
+              </strong>
+            </span>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              [disabled]="cls.is_grade_locked"
+              (click)="togglePracticeLock()">
+              @if (!cls.allow_practice_submission) {
+                <svg lucideUnlock [size]="15"></svg> Mở
+              } @else {
+                <svg lucideLock [size]="15"></svg> Khóa
+              }
+            </button>
+          </div>
+
+          <!-- 2. KHÓA NỘP BÀI -->
+          <div class="control-box">
+            <span class="control-title">
+              Nộp bài:
+              <strong [class.text-locked]="!cls.allow_exam_submission" [class.text-open]="cls.allow_exam_submission">
+                {{ !cls.allow_exam_submission ? 'Đã khóa' : 'Đang mở' }}
+              </strong>
+            </span>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              [disabled]="cls.is_grade_locked"
+              (click)="toggleSubmissionLock()">
+              @if (!cls.allow_exam_submission) {
+                <svg lucideUnlock [size]="15"></svg> Mở
+              } @else {
+                <svg lucideLock [size]="15"></svg> Khóa
+              }
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. GIÁO VIÊN LÀ NGƯỜI CHỐT ĐIỂM -->
+        <div class="action-group-right">
+          @if (!cls.is_grade_locked) {
+            <button
+              type="button"
+              class="btn btn-finalize"
+              (click)="openFinalizeModal()">
+              <svg lucideCheckCircle2 [size]="16"></svg>
+              <span>Chốt điểm</span>
+            </button>
+          } @else {
+            <button
+              type="button"
+              class="btn btn-secondary btn-unlock-grades"
+              (click)="unlockGradesForCorrection()">
+              <svg lucideEdit3 [size]="16"></svg>
+              <span>Mở khóa chỉnh sửa điểm</span>
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN TABS CONTAINER -->
+    <div class="card tabs-main-card">
+      @if (currentGradebook(); as gb) {
+        <!-- Tab Navigation -->
+        <div class="tab-bar">
+          <button
+            type="button"
+            class="tab-btn"
+            [class.active]="activeTab() === 'students'"
+            (click)="setTab('students')">
+            <svg lucideUsers [size]="17"></svg>
+            <span>Danh sách sinh viên ({{ gb.students.length }})</span>
+          </button>
+
+          <button
+            type="button"
+            class="tab-btn"
+            [class.active]="activeTab() === 'assessments'"
+            (click)="setTab('assessments')">
+            <svg lucideFileSpreadsheet [size]="17"></svg>
+            <span>Bài kiểm tra ({{ gb.task_list.length }})</span>
+          </button>
+
+          <button
+            type="button"
+            class="tab-btn"
+            [class.active]="activeTab() === 'stats'"
+            (click)="setTab('stats')">
+            <svg lucideAward [size]="17"></svg>
+            <span>Thống kê & Phổ điểm</span>
+          </button>
+        </div>
+
+        <!-- ==================== TAB 1: DANH SÁCH SINH VIÊN ==================== -->
+        @if (activeTab() === 'students') {
+          <div class="tab-content-pane">
+            <!-- Filter and Table Actions -->
+            <div class="table-toolbar">
+              <div class="toolbar-search">
+                <app-search-input
+                  placeholder="Tìm sinh viên theo Mã SV, Họ tên..."
+                  [(value)]="studentSearch">
+                </app-search-input>
+              </div>
+
+              <div class="toolbar-select">
+                <app-select
+                  label=""
+                  [options]="statusFilterOptions"
+                  [(value)]="studentStatusFilter">
+                </app-select>
+              </div>
+
+              <div class="toolbar-actions">
+                <button type="button" class="btn btn-secondary" (click)="exportExcel()">
+                  <svg lucideFileSpreadsheet [size]="16"></svg>
+                  <span>Xuất bảng điểm Excel</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Alert if finalized -->
+            @if (cls.is_grade_locked) {
+              <div class="finalized-alert-banner">
+                <svg lucideLock [size]="18"></svg>
+                <span>Bảng điểm đã được chốt chính thức. Điểm số đã đóng băng.</span>
+              </div>
+            }
+
+            <!-- Students Table -->
+            <div class="table-container custom-scrollbar">
+              <table class="students-table">
+                <thead>
+                  <tr>
+                    <th class="text-center col-stt">STT</th>
+                    <th class="text-left col-code">Mã sinh viên</th>
+                    <th class="text-left col-name">Họ và tên</th>
+                    <!-- Dynamic tasks -->
+                    @for (task of gb.task_list; track task.id) {
+                      <th class="text-center col-score">{{ task.title }}<br><small>({{ task.category === 'exam' ? gb.formula.exam_weight : gb.formula.attendance_weight }}%)</small></th>
+                    }
+                    <th class="text-center col-avg">Tổng kết<br><small>(Hệ 10)</small></th>
+                    <th class="text-center col-letter">Chữ</th>
+                    <th class="text-center col-status">Kết quả</th>
+                    <th class="text-center col-action">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (student of filteredStudents(); track student.user_id; let i = $index) {
+                    <tr>
+                      <td class="text-center">{{ i + 1 }}</td>
+                      <td class="text-left font-mono">{{ student.student_code || '---' }}</td>
+                      <td class="text-left student-name" (click)="openSubmissionModal(student)">
+                        {{ student.student_name || '---' }}
+                      </td>
+
+                      <!-- Task Scores -->
+                      @for (task of gb.task_list; track task.id) {
+                        <td class="text-center">
+                          {{ student.task_scores && student.task_scores[task.id] !== undefined ? student.task_scores[task.id] : '—' }}
+                        </td>
+                      }
+
+                      <!-- Final Avg Score -->
+                      <td class="text-center font-bold">
+                        {{ student.grades.final_score !== null && student.grades.final_score !== undefined ? student.grades.final_score : '—' }}
+                      </td>
+
+                      <!-- Letter Grade -->
+                      <td class="text-center">
+                        {{ student.grades.letter_grade || '—' }}
+                      </td>
+
+                      <!-- Status -->
+                      <td class="text-center">
+                        @if (student.grades.is_passed === true) {
+                          <span class="status-text pass">Đạt</span>
+                        } @else if (student.grades.is_passed === false) {
+                          <span class="status-text fail">Chưa đạt</span>
+                        } @else {
+                          <span class="status-text">Đang học</span>
+                        }
+                      </td>
+
+                      <!-- Actions -->
+                      <td class="text-center">
+                        <button
+                          type="button"
+                          class="btn-edit-score"
+                          (click)="openSubmissionModal(student)">
+                          Nhập điểm
+                        </button>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="12" class="text-center empty-table-cell">
+                        Không tìm thấy sinh viên phù hợp.
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+
+        <!-- ==================== TAB 2: BÀI KIỂM TRA ==================== -->
+        @if (activeTab() === 'assessments') {
+          <div class="tab-content-pane assessments-pane">
+            <div class="assessments-header-intro">
+              <div>
+                <h3>Danh sách các bài kiểm tra & đánh giá thể chất</h3>
+                <p>Giáo viên có thể quản lý thời gian, khóa nộp bài từng đợt và theo dõi số lượng sinh viên đã hoàn thành.</p>
+              </div>
+            </div>
+
+            <div class="assessments-list">
+              @for (item of gb.task_list; track item.id) {
+                <div class="assessment-card" [class.locked]="cls.is_grade_locked || !cls.allow_exam_submission">
+                  <div class="assessment-top">
+                    <div class="assessment-title-wrap">
+                      <span class="weight-badge">Loại: {{ item.category === 'exam' ? 'Thi kết thúc' : 'Luyện tập' }}</span>
+                      <h4>{{ item.title }}</h4>
+                    </div>
+
+                    <div class="assessment-lock-status">
+                      @if (cls.is_grade_locked || (item.category === 'exam' && !cls.allow_exam_submission) || (item.category === 'practice' && !cls.allow_practice_submission)) {
+                        <span class="lock-status-plain">Đã khóa nộp bài</span>
+                      } @else {
+                        <span class="lock-status-plain">Đang mở</span>
+                      }
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- ==================== TAB 3: THỐNG KÊ & PHỔ ĐIỂM ==================== -->
+        @if (activeTab() === 'stats') {
+          <div class="tab-content-pane stats-pane">
+            @if (classStats(); as stats) {
+              <div class="stats-overview-grid">
+                <div class="stat-box">
+                  <span class="stat-num">{{ stats.total }}</span>
+                  <span class="stat-title">Tổng số sinh viên</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-num">{{ stats.passed }}</span>
+                  <span class="stat-title">Sinh viên Đạt</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-num">{{ stats.failed }}</span>
+                  <span class="stat-title">Chưa đạt / Cần thi lại</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-num">{{ stats.avgScore }}</span>
+                  <span class="stat-title">Điểm trung bình cả lớp</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-num">{{ stats.passRate }}%</span>
+                  <span class="stat-title">Tỷ lệ hoàn thành</span>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      }
+    </div>
+
+    <!-- ==================== MODAL 1: XÁC NHẬN CHỐT ĐIỂM ==================== -->
+    @if (isFinalizeModalOpen()) {
+      <div class="modal-backdrop" (click)="closeFinalizeModal()">
+        <div class="modal-card modal-finalize" (click)="$event.stopPropagation()">
+          <div class="modal-header danger-header">
+            <div class="modal-header-icon">
+              <svg lucideShieldAlert [size]="24"></svg>
+            </div>
+            <div>
+              <h3>Xác nhận Chốt điểm Lớp học phần</h3>
+              <p>{{ cls.code }} - {{ cls.name }}</p>
+            </div>
+            <button type="button" class="modal-close-btn" (click)="closeFinalizeModal()">
+              <svg lucideX [size]="20"></svg>
+            </button>
+          </div>
+
+          <div class="modal-body">
+            <div class="warning-callout">
+              <strong>Lưu ý quan trọng dành cho Giảng viên:</strong>
+              <ul>
+                <li>Sau khi chốt điểm, bảng điểm sẽ được <strong>khóa chính thức</strong> và chuyển tới Phòng Đào tạo & Khảo thí.</li>
+                <li>Toàn bộ tính năng nộp bài và luyện tập của lớp học phần sẽ được tự động <strong>khóa lại</strong>.</li>
+                <li>Sinh viên sẽ không thể gửi thêm lượt nộp video mới.</li>
+              </ul>
+            </div>
+
+            <div class="confirm-checkbox-row">
+              <label class="checkbox-label">
+                <input
+                  type="checkbox"
+                  [checked]="hasFinalizeConfirmedCheck()"
+                  (change)="hasFinalizeConfirmedCheck.set(!hasFinalizeConfirmedCheck())" />
+                <span>Tôi xác nhận đã rà soát kỹ bảng điểm của toàn bộ sinh viên trong lớp và đồng ý chốt điểm học phần.</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeFinalizeModal()">
+              Hủy bỏ
+            </button>
+            <button
+              type="button"
+              class="btn btn-danger"
+              [disabled]="!hasFinalizeConfirmedCheck()"
+              (click)="executeFinalizeGrades()">
+              <svg lucideCheckCircle2 [size]="16"></svg>
+              <span>Xác nhận chốt điểm</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ==================== MODAL 2: XEM BÀI NỘP & CHẤM ĐIỂM SINH VIÊN ==================== -->
+    @if (isSubmissionModalOpen()) {
+      <div class="modal-backdrop" (click)="closeSubmissionModal()">
+        <div class="modal-card modal-submission" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <div>
+              <h3>Chi tiết bài nộp & Đánh giá thể chất</h3>
+              @if (selectedStudentForDetail(); as st) {
+                <p>Sinh viên: <strong>{{ st.student_name }}</strong> (Mã SV: {{ st.student_code }})</p>
+              }
+            </div>
+            <button type="button" class="modal-close-btn" (click)="closeSubmissionModal()">
+              <svg lucideX [size]="20"></svg>
+            </button>
+          </div>
+
+          <div class="modal-body">
+            <!-- Assessment switch buttons inside modal -->
+            <div class="modal-assessment-tabs">
+              @if (currentGradebook(); as gb) {
+                @for (ass of gb.task_list; track ass.id) {
+                  <button
+                    type="button"
+                    class="modal-tab-btn"
+                    [class.active]="selectedAssessmentForDetail()?.id === ass.id"
+                    (click)="switchAssessmentInModal(ass.id)">
+                    {{ ass.title }}
+                  </button>
+                }
+              }
+            </div>
+
+            <div class="submission-grid-details">
+              <!-- Left: Thông tin nộp bài -->
+              <div class="submission-info-pane">
+                <div class="info-block">
+                  <div class="info-row">
+                    <span class="info-lbl">Bài kiểm tra:</span>
+                    <strong>{{ selectedAssessmentForDetail()?.title }}</strong>
+                  </div>
+                </div>
+
+                @if (currentSubmissionDetail(); as sub) {
+                  <div class="info-block mt-2">
+                    <div class="info-row">
+                      <span class="info-lbl">Thời gian nộp:</span>
+                      <span>{{ sub.submittedAt }}</span>
+                    </div>
+                    @if (sub.aiScore !== undefined) {
+                      <div class="info-row">
+                        <span class="info-lbl">Điểm AI gợi ý:</span>
+                        <strong>{{ sub.aiScore }} / 10</strong>
+                      </div>
+                    }
+                    @if (sub.aiFeedback) {
+                      <div class="ai-note-box">
+                        <span class="info-lbl">Nhận xét từ AI:</span>
+                        <p>{{ sub.aiFeedback }}</p>
+                      </div>
+                    }
+                    @if (sub.videoUrl) {
+                      <div class="teacher-video-container mt-2">
+                        <span class="info-lbl video-tag-lbl">🎥 Video bài nộp:</span>
+                        <video [src]="sub.videoUrl" controls class="teacher-video-player" playsinline preload="metadata">
+                          Trình duyệt không hỗ trợ phát video.
+                        </video>
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <div class="not-submitted-simple">
+                    <span>Sinh viên chưa nộp bài kiểm tra này.</span>
+                  </div>
+                }
+              </div>
+
+              <!-- Right: Teacher Grading Inputs -->
+              <div class="grading-form-block">
+                <div class="form-group">
+                  <label>Điểm đánh giá (thang điểm 10):</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                    class="score-input"
+                    [disabled]="cls.is_grade_locked"
+                    [ngModel]="editScoreValue()"
+                    (ngModelChange)="editScoreValue.set($event)"
+                    placeholder="Nhập điểm..." />
+                </div>
+
+                <div class="form-group">
+                  <label>Ghi chú / Nhận xét của giảng viên:</label>
+                  <textarea
+                    rows="4"
+                    class="comment-textarea"
+                    [disabled]="cls.is_grade_locked"
+                    [ngModel]="editCommentValue()"
+                    (ngModelChange)="editCommentValue.set($event)"
+                    placeholder="Nhập nhận xét...">
+                  </textarea>
+                </div>
+
+                @if (cls.is_grade_locked) {
+                  <div class="locked-hint">
+                    <span>Lớp đã chốt điểm. Mở khóa lớp nếu muốn cập nhật.</span>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeSubmissionModal()">
+              Đóng
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="cls.is_grade_locked"
+              (click)="saveTeacherGrading()">
+              <svg lucideCheck [size]="16"></svg>
+              <span>Lưu điểm đánh giá</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  }
+</div>

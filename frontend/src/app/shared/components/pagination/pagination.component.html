@@ -1,0 +1,72 @@
+<div class="pagination-container">
+  @if (showInfo()) {
+    <div class="pagination-info">
+      @if (totalItems() > 0) {
+        Hiển thị <span class="highlight">{{ startItem() }}</span> –
+        <span class="highlight">{{ endItem() }}</span> trên tổng số
+        <span class="highlight">{{ totalItems() }}</span> kết quả
+      } @else {
+        Không có dữ liệu
+      }
+    </div>
+  }
+
+  <div class="pagination-controls">
+    <!-- First Page Button -->
+    <button
+      type="button"
+      class="nav-btn"
+      [disabled]="currentPage() <= 1"
+      (click)="firstPage()"
+      title="Trang đầu">
+      <svg lucideChevronsLeft [size]="16"></svg>
+    </button>
+
+    <!-- Prev Page Button -->
+    <button
+      type="button"
+      class="nav-btn"
+      [disabled]="currentPage() <= 1"
+      (click)="prevPage()"
+      title="Trang trước">
+      <svg lucideChevronLeft [size]="16"></svg>
+    </button>
+
+    <!-- Page Numbers & Ellipsis -->
+    <div class="page-numbers">
+      @for (item of pages(); track $index) {
+        @if (item === '...') {
+          <span class="ellipsis">...</span>
+        } @else {
+          <button
+            type="button"
+            class="page-number-btn"
+            [class.active]="currentPage() === item"
+            (click)="goToPage(item)">
+            {{ item }}
+          </button>
+        }
+      }
+    </div>
+
+    <!-- Next Page Button -->
+    <button
+      type="button"
+      class="nav-btn"
+      [disabled]="currentPage() >= totalPages()"
+      (click)="nextPage()"
+      title="Trang sau">
+      <svg lucideChevronRight [size]="16"></svg>
+    </button>
+
+    <!-- Last Page Button -->
+    <button
+      type="button"
+      class="nav-btn"
+      [disabled]="currentPage() >= totalPages()"
+      (click)="lastPage()"
+      title="Trang cuối">
+      <svg lucideChevronsRight [size]="16"></svg>
+    </button>
+  </div>
+</div>

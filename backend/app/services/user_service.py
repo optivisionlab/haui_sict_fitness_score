@@ -1,99 +1,112 @@
-from typing import Optional, List
-from sqlmodel import Session, select
+from typing import Optional
 from fastapi import HTTPException, status
-from sqlalchemy import text
 
-from app.models.user import User
-from app.schemas.users import UserCreate, UserUpdate
-from app.core.security import hash_password, verify_password
-
-from app.models.user import User
-from app.schemas.users import UserCreate, UserUpdate
-from app.core.security import hash_password, verify_password
+from app.crud.user import crud_user
+from app.models.user import User, UserRole
+from app.schemas.user import Token, UserCreate, UserLogin, UserRead, UserUpdate
+from app.services.auth_service import create_access_token, hash_password, verify_password
 
 
-def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
-    return db.get(User, user_id)
+class UserService:
+    def register(self, user_in: UserCreate) -> User:
+        """Đăng ký tài khoản mới."""
+        existing_user = crud_user.get_by_email(user_in.email)
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email đã được sử dụng trong hệ thống",
+            )
+
+        if user_in.user_code:
+            existing_code = crud_user.get_by_user_code(user_in.user_code)
+            if existing_code:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Mã người dùng '{user_in.user_code}' đã tồn tại",
+                )
+
+        # Hash password
+        user_dict = user_in.model_dump(by_alias=True, exclude_unset=True)
+        user_dict["password"] = hash_password(user_in.password)
+
+        return crud_user.create(user_dict)
+
+    def login(self, login_data: UserLogin) -> tuple[User, Token]:
+        """Đăng nhập hệ thống."""
+        user = crud_user.get_by_email(login_data.email)
+        if not user or not verify_password(login_data.password, user.password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email hoặc mật khẩu không chính xác",
+            )
+
+        if user.user_status == "blocked":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tài khoản của bạn đã bị khóa",
+            )
+
+        access_token = create_access_token({
+            "sub": str(user.id),
+            "role": user.role.value,
+            "email": user.email,
+        })
+        token = Token(
+            access_token=access_token,
+            token_type="bearer",
+            user=UserRead.model_validate(user),
+        )
+        return user, token
+
+    def get_by_id(self, user_id: str) -> User:
+        """Lấy thông tin người dùng theo ID."""
+        user = crud_user.get(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Không tìm thấy người dùng",
+            )
+        return user
+
+    def update_profile(self, user_id: str, user_in: UserUpdate) -> User:
+        """Cập nhật thông tin tài khoản."""
+        user = self.get_by_id(user_id)
+
+        update_data = user_in.model_dump(by_alias=True, exclude_unset=True)
+        if "password" in update_data and update_data["password"]:
+            update_data["password"] = hash_password(update_data["password"])
+
+        if "email" in update_data and update_data["email"] != user.email:
+            existing = crud_user.get_by_email(update_data["email"])
+            if existing and str(existing.id) != str(user_id):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email đã tồn tại trong hệ thống",
+                )
+
+        updated = crud_user.update(user_id, update_data)
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cập nhật thông tin thất bại",
+            )
+        return updated
+
+    def get_users(
+        self,
+        role: Optional[UserRole] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[User], int]:
+        """Lấy danh sách người dùng có phân trang."""
+        if role:
+            return crud_user.get_by_role(role, skip=skip, limit=limit)
+        return crud_user.get_multi(skip=skip, limit=limit)
+
+    def delete_user(self, user_id: str) -> bool:
+        """Xóa người dùng."""
+        self.get_by_id(user_id)
+        return crud_user.delete(user_id)
 
 
-def get_user_by_email(db: Session, email: str) -> Optional[User]:
-    return db.exec(select(User).where(User.email == email)).first()
-
-
-def get_user_by_username(db: Session, user_name: str) -> Optional[User]:
-    return db.exec(select(User).where(User.user_name == user_name)).first()
-
-
-def list_users(db: Session, skip: int = 0, limit: int = 100) -> List[User]:
-    return db.exec(select(User).offset(skip).limit(limit)).all()
-
-
-def create_user(db: Session, user_in: UserCreate) -> User:
-    # uniqueness checks
-    if get_user_by_email(db, user_in.email):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
-    if get_user_by_username(db, user_in.user_name):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already registered")
-
-    hashed = hash_password(user_in.password)
-    db_user = User(**user_in.dict(exclude={"password"}), password=hashed)
-    db.add(db_user)
-    try:
-        db.commit()
-        db.refresh(db_user)
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-    return db_user
-
-
-def update_user(db: Session, user_id: int, user_in: UserUpdate) -> User:
-    user = get_user_by_id(db, user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    data = user_in.dict(exclude_unset=True)
-    if "password" in data and data["password"]:
-        data["password"] = hash_password(data["password"])
-
-    for field, value in data.items():
-        setattr(user, field, value)
-
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
-def delete_user(db: Session, user_id: int) -> None:
-    user = get_user_by_id(db, user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    # Cleanup related data explicitly to keep behavior consistent across DBs.
-    # 1) Set teacher_id = NULL for classes taught by this user
-    db.execute(text("""
-        UPDATE classes SET teacher_id = NULL WHERE teacher_id = :uid
-        """), {"uid": user_id})
-    # 2) Delete enrollments
-    db.execute(text("""
-        DELETE FROM user_class WHERE user_id = :uid
-        """), {"uid": user_id})
-    # 3) Delete results
-    db.execute(text("""
-        DELETE FROM results WHERE user_id = :uid
-        """), {"uid": user_id})
-
-    db.delete(user)
-    db.commit()
-
-
-def authenticate_user(db: Session, username_or_email: str, password: str) -> Optional[User]:
-    # allow login by email or username
-    user = db.exec(
-        select(User).where((User.email == username_or_email) | (User.user_name == username_or_email))
-    ).first()
-    if not user:
-        return None
-    if not verify_password(password, user.password):
-        return None
-    return user
+user_service = UserService()
