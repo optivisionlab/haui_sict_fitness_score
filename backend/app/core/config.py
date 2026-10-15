@@ -47,6 +47,10 @@ class Settings:
 
     # AI / Worker Auth
     AI_API_KEY: str = os.getenv("AI_API_KEY", "internal-ai-worker-secret-key")
+    AI_API_URL: str = os.getenv("AI_API_URL", "")
+    AI_API_TIMEOUT_SECONDS: float = float(os.getenv("AI_API_TIMEOUT_SECONDS", "120"))
+    AI_ROUTER_ENABLED: bool = os.getenv("AI_ROUTER_ENABLED", "false").lower() == "true"
+    AI_MOCK_MODE: bool = os.getenv("AI_MOCK_MODE", "false").lower() == "true"
 
     # Kafka
     KAFKA_BOOTSTRAP_SERVERS: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
@@ -55,6 +59,7 @@ class Settings:
     KAFKA_TOPIC_GRADING_DLQ: str = os.getenv("KAFKA_TOPIC_GRADING_DLQ", "video-grading-dlq")
     KAFKA_CONSUMER_GROUP_BACKEND: str = os.getenv("KAFKA_CONSUMER_GROUP_BACKEND", "backend-result-consumer")
     KAFKA_CONSUMER_GROUP_AI: str = os.getenv("KAFKA_CONSUMER_GROUP_AI", "ai-grading-worker")
+    KAFKA_CONSUMER_GROUP_ROUTER: str = os.getenv("KAFKA_CONSUMER_GROUP_ROUTER", "backend-ai-router")
 
     # CORS
     CORS_ORIGINS: list[str] = [

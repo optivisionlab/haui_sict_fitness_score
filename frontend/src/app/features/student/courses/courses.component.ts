@@ -447,15 +447,11 @@ export class CoursesComponent implements OnInit, OnDestroy {
 
     const courseId = this.selectedCourseId();
     const assessmentId = this.selectedAssessmentId();
-    const user = this.authService.currentUser();
-    const studentId = user?.id || user?.user_code || '67890';
-
     this.isUploading.set(true);
     this.uploadProgress.set(0);
 
     this.videoResultService.uploadVideo({
       file,
-      student_id: studentId,
       exercise_id: assessmentId,
       course_id: courseId
     }).subscribe({
@@ -481,7 +477,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
                 attemptNo: attemptNo,
                 date: dateStr,
                 pending: true,
-                videoUrl: videoResult?.video_url,
+                videoUrl: videoResult?.videoUrl || videoResult?.video_url,
                 videoResultId: videoResult?.id
               };
 

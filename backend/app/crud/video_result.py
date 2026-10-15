@@ -69,12 +69,36 @@ class CRUDVideoResult(CRUDBase[VideoResult, VideoResultCreate, VideoResultAIUpda
             else dict(update_data)
         )
 
-        fields["pending"] = False
+        is_pending = bool(fields.get("pending", False))
+        fields["pending"] = is_pending
+        fields["status"] = "processing" if is_pending else "completed"
+        fields.pop("error", None)
         fields["updatedAt"] = datetime.now(timezone.utc)
 
         updated_doc = self.collection.find_one_and_update(
             {"_id": oid},
             {"$set": fields},
+            return_document=ReturnDocument.AFTER,
+        )
+        if not updated_doc:
+            return None
+        return self.model.model_validate(updated_doc)
+
+    def mark_failed(self, result_id: str | ObjectId, error_code: str) -> Optional[VideoResult]:
+        oid = to_object_id(result_id)
+        if oid is None:
+            return None
+
+        updated_doc = self.collection.find_one_and_update(
+            {"_id": oid},
+            {
+                "$set": {
+                    "pending": False,
+                    "status": "failed",
+                    "error": error_code,
+                    "updatedAt": datetime.now(timezone.utc),
+                }
+            },
             return_document=ReturnDocument.AFTER,
         )
         if not updated_doc:

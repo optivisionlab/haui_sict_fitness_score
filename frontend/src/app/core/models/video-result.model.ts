@@ -8,6 +8,7 @@ export interface VideoResult {
   course_id?: string | null;
   status: VideoResultStatus;
   video_url: string;
+  videoUrl?: string;
   file_name: string;
   file_size: number;
   content_type?: string | null;
@@ -21,10 +22,16 @@ export interface VideoResult {
 
 export interface VideoUploadPayload {
   file: File;
-  student_id: string;
   exercise_id: string;
-  class_id?: string;
   course_id?: string;
+}
+
+export interface VideoUploadUrl {
+  uploadId: string;
+  resultId: string;
+  objectKey: string;
+  uploadUrl: string;
+  expiresIn: number;
 }
 
 export interface VideoResultFilter {

@@ -1,9 +1,10 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpEvent, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpEvent, HttpHeaders, HttpParams, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { concatMap, map, switchMap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/auth.model';
-import { VideoResult, VideoResultFilter, VideoUploadPayload } from '../models/video-result.model';
+import { VideoResult, VideoResultFilter, VideoUploadPayload, VideoUploadUrl } from '../models/video-result.model';
 
 @Injectable({
   providedIn: 'root'
@@ -12,26 +13,42 @@ export class VideoResultService {
   private http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiUrl}/video-results`;
 
-  /**
-   * Tải video lên server với theo dõi tiến trình (Progress tracking)
-   */
+  /** Upload directly to MinIO, then confirm the object with the backend. */
   uploadVideo(payload: VideoUploadPayload): Observable<HttpEvent<ApiResponse<VideoResult>>> {
-    const formData = new FormData();
-    formData.append('file', payload.file);
-    formData.append('student_id', payload.student_id);
-    formData.append('exercise_id', payload.exercise_id);
+    return this.http.post<ApiResponse<VideoUploadUrl>>(`${this.baseUrl}/upload-url`, {
+      task_id: payload.exercise_id,
+      course_id: payload.course_id,
+      file_name: payload.file.name,
+      content_type: payload.file.type || 'application/octet-stream',
+      file_size: payload.file.size
+    }).pipe(
+      switchMap((response) => {
+        const upload = response.data;
+        if (!upload?.uploadUrl || !upload.uploadId) {
+          throw new Error('Backend không trả về thông tin upload hợp lệ.');
+        }
 
-    if (payload.class_id) {
-      formData.append('class_id', payload.class_id);
-    }
-    if (payload.course_id) {
-      formData.append('course_id', payload.course_id);
-    }
-
-    return this.http.post<ApiResponse<VideoResult>>(`${this.baseUrl}/upload`, formData, {
-      reportProgress: true,
-      observe: 'events'
-    });
+        return this.http.put(upload.uploadUrl, payload.file, {
+          headers: new HttpHeaders({ 'Content-Type': payload.file.type || 'application/octet-stream' }),
+          observe: 'events',
+          reportProgress: true,
+          responseType: 'text'
+        }).pipe(
+          concatMap((event) => {
+            if (event instanceof HttpResponse) {
+              return this.http.post<ApiResponse<VideoResult>>(`${this.baseUrl}/confirm-upload`, {
+                upload_id: upload.uploadId
+              }).pipe(map((confirmed) => new HttpResponse({
+                body: confirmed,
+                status: 200,
+                url: `${this.baseUrl}/confirm-upload`
+              })));
+            }
+            return [event as HttpEvent<ApiResponse<VideoResult>>];
+          })
+        );
+      })
+    );
   }
 
   /**

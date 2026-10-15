@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 from bson import ObjectId
@@ -11,6 +11,7 @@ from app.crud.sport import crud_sport
 from app.crud.task import crud_task
 from app.crud.user import crud_user
 from app.crud.video_result import crud_video_result
+from app.core.database import get_db
 from app.models.course import Course
 from app.models.notification import NotificationType
 from app.models.sport import SportMode
@@ -22,6 +23,8 @@ from app.schemas.video_result import (
     VideoResultCreate,
     VideoResultStatusResponse,
     VideoResultTeacherGrade,
+    VideoUploadUrlRequest,
+    VideoUploadUrlResponse,
 )
 from app.services.enrollment_service import enrollment_service
 from app.services.minio_service import minio_service
@@ -30,6 +33,7 @@ from app.services.sports.registry import sport_registry
 
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
 MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500 MB
+UPLOAD_URL_TTL_SECONDS = 600
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +61,19 @@ class VideoResultService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Không tìm thấy khóa học chứa bài tập này",
+            )
+
+        if str(task.sport_id) != str(sport_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Môn thể thao của bài tập không khớp với môn trong yêu cầu",
+            )
+
+        enrollment = crud_enrollment.get_by_user_and_course(user_id, task.course_id)
+        if not enrollment or enrollment.status.value != "active":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn chưa ghi danh hoặc không còn quyền học khóa học này",
             )
 
         # GUARD 1: Kiểm tra trạng thái chốt điểm của lớp học phần
@@ -106,10 +123,16 @@ class VideoResultService:
             "taskId": str(task_id),
             "userId": str(user_id),
         })
-        if getattr(task, "max_attempts", None) and existing_count >= task.max_attempts:
+        active_uploads = get_db().video_upload_sessions.count_documents({
+            "taskId": str(task_id),
+            "userId": str(user_id),
+            "status": "uploading",
+            "expiresAt": {"$gt": datetime.now(timezone.utc)},
+        })
+        if getattr(task, "max_attempts", None) and existing_count + active_uploads >= task.max_attempts:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Bạn đã hết lượt nộp bài cho phép ({existing_count}/{task.max_attempts} lần)",
+                detail=f"Bạn đã hết lượt nộp bài cho phép ({existing_count + active_uploads}/{task.max_attempts} lần)",
             )
 
         # Kiểm tra sport
@@ -126,8 +149,195 @@ class VideoResultService:
                 detail="Môn thể thao này không áp dụng hình thức nộp video",
             )
 
-        next_attempt = existing_count + 1
+        next_attempt = existing_count + active_uploads + 1
         return task, course, next_attempt
+
+    def _resolve_task_id(self, task_id: str, course_id: Optional[str]) -> str:
+        if ObjectId.is_valid(task_id):
+            task = crud_task.get(task_id)
+            if not task:
+                raise HTTPException(status_code=404, detail="Không tìm thấy bài tập")
+            if course_id and str(task.course_id) != str(course_id):
+                raise HTTPException(status_code=400, detail="Bài tập không thuộc khóa học đã chọn")
+            return str(task.id)
+
+        if not course_id:
+            raise HTTPException(status_code=400, detail="course_id bắt buộc khi task_id là alias")
+
+        tasks = list(get_db().tasks.find({"courseId": str(course_id)}).sort("createdAt", 1))
+        if not tasks:
+            raise HTTPException(status_code=404, detail="Khóa học chưa có bài tập")
+
+        alias = task_id.lower()
+        if "tx1" in alias or alias == "task-0":
+            index = 0
+        elif "tx2" in alias or alias == "task-1":
+            index = min(1, len(tasks) - 1)
+        elif "midterm" in alias or alias == "task-2":
+            index = min(2, len(tasks) - 1)
+        elif "final" in alias:
+            index = len(tasks) - 1
+        else:
+            raise HTTPException(status_code=404, detail="Không xác định được bài tập từ alias")
+        return str(tasks[index]["_id"])
+
+    def create_upload_url(self, user_id: str, upload_in: VideoUploadUrlRequest) -> VideoUploadUrlResponse:
+        filename = Path(upload_in.file_name).name
+        extension = Path(filename).suffix.lower()
+        if extension not in ALLOWED_VIDEO_EXTENSIONS:
+            raise HTTPException(status_code=400, detail="Định dạng video không được hỗ trợ")
+        if upload_in.file_size > MAX_VIDEO_SIZE:
+            raise HTTPException(status_code=400, detail="Dung lượng video vượt quá giới hạn 500MB")
+        if not upload_in.content_type.lower().startswith("video/") and upload_in.content_type.lower() != "application/octet-stream":
+            raise HTTPException(status_code=400, detail="Content-Type không phải định dạng video")
+
+        task_id = self._resolve_task_id(upload_in.task_id, upload_in.course_id)
+        task = crud_task.get(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Không tìm thấy bài tập")
+        _, _, attempt_no = self._validate_submission_guards(task_id, user_id, task.sport_id)
+        sport = crud_sport.get(task.sport_id)
+        if not sport:
+            raise HTTPException(status_code=404, detail="Không tìm thấy môn thể thao")
+
+        now = datetime.now(timezone.utc)
+        upload_id = ObjectId()
+        result_id = ObjectId()
+        object_key = f"submissions/{task_id}/{result_id}{extension}"
+        expires_at = now + timedelta(seconds=UPLOAD_URL_TTL_SECONDS)
+        session = {
+            "_id": upload_id,
+            "resultId": result_id,
+            "taskId": task_id,
+            "courseId": str(task.course_id),
+            "sportId": str(task.sport_id),
+            "sportCode": sport.code.upper(),
+            "sportMode": sport.mode.value.upper(),
+            "userId": str(user_id),
+            "attemptNo": attempt_no,
+            "bucket": minio_service.default_bucket,
+            "objectKey": object_key,
+            "fileName": filename,
+            "contentType": upload_in.content_type,
+            "declaredFileSize": upload_in.file_size,
+            "durationSec": upload_in.duration_sec,
+            "taskDetail": {
+                "title": task.title,
+                "category": task.category.value,
+                "gradingMethod": task.grading_method.value,
+                "timeLimit": task.time_limit,
+            },
+            "status": "uploading",
+            "expiresAt": expires_at,
+            "createdAt": now,
+        }
+        get_db().video_upload_sessions.insert_one(session)
+        upload_url = minio_service.get_presigned_put_url(
+            object_name=object_key,
+            expires=timedelta(seconds=UPLOAD_URL_TTL_SECONDS),
+        )
+        return VideoUploadUrlResponse(
+            upload_id=str(upload_id),
+            result_id=str(result_id),
+            object_key=object_key,
+            upload_url=upload_url,
+            expires_in=UPLOAD_URL_TTL_SECONDS,
+        )
+
+    def confirm_upload(self, user_id: str, upload_id: str) -> VideoResult:
+        upload_oid = to_object_id(upload_id)
+        if not upload_oid:
+            raise HTTPException(status_code=400, detail="upload_id không hợp lệ")
+        sessions = get_db().video_upload_sessions
+        session = sessions.find_one({"_id": upload_oid, "userId": str(user_id)})
+        if not session:
+            raise HTTPException(status_code=404, detail="Không tìm thấy phiên upload")
+
+        result_id = session["resultId"]
+        existing = crud_video_result.collection.find_one({"_id": result_id})
+        if existing:
+            return VideoResult.model_validate(existing)
+        expires_at = session["expiresAt"]
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if session.get("status") != "uploading" or expires_at <= datetime.now(timezone.utc):
+            raise HTTPException(status_code=410, detail="Phiên upload đã hết hạn hoặc không còn hiệu lực")
+
+        try:
+            object_stat = minio_service.stat_object(session["objectKey"], session["bucket"])
+        except Exception as exc:
+            logger.warning("MinIO object verification failed for uploadId=%s: %s", upload_id, exc)
+            raise HTTPException(status_code=400, detail="Không tìm thấy video đã upload trong MinIO") from exc
+
+        if object_stat.size <= 0 or object_stat.size > MAX_VIDEO_SIZE:
+            raise HTTPException(status_code=400, detail="Dung lượng video thực tế không hợp lệ")
+        if object_stat.size != session["declaredFileSize"]:
+            raise HTTPException(status_code=400, detail="Dung lượng video khác với thông tin đã khai báo")
+
+        task = crud_task.get(session["taskId"])
+        sport = crud_sport.get(session["sportId"])
+        user = crud_user.get(user_id)
+        if not task or not sport or str(task.course_id) != session["courseId"] or str(task.sport_id) != session["sportId"]:
+            raise HTTPException(status_code=400, detail="Thông tin task/course/sport không còn hợp lệ")
+
+        now = datetime.now(timezone.utc)
+        job = {
+            "jobId": str(result_id),
+            "resultId": str(result_id),
+            "taskId": session["taskId"],
+            "courseId": session["courseId"],
+            "sportId": session["sportId"],
+            "sportCode": session["sportCode"],
+            "mode": session["sportMode"],
+            "userId": str(user_id),
+            "bucket": session["bucket"],
+            "objectKey": session["objectKey"],
+            "videoUrl": f"{session['bucket']}/{session['objectKey']}",
+            "minioBucket": session["bucket"],
+            "attemptNo": session["attemptNo"],
+            "detail": session["taskDetail"],
+            "schemaVersion": 1,
+        }
+        data = {
+            "_id": result_id,
+            "taskId": session["taskId"],
+            "courseId": session["courseId"],
+            "sportId": session["sportId"],
+            "userId": str(user_id),
+            "attemptNo": session["attemptNo"],
+            "pending": True,
+            "status": "pending",
+            "videoUrl": f"{session['bucket']}/{session['objectKey']}",
+            "objectKey": session["objectKey"],
+            "bucket": session["bucket"],
+            "fileName": session["fileName"],
+            "fileSize": object_stat.size,
+            "contentType": session["contentType"],
+            "durationSec": session.get("durationSec"),
+            "submittedAt": now,
+            "taskTitle": task.title,
+            "studentName": user.name if user else None,
+            "studentCode": user.user_code if user else None,
+            "gradingJob": job,
+            "gradingJobStatus": "pending",
+            "gradingJobAttempts": 0,
+            "gradingJobNextAttemptAt": now,
+        }
+        try:
+            crud_video_result.collection.insert_one(data)
+        except Exception:
+            existing = crud_video_result.collection.find_one({"_id": result_id})
+            if not existing:
+                raise
+        sessions.update_one({"_id": upload_oid}, {"$set": {"status": "confirmed", "confirmedAt": now}})
+        notification_service.send_notification(
+            user_id=str(user_id),
+            title=f"Đã nộp bài: {task.title}",
+            message=f"Bài nộp lần thứ {session['attemptNo']} đã được xác nhận và đang chờ hệ thống AI xử lý.",
+            notif_type=NotificationType.SUBMISSION_RECEIVED,
+            link=f"/student/courses/{task.course_id}/grades",
+        )
+        return VideoResult.model_validate(crud_video_result.collection.find_one({"_id": result_id}))
 
     def submit_video(self, user_id: str, video_in: VideoResultCreate) -> VideoResult:
         """Sinh viên nộp video bài tập qua URL có sẵn (legacy / metadata)."""
@@ -317,7 +527,7 @@ class VideoResultService:
 
         doc = crud_video_result.collection.find_one(
             {"_id": obj_id},
-            {"_id": 1, "pending": 1, "aiScore": 1, "finalScore": 1},
+            {"_id": 1, "pending": 1, "status": 1, "error": 1, "aiScore": 1, "finalScore": 1},
         )
         if not doc:
             raise HTTPException(status_code=404, detail="Không tìm thấy bài nộp")
@@ -325,6 +535,8 @@ class VideoResultService:
         return VideoResultStatusResponse(
             id=str(doc["_id"]),
             pending=doc.get("pending", True),
+            status=doc.get("status", "pending"),
+            error=doc.get("error"),
             ai_score=doc.get("aiScore"),
             final_score=doc.get("finalScore"),
         )
@@ -432,6 +644,16 @@ class VideoResultService:
             link=f"/student/courses/{task.course_id if task else ''}/grades",
         )
 
+        return updated
+
+    def ai_failure(self, result_id: str, error_code: str) -> VideoResult:
+        """Persist a terminal AI failure without exposing worker exception details."""
+        updated = crud_video_result.mark_failed(result_id, error_code[:100])
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Không tìm thấy kết quả bài nộp",
+            )
         return updated
 
     def teacher_grade(

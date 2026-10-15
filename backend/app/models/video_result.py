@@ -25,6 +25,8 @@ class VideoResult(BaseDocument):
     )
 
     pending: bool = True
+    status: str = "pending"
+    error: Optional[str] = None
     video_url: Optional[str] = None
     file_name: Optional[str] = None
     file_size: Optional[int] = None

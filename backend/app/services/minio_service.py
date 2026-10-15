@@ -102,6 +102,29 @@ class MinioService:
             logger.error("Failed to generate presigned URL for '%s': %s", clean_name, e)
             raise
 
+    def get_presigned_put_url(
+        self,
+        object_name: str,
+        expires: timedelta = timedelta(minutes=10),
+        bucket_name: str | None = None,
+    ) -> str:
+        bucket = bucket_name or self.default_bucket
+        try:
+            self.ensure_bucket(bucket)
+            return self.public_client.presigned_put_object(
+                bucket_name=bucket,
+                object_name=object_name,
+                expires=expires,
+            )
+        except S3Error as e:
+            logger.error("Failed to generate upload URL for '%s': %s", object_name, e)
+            raise
+
+    def stat_object(self, object_name: str, bucket_name: str | None = None):
+        bucket = bucket_name or self.default_bucket
+        clean_name = object_name[len(bucket) + 1 :] if object_name.startswith(f"{bucket}/") else object_name
+        return self.client.stat_object(bucket_name=bucket, object_name=clean_name)
+
     def delete_file(self, object_name: str, bucket_name: str | None = None) -> bool:
         bucket = bucket_name or self.default_bucket
         if object_name.startswith(f"{bucket}/"):

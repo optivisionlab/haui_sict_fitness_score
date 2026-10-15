@@ -76,16 +76,55 @@ class KafkaProducerService:
         }
 
         try:
-            # Gửi message với key=result_id để các message cùng bài nộp luôn vào 1 partition
+            return await self.publish_grading_job(message)
+        except Exception as e:
+            logger.exception("Kafka Producer error sending job for resultId=%s: %s", result_id, e)
+            return False
+
+    @property
+    def is_ready(self) -> bool:
+        return self._producer is not None and self._is_ready
+
+    async def publish_grading_job(self, message: dict[str, Any]) -> bool:
+        """Publish a persisted grading job without rebuilding its metadata."""
+        if not self.is_ready:
+            return False
+
+        result_id = str(message.get("resultId") or message.get("jobId") or "")
+        if not result_id:
+            logger.error("Refusing to publish grading job without resultId")
+            return False
+
+        try:
             await self._producer.send_and_wait(
                 topic=settings.KAFKA_TOPIC_GRADING_JOBS,
                 value=message,
                 key=result_id,
             )
-            logger.info("📤 Kafka Producer: Sent grading job -> resultId=%s, sport=%s", result_id, sport_code)
+            logger.info("Kafka Producer: sent grading job -> resultId=%s", result_id)
             return True
         except Exception as e:
             logger.exception("Kafka Producer error sending job for resultId=%s: %s", result_id, e)
+            return False
+
+    async def publish_grading_result(self, message: dict[str, Any]) -> bool:
+        if not self.is_ready:
+            return False
+
+        result_id = str(message.get("resultId") or message.get("jobId") or "")
+        if not result_id:
+            logger.error("Refusing to publish grading result without resultId")
+            return False
+
+        try:
+            await self._producer.send_and_wait(
+                topic=settings.KAFKA_TOPIC_GRADING_RESULTS,
+                value=message,
+                key=result_id,
+            )
+            return True
+        except Exception:
+            logger.exception("Kafka Producer error sending grading result for resultId=%s", result_id)
             return False
 
     def dispatch_grading_job(

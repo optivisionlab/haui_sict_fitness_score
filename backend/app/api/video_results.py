@@ -13,11 +13,33 @@ from app.schemas.video_result import (
     VideoResultRead,
     VideoResultStatusResponse,
     VideoResultTeacherGrade,
+    VideoUploadConfirmRequest,
+    VideoUploadUrlRequest,
+    VideoUploadUrlResponse,
 )
 from app.services.auth_service import get_current_user, require_roles, verify_internal_api_key
 from app.services.video_result_service import video_result_service
 
 router = APIRouter(prefix="/video-results", tags=["Video Results"])
+
+
+@router.post("/upload-url", response_model=VideoUploadUrlResponse)
+def create_video_upload_url(
+    upload_in: VideoUploadUrlRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Tạo upload session và cấp presigned PUT URL có thời hạn ngắn."""
+    return video_result_service.create_upload_url(str(current_user.id), upload_in)
+
+
+@router.post("/confirm-upload", response_model=VideoResultRead, status_code=status.HTTP_201_CREATED)
+def confirm_video_upload(
+    confirm_in: VideoUploadConfirmRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Xác minh object trong MinIO rồi ghi nhận bài nộp và job chấm điểm."""
+    result = video_result_service.confirm_upload(str(current_user.id), confirm_in.upload_id)
+    return VideoResultRead.model_validate(result)
 
 
 @router.post("/upload", response_model=VideoResultRead, status_code=status.HTTP_201_CREATED)
