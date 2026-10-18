@@ -194,11 +194,23 @@
           <div>Hạn nộp bài: <strong>{{ a.closeTime }}</strong></div>
         </div>
 
+        <!-- Bài tập: nộp nhiều lần | Bài kiểm tra/thi: nút riêng, chỉ nộp 1 lần -->
         <div class="assessment-action-row">
-          <button type="button" class="btn-primary" (click)="openSubmitModal()">
-            <svg lucideUploadCloud [size]="18"></svg>
-            <span>Nộp bài video</span>
-          </button>
+          @if (isExam(a)) {
+            <button type="button" class="btn-primary btn-exam" [disabled]="examSubmitted()" (click)="openSubmitModal()">
+              <svg lucideUploadCloud [size]="18"></svg>
+              <span>{{ examSubmitted() ? 'Đã nộp bài thi' : 'Nộp video bài thi' }}</span>
+            </button>
+            <span class="submit-rule-hint exam">
+              Bài kiểm tra/bài thi chỉ được nộp <strong>1 lần duy nhất</strong> và chấm điểm 1 lần.
+            </span>
+          } @else {
+            <button type="button" class="btn-primary" (click)="openSubmitModal()">
+              <svg lucideUploadCloud [size]="18"></svg>
+              <span>Nộp bài tập</span>
+            </button>
+            <span class="submit-rule-hint">Bài tập được nộp nhiều lần, hệ thống lấy điểm lần cao nhất.</span>
+          }
         </div>
       </div>
     </div>
@@ -206,10 +218,10 @@
     <!-- Kết quả & Lịch sử nộp bài -->
     <div class="card">
       <div class="section-header">
-        <h3 class="section-heading">Lịch sử các lần nộp bài</h3>
+        <h3 class="section-heading">{{ isExam(a) ? 'Bài thi đã nộp' : 'Lịch sử các lần nộp bài' }}</h3>
         @if (highestScore() !== null) {
           <div class="highest-score-tag">
-            Điểm cao nhất: <strong>{{ highestScore() }}</strong>
+            {{ isExam(a) ? 'Điểm bài thi' : 'Điểm cao nhất' }}: <strong>{{ highestScore() }}</strong>
           </div>
         }
       </div>
@@ -218,7 +230,7 @@
         <div class="empty-attempts-box">
           <svg lucideAlertCircle [size]="32" class="empty-icon"></svg>
           <div class="empty-title">Bạn chưa nộp bài lần nào cho mục này.</div>
-          <div class="empty-desc">Nhấn vào nút "Nộp bài video" ở trên để gửi video bài thực hành.</div>
+          <div class="empty-desc">Nhấn vào nút "{{ isExam(a) ? 'Nộp video bài thi' : 'Nộp bài tập' }}" ở trên để gửi video bài thực hành.</div>
         </div>
       } @else {
         <div class="table-responsive">
@@ -280,7 +292,7 @@
   <div class="modal-overlay" (click)="closeSubmitModal()">
     <div class="modal-content" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h3 class="modal-title">Nộp video bài tập</h3>
+        <h3 class="modal-title">{{ isExam(currentAssessment()) ? 'Nộp video bài thi' : 'Nộp video bài tập' }}</h3>
         <button type="button" class="close-btn" (click)="closeSubmitModal()">
           <svg lucideX [size]="20"></svg>
         </button>
@@ -292,6 +304,13 @@
           <div class="task-deadline">Hạn nộp: {{ currentAssessment().closeTime }}</div>
         }
       </div>
+
+      @if (isExam(currentAssessment())) {
+        <div class="exam-warning-box">
+          <svg lucideAlertCircle [size]="18"></svg>
+          <span>Bài kiểm tra/bài thi chỉ được nộp <strong>1 lần duy nhất</strong>. Sau khi nộp sẽ không thể nộp lại, hãy kiểm tra kỹ video trước khi xác nhận.</span>
+        </div>
+      }
 
       <!-- Dropzone -->
       <div
@@ -333,7 +352,7 @@
             <span class="btn-spinner"></span>
             <span>Đang nộp...</span>
           } @else {
-            <span>Nộp bài</span>
+            <span>{{ isExam(currentAssessment()) ? 'Xác nhận nộp bài thi' : 'Nộp bài' }}</span>
           }
         </button>
       </div>

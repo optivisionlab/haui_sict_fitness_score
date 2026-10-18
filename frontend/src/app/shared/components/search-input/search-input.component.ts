@@ -20,6 +20,9 @@ export class SearchInputComponent {
   /** Optional label above the input */
   label = input<string>('');
 
+  /** Max number of characters allowed */
+  maxLength = input<number>(255);
+
   /** Whether to show a clear button when input has text */
   showClear = input<boolean>(true);
 

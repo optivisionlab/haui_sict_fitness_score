@@ -50,9 +50,18 @@ def get_student_course_grades(
 
         sub_status = "not_submitted"
         submitted_at = None
+        if score is not None:
+            sub_status = "graded"
         if last_sub:
             submitted_at = last_sub.get("submittedAt")
-            sub_status = "pending" if last_sub.get("pending", True) else "graded"
+            if sub_status != "graded":
+                raw_status = last_sub.get("status", "")
+                if raw_status == "failed":
+                    sub_status = "failed"
+                elif last_sub.get("pending", True):
+                    sub_status = "pending"
+                else:
+                    sub_status = "graded"
 
         task_items.append(
             StudentTaskGradeItem(

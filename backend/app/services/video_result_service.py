@@ -45,11 +45,10 @@ class VideoResultService:
         self, task_id: str, user_id: str, sport_id: str
     ) -> tuple[Task, Course, int]:
         """
-        4 Lớp Bảo Vệ (4-Layer Guards):
+        3 Lớp Bảo Vệ (3-Layer Guards):
         1. Kiểm tra lớp đã chốt sổ điểm chưa.
         2. Kiểm tra cờ khóa nộp bài cấp lớp (allowPracticeSubmission / allowExamSubmission).
         3. Kiểm tra bài tập có bị khóa hoặc ngoài khung giờ nộp bài.
-        4. Kiểm tra giới hạn số lần nộp (maxAttempts).
         """
         task = crud_task.get(task_id)
         if not task:
@@ -120,7 +119,6 @@ class VideoResultService:
                     detail="Bài tập chưa tới thời gian mở nộp bài",
                 )
 
-        # GUARD 4: Kiểm tra giới hạn số lần nộp bài (maxAttempts)
         existing_count = crud_video_result.collection.count_documents({
             "taskId": str(task_id),
             "userId": str(user_id),
@@ -131,11 +129,18 @@ class VideoResultService:
             "status": "uploading",
             "expiresAt": {"$gt": datetime.now(timezone.utc)},
         })
-        if getattr(task, "max_attempts", None) and existing_count + active_uploads >= task.max_attempts:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Bạn đã hết lượt nộp bài cho phép ({existing_count + active_uploads}/{task.max_attempts} lần)",
-            )
+        # GUARD 4: Bài kiểm tra/bài thi chỉ được nộp 1 lần (lần chấm thất bại được nộp lại)
+        if task_category == TaskCategory.EXAM:
+            valid_exam_submissions = crud_video_result.collection.count_documents({
+                "taskId": str(task_id),
+                "userId": str(user_id),
+                "status": {"$ne": "failed"},
+            })
+            if valid_exam_submissions > 0 or active_uploads > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Bài kiểm tra/bài thi chỉ được nộp 1 lần. Bạn đã nộp bài này.",
+                )
 
         # Kiểm tra sport
         sport = crud_sport.get(sport_id)
@@ -151,7 +156,13 @@ class VideoResultService:
                 detail="Môn thể thao này không áp dụng hình thức nộp video",
             )
 
-        next_attempt = existing_count + active_uploads + 1
+        max_attempt_doc = crud_video_result.collection.find_one(
+            {"taskId": str(task_id), "userId": str(user_id)},
+            {"attemptNo": 1},
+            sort=[("attemptNo", -1)],
+        )
+        max_existing = max_attempt_doc["attemptNo"] if max_attempt_doc else 0
+        next_attempt = max(existing_count + active_uploads, max_existing) + 1
         return task, course, next_attempt
 
     def _resolve_task_id(self, task_id: str, course_id: Optional[str]) -> str:
@@ -496,9 +507,9 @@ class VideoResultService:
             data["studentCode"] = user.user_code
 
         created = crud_video_result.create(data)
-        # Job được outbox dispatcher gửi đi (Kafka hoặc gọi thẳng AI), không dispatch trực tiếp để tránh chấm trùng
+        result_oid = ObjectId(created.id)
         crud_video_result.collection.update_one(
-            {"_id": created.id},
+            {"_id": result_oid},
             {"$set": {"gradingJob.jobId": str(created.id), "gradingJob.resultId": str(created.id)}}
         )
 

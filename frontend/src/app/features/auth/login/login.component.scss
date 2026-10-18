@@ -361,6 +361,11 @@
   position: relative;
   margin-bottom: 24px;
 
+  // Khung chứa input: viền/nền chỉ bao quanh ô nhập, thông báo lỗi nằm bên ngoài
+  .field-control {
+    position: relative;
+  }
+
   .field-nature {
     position: absolute;
     top: 0;

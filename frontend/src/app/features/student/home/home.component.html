@@ -8,20 +8,25 @@
       <p class="banner-desc">
         Chúc bạn một ngày học tập hứng khởi và đạt nhiều kết quả xuất sắc.
       </p>
-      <div class="banner-meta">
-        <span class="meta-item">
-          <svg lucideGraduationCap [size]="15"></svg>
-          Mã SV: {{ student().studentId }}
-        </span>
-        @if (student().classCode && student().classCode !== 'Chưa cập nhật') {
-          <span class="meta-dot">•</span>
-          <span class="meta-item">{{ student().classCode }}</span>
-        }
-        @if (student().semester && student().semester !== 'Chưa cập nhật') {
-          <span class="meta-dot">•</span>
-          <span class="meta-item">{{ student().semester }}</span>
-        }
-      </div>
+      <!-- Mã SV đã hiển thị ở header (user pill) nên không lặp lại ở đây -->
+      @let hasClass = student().classCode && student().classCode !== 'Chưa cập nhật';
+      @let hasSemester = student().semester && student().semester !== 'Chưa cập nhật';
+      @if (hasClass || hasSemester) {
+        <div class="banner-meta">
+          @if (hasClass) {
+            <span class="meta-item">
+              <svg lucideGraduationCap [size]="15"></svg>
+              {{ student().classCode }}
+            </span>
+          }
+          @if (hasClass && hasSemester) {
+            <span class="meta-dot">•</span>
+          }
+          @if (hasSemester) {
+            <span class="meta-item">{{ student().semester }}</span>
+          }
+        </div>
+      }
     </div>
   </div>
 

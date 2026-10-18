@@ -181,13 +181,16 @@ export class CoursesComponent implements OnInit, OnDestroy {
 
         const mappedAssessments: AssessmentItem[] = data.tasks.map((t: any, idx: number) => {
           const isExam = t.category === 'exam';
-          const type = isExam ? 'final' : (idx === 0 ? 'tx1' : 'tx2');
+          const titleLower = (t.taskTitle || '').toLowerCase();
+          const type = isExam
+            ? (titleLower.includes('giữa') || titleLower.includes('midterm') ? 'midterm' : 'final')
+            : (titleLower.includes('tx1') || idx === 0 ? 'tx1' : 'tx2');
           const hasScore = t.score !== null && t.score !== undefined;
           return {
             id: t.taskId || `task-${idx}`,
             name: t.taskTitle || (isExam ? 'Bài cuối kỳ - Thi đấu tính điểm chính thức' : `Bài thường xuyên ${idx + 1}`),
             type: type as any,
-            gradingMethod: 'Lần cao nhất',
+            gradingMethod: isExam ? 'Chấm 1 lần duy nhất' : 'Lần cao nhất',
             timeLimit: isExam ? '60 phút' : 'Không giới hạn',
             openTime: '01/09/2026 08:00',
             closeTime: '20/11/2026 23:59',
@@ -259,7 +262,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
                       const isPending = videoAttempts.some((a) => a.pending);
                       return {
                         ...ass,
-                        status: isPending ? ('pending' as const) : ass.status,
+                        status: isPending && ass.status !== 'graded' ? ('pending' as const) : ass.status,
                         attempts: videoAttempts
                       };
                     }
@@ -381,6 +384,18 @@ export class CoursesComponent implements OnInit, OnDestroy {
     return course.assessments.find((a: AssessmentItem) => a.id === this.selectedAssessmentId()) || course.assessments[0] || this.defaultAssessment;
   });
 
+  /** Bài kiểm tra giữa kỳ / bài thi cuối kỳ: chỉ được nộp 1 lần. */
+  isExam(assessment: AssessmentItem): boolean {
+    return assessment.type === 'midterm' || assessment.type === 'final';
+  }
+
+  // Bài thi đã có lần nộp hợp lệ (lần chấm thất bại vẫn cho nộp lại)
+  examSubmitted = computed<boolean>(() => {
+    const assessment = this.currentAssessment();
+    if (!this.isExam(assessment)) return false;
+    return assessment.status === 'graded' || assessment.attempts.some((a: AssessmentAttempt) => !a.failed);
+  });
+
   // Highest score for current assessment
   highestScore = computed<number | null>(() => {
     const assessment = this.currentAssessment();
@@ -441,6 +456,10 @@ export class CoursesComponent implements OnInit, OnDestroy {
 
   // Submit Video Modal handlers
   openSubmitModal(): void {
+    if (this.examSubmitted()) {
+      this.showToast('Bài kiểm tra/bài thi chỉ được nộp 1 lần. Bạn đã nộp bài này.');
+      return;
+    }
     this.selectedFile.set(null);
     this.selectedFileName.set('');
     this.hasVideoSelected.set(false);
@@ -490,7 +509,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
 
   submitVideo(): void {
     const file = this.selectedFile();
-    if (!file) return;
+    if (!file || this.examSubmitted()) return;
 
     const courseId = this.selectedCourseId();
     const assessmentId = this.selectedAssessmentId();
