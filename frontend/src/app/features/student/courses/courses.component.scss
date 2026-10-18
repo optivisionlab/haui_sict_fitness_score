@@ -586,6 +586,17 @@ $primary-blue-light: #eff6ff;
   border-radius: 4px;
 }
 
+.status-badge-failed {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 4px;
+}
+
 .status-badge-pending {
   display: inline-block;
   padding: 2px 8px;

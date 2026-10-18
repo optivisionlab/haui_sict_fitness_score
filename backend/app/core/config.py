@@ -47,10 +47,23 @@ class Settings:
 
     # AI / Worker Auth
     AI_API_KEY: str = os.getenv("AI_API_KEY", "internal-ai-worker-secret-key")
-    AI_API_URL: str = os.getenv("AI_API_URL", "")
-    AI_API_TIMEOUT_SECONDS: float = float(os.getenv("AI_API_TIMEOUT_SECONDS", "120"))
-    AI_ROUTER_ENABLED: bool = os.getenv("AI_ROUTER_ENABLED", "false").lower() == "true"
+    AI_API_URL: str = os.getenv("AI_API_URL", "http://0.0.0.0:8888/api/v1/process")
+    AI_PICKLEBALL_VIDEO_URL: str = os.getenv(
+        "AI_PICKLEBALL_VIDEO_URL", "http://0.0.0.0:8888/api/v1/process"
+    )
+    # AI xử lý video đồng bộ trong 1 request nên cần timeout dài
+    AI_API_TIMEOUT_SECONDS: float = float(os.getenv("AI_API_TIMEOUT_SECONDS", "600"))
+    AI_ROUTER_ENABLED: bool = os.getenv("AI_ROUTER_ENABLED", "true").lower() == "true"
     AI_MOCK_MODE: bool = os.getenv("AI_MOCK_MODE", "false").lower() == "true"
+    AI_WORKER_ENABLED: bool = os.getenv("AI_WORKER_ENABLED", "true").lower() == "true"
+    # Gọi thẳng AI khi Kafka không sẵn sàng (outbox fallback)
+    AI_DIRECT_FALLBACK: bool = os.getenv("AI_DIRECT_FALLBACK", "true").lower() == "true"
+    # MinIO endpoint mà AI service dùng để tải video (phải truy cập được từ máy chạy AI)
+    AI_MINIO_ENDPOINT: str = (
+        os.getenv("AI_MINIO_ENDPOINT")
+        or os.getenv("MINIO_PUBLIC_ENDPOINT")
+        or os.getenv("MINIO_ENDPOINT", "localhost:9000")
+    )
 
     # Kafka
     KAFKA_BOOTSTRAP_SERVERS: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")

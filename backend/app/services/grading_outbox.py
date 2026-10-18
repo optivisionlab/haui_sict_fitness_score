@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 OUTBOX_BATCH_SIZE = 20
 OUTBOX_MAX_ATTEMPTS = 10
-OUTBOX_LEASE_SECONDS = 300
+OUTBOX_LEASE_SECONDS = 900
 
 
 class GradingOutboxDispatcher:
@@ -45,6 +45,9 @@ class GradingOutboxDispatcher:
 
     async def dispatch_pending(self) -> int:
         if not kafka_producer.is_ready:
+            from app.core.config import settings
+            if settings.AI_DIRECT_FALLBACK:
+                return await self._dispatch_direct_fallback()
             return 0
 
         collection = get_db().video_results
@@ -112,6 +115,90 @@ class GradingOutboxDispatcher:
                 {"_id": document["_id"], "gradingJobStatus": "processing"},
                 update,
             )
+
+        return dispatched
+
+    async def _dispatch_direct_fallback(self) -> int:
+        """Fallback: Nếu Kafka broker chưa chạy, trực tiếp gọi AI client để chấm điểm bài nộp."""
+        from app.services.ai_grading_client import AIGradingError, ai_grading_client
+        from app.services.video_result_service import video_result_service
+        from app.schemas.video_result import VideoResultAIUpdate
+
+        collection = get_db().video_results
+        dispatched = 0
+        now = datetime.now(timezone.utc)
+        for _ in range(OUTBOX_BATCH_SIZE):
+            document = collection.find_one_and_update(
+                {
+                    "gradingJob": {"$exists": True},
+                    "$or": [
+                        {
+                            "gradingJobStatus": "pending",
+                            "$or": [
+                                {"gradingJobNextAttemptAt": {"$exists": False}},
+                                {"gradingJobNextAttemptAt": {"$lte": now}},
+                            ],
+                        },
+                        {
+                            "gradingJobStatus": "processing",
+                            "gradingJobLeaseUntil": {"$lte": now},
+                        },
+                    ],
+                },
+                {
+                    "$set": {
+                        "gradingJobStatus": "processing",
+                        "gradingJobLeaseUntil": now + timedelta(seconds=OUTBOX_LEASE_SECONDS),
+                    }
+                },
+                return_document=ReturnDocument.AFTER,
+            )
+            if not document:
+                break
+
+            job = document["gradingJob"]
+            result_id = str(document["_id"])
+            try:
+                ai_res = await ai_grading_client.grade(job)
+                ai_update = VideoResultAIUpdate(
+                    pending=False,
+                    metrics=ai_res.get("metrics", {}),
+                    ai_score=ai_res.get("aiScore"),
+                    ai_comment=ai_res.get("aiComment"),
+                )
+                video_result_service.ai_callback(result_id, ai_update)
+                collection.update_one(
+                    {"_id": document["_id"]},
+                    {
+                        "$set": {
+                            "gradingJobStatus": "completed",
+                            "gradingJobSentAt": datetime.now(timezone.utc),
+                        },
+                        "$unset": {"gradingJobLeaseUntil": "", "gradingJobNextAttemptAt": ""},
+                    },
+                )
+                dispatched += 1
+            except Exception as exc:
+                logger.warning("Direct grading fallback attempt failed for resultId=%s: %s", result_id, exc)
+                attempts = int(document.get("gradingJobAttempts", 0)) + 1
+                # Lỗi vĩnh viễn (request/video không hợp lệ) thì không retry
+                terminal = attempts >= OUTBOX_MAX_ATTEMPTS or (
+                    isinstance(exc, AIGradingError) and not exc.retryable
+                )
+                error_code = exc.code if isinstance(exc, AIGradingError) else "ai_grading_failed"
+                update = {
+                    "$set": {
+                        "gradingJobStatus": "failed" if terminal else "pending",
+                        "gradingJobAttempts": attempts,
+                    },
+                    "$unset": {"gradingJobLeaseUntil": ""},
+                }
+                if terminal:
+                    update["$set"].update({"status": "failed", "pending": False, "error": error_code})
+                else:
+                    delay = min(2 ** attempts, 60)
+                    update["$set"]["gradingJobNextAttemptAt"] = datetime.now(timezone.utc) + timedelta(seconds=delay)
+                collection.update_one({"_id": document["_id"]}, update)
 
         return dispatched
 

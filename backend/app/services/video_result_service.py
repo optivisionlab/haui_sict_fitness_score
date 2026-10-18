@@ -11,6 +11,7 @@ from app.crud.sport import crud_sport
 from app.crud.task import crud_task
 from app.crud.user import crud_user
 from app.crud.video_result import crud_video_result
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.course import Course
 from app.models.notification import NotificationType
@@ -31,7 +32,8 @@ from app.services.minio_service import minio_service
 from app.services.notification_service import notification_service
 from app.services.sports.registry import sport_registry
 
-ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
+# AI service (pickleball_track) chỉ đọc được MP4/MOV
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov"}
 MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500 MB
 UPLOAD_URL_TTL_SECONDS = 600
 
@@ -440,44 +442,65 @@ class VideoResultService:
         )
 
         user = crud_user.get(user_id)
+        sport = crud_sport.get(sport_id)
+        sport_code = sport.code.upper() if sport else "unknown"
+        sport_mode = (sport.mode.value if sport and hasattr(sport.mode, "value") else (sport.mode if sport else "video")).upper()
+        now = datetime.now(timezone.utc)
+
         data = {
             "taskId": str(task_id),
             "sportId": str(sport_id),
             "userId": str(user_id),
             "attemptNo": next_attempt,
             "pending": True,
+            "status": "pending",
             "videoUrl": minio_path,
+            "bucket": settings.MINIO_BUCKET_NAME,
+            "objectKey": object_name,
             "fileName": file.filename,
             "fileSize": file_size,
             "contentType": file.content_type or "video/mp4",
             "durationSec": duration_sec,
-            "submittedAt": datetime.now(timezone.utc),
+            "submittedAt": now,
             # Denormalization (lưu dư thừa)
             "courseId": str(task.course_id),
             "taskTitle": task.title,
+            "gradingJob": {
+                "jobId": None,
+                "resultId": None,
+                "taskId": str(task_id),
+                "courseId": str(task.course_id),
+                "sportId": str(sport_id),
+                "sportCode": sport_code,
+                "mode": sport_mode,
+                "userId": str(user_id),
+                "bucket": settings.MINIO_BUCKET_NAME,
+                "objectKey": object_name,
+                "videoUrl": minio_path,
+                "minioBucket": settings.MINIO_BUCKET_NAME,
+                "attemptNo": next_attempt,
+                "detail": {
+                    "title": task.title,
+                    "category": task.category.value,
+                    "gradingMethod": task.grading_method.value,
+                    "timeLimit": task.time_limit,
+                },
+                "schemaVersion": 1,
+            },
+            "gradingJobStatus": "pending",
+            "gradingJobAttempts": 0,
+            "gradingJobNextAttemptAt": now,
         }
         if user:
             data["studentName"] = user.name
             data["studentCode"] = user.user_code
 
         created = crud_video_result.create(data)
-
-        # Gửi job chấm điểm vào Kafka
-        try:
-            from app.services.kafka_producer import kafka_producer
-            sport = crud_sport.get(sport_id)
-            sport_code = sport.code if sport else "unknown"
-            kafka_producer.dispatch_grading_job(
-                result_id=str(created.id),
-                task_id=str(task_id),
-                sport_id=str(sport_id),
-                sport_code=sport_code,
-                user_id=str(user_id),
-                video_url=minio_path,
-                attempt_no=next_attempt,
-            )
-        except Exception as e:
-            logger.warning("Could not dispatch Kafka grading job: %s", e)
+        # Job được outbox dispatcher gửi đi (Kafka hoặc gọi thẳng AI), không dispatch trực tiếp để tránh chấm trùng
+        crud_video_result.collection.update_one(
+            {"_id": created.id},
+            {"$set": {"gradingJob.jobId": str(created.id), "gradingJob.resultId": str(created.id)}}
+        )
 
         notification_service.send_notification(
             user_id=str(user_id),

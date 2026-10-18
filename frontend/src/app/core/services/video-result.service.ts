@@ -4,7 +4,14 @@ import { Observable } from 'rxjs';
 import { concatMap, map, switchMap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/auth.model';
-import { VideoResult, VideoResultFilter, VideoUploadPayload, VideoUploadUrl } from '../models/video-result.model';
+import {
+  Paginated,
+  VideoResult,
+  VideoResultFilter,
+  VideoResultStatusInfo,
+  VideoUploadPayload,
+  VideoUploadUrl
+} from '../models/video-result.model';
 
 @Injectable({
   providedIn: 'root'
@@ -54,16 +61,23 @@ export class VideoResultService {
   /**
    * Lấy danh sách kết quả video nộp bài theo bộ lọc (sinh viên, bài tập, lớp)
    */
-  getVideoResults(filters?: VideoResultFilter): Observable<ApiResponse<VideoResult[]>> {
+  getVideoResults(filters?: VideoResultFilter): Observable<ApiResponse<Paginated<VideoResult>>> {
     let params = new HttpParams();
     if (filters?.student_id) params = params.set('student_id', filters.student_id);
     if (filters?.exercise_id) params = params.set('exercise_id', filters.exercise_id);
     if (filters?.class_id) params = params.set('class_id', filters.class_id);
     if (filters?.status) params = params.set('status', filters.status);
-    if (filters?.skip !== undefined) params = params.set('skip', filters.skip.toString());
-    if (filters?.limit !== undefined) params = params.set('limit', filters.limit.toString());
+    if (filters?.page !== undefined) params = params.set('page', filters.page.toString());
+    if (filters?.page_size !== undefined) params = params.set('page_size', filters.page_size.toString());
 
-    return this.http.get<ApiResponse<VideoResult[]>>(this.baseUrl, { params });
+    return this.http.get<ApiResponse<Paginated<VideoResult>>>(this.baseUrl, { params });
+  }
+
+  /**
+   * Trạng thái chấm điểm của một bài nộp (dùng để polling sau khi upload)
+   */
+  getSubmissionStatus(id: string): Observable<ApiResponse<VideoResultStatusInfo>> {
+    return this.http.get<ApiResponse<VideoResultStatusInfo>>(`${this.baseUrl}/${id}/status`);
   }
 
   /**
@@ -76,7 +90,7 @@ export class VideoResultService {
   /**
    * Lấy link presigned trực tiếp để phát video từ MinIO
    */
-  getVideoStreamUrl(id: string): Observable<ApiResponse<{ video_url: string; expires_in: number }>> {
-    return this.http.get<ApiResponse<{ video_url: string; expires_in: number }>>(`${this.baseUrl}/${id}/video-url`);
+  getVideoStreamUrl(id: string): Observable<ApiResponse<{ videoUrl: string; expiresInSeconds: number }>> {
+    return this.http.get<ApiResponse<{ videoUrl: string; expiresInSeconds: number }>>(`${this.baseUrl}/${id}/video-url`);
   }
 }

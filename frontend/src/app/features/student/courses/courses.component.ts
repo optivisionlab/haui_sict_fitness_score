@@ -21,12 +21,16 @@ import { environment } from '../../../../environments/environment';
 import { ApiResponse } from '../../../core/models/auth.model';
 import { AuthService } from '../../../core/services/auth.service';
 import { VideoResultService } from '../../../core/services/video-result.service';
+import { VideoResult } from '../../../core/models/video-result.model';
 import {
   Course,
   CourseDetailInfo,
   AssessmentItem,
   AssessmentAttempt
 } from './models/course-detail.model';
+
+const STATUS_POLL_INTERVAL_MS = 3000;
+const STATUS_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
 @Component({
   selector: 'app-courses',
@@ -83,6 +87,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
   toastMessage = signal<string>('');
   isToastVisible = signal<boolean>(false);
   private toastTimer: any = null;
+  private pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   // Base courses list
   courses = signal<Course[]>([]);
@@ -238,27 +243,20 @@ export class CoursesComponent implements OnInit, OnDestroy {
         const user = this.authService.currentUser();
         const studentId = user?.id || user?.user_code;
         if (studentId) {
-          this.videoResultService.getVideoResults({ student_id: studentId }).subscribe({
+          this.videoResultService.getVideoResults({ student_id: studentId, page_size: 100 }).subscribe({
             next: (vrRes) => {
-              const videoList = vrRes?.data || [];
+              const videoList = vrRes?.data?.items || [];
               if (videoList.length > 0) {
                 this.courseDetails.update((prev) => {
                   const currCourse = prev[courseId];
                   if (!currCourse) return prev;
                   const updatedAssessments = currCourse.assessments.map((ass) => {
-                    const matchingVideos = videoList.filter(
-                      (v) => v.exercise_id === ass.id && (!v.course_id || v.course_id === courseId)
-                    );
+                    const matchingVideos = videoList
+                      .filter((v) => v.taskId === ass.id)
+                      .sort((x, y) => y.attemptNo - x.attemptNo);
                     if (matchingVideos.length > 0) {
-                      const videoAttempts: AssessmentAttempt[] = matchingVideos.map((v, i) => ({
-                        attemptNo: matchingVideos.length - i,
-                        date: new Date(v.created_at).toLocaleString('vi-VN'),
-                        pending: v.status === 'pending' || v.status === 'processing',
-                        score: v.score !== null && v.score !== undefined ? v.score : undefined,
-                        videoUrl: v.video_url,
-                        videoResultId: v.id
-                      }));
-                      const isPending = matchingVideos.some((v) => v.status === 'pending' || v.status === 'processing');
+                      const videoAttempts: AssessmentAttempt[] = matchingVideos.map((v) => this.toAttempt(v));
+                      const isPending = videoAttempts.some((a) => a.pending);
                       return {
                         ...ass,
                         status: isPending ? ('pending' as const) : ass.status,
@@ -283,6 +281,53 @@ export class CoursesComponent implements OnInit, OnDestroy {
       },
       error: () => {}
     });
+  }
+
+  /** Map một bài nộp từ API sang dòng lịch sử nộp bài. */
+  private toAttempt(v: VideoResult): AssessmentAttempt {
+    const score = v.finalScore ?? v.aiScore ?? undefined;
+    const failed = v.status === 'failed';
+    // Dữ liệu cũ có thể thiếu status nhưng đã có điểm => coi là đã chấm
+    const pending = !failed && score === undefined && (v.pending || v.status === 'pending' || v.status === 'processing');
+    const duration = v.durationSec ? `${Math.floor(v.durationSec / 60)}:${String(v.durationSec % 60).padStart(2, '0')}` : undefined;
+    return {
+      attemptNo: v.attemptNo,
+      date: new Date(v.submittedAt).toLocaleString('vi-VN'),
+      duration,
+      pending,
+      failed,
+      error: v.error || undefined,
+      score,
+      feedback: v.teacherComment || v.aiComment || undefined,
+      videoResultId: v.id
+    };
+  }
+
+  /** Poll trạng thái chấm điểm sau khi upload cho tới khi completed/failed rồi tải lại kết quả. */
+  private pollSubmission(resultId: string, courseId: string, startedAt = Date.now()): void {
+    if (Date.now() - startedAt > STATUS_POLL_TIMEOUT_MS) return;
+    this.pollTimers.set(
+      resultId,
+      setTimeout(() => {
+        this.videoResultService.getSubmissionStatus(resultId).subscribe({
+          next: (res) => {
+            const st = res?.data;
+            if (st?.status === 'completed' || st?.status === 'failed') {
+              this.pollTimers.delete(resultId);
+              this.loadCourseAssessments(courseId);
+              this.showToast(
+                st.status === 'completed'
+                  ? `Đã có kết quả chấm điểm: ${st.finalScore ?? st.aiScore} điểm.`
+                  : `Chấm điểm thất bại (${st.error || 'lỗi không xác định'}). Vui lòng thử nộp lại.`
+              );
+              return;
+            }
+            this.pollSubmission(resultId, courseId, startedAt);
+          },
+          error: () => this.pollSubmission(resultId, courseId, startedAt)
+        });
+      }, STATUS_POLL_INTERVAL_MS)
+    );
   }
 
   // Fallback course detail if route is loaded before items
@@ -364,6 +409,8 @@ export class CoursesComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     clearTimeout(this.toastTimer);
+    this.pollTimers.forEach((timer) => clearTimeout(timer));
+    this.pollTimers.clear();
   }
 
   setTab(tab: 'all' | 'active' | 'done'): void {
@@ -474,10 +521,9 @@ export class CoursesComponent implements OnInit, OnDestroy {
               const attemptNo = (currentAss.attempts?.length || 0) + 1;
 
               const newAttempt: AssessmentAttempt = {
-                attemptNo: attemptNo,
+                attemptNo: videoResult?.attemptNo || attemptNo,
                 date: dateStr,
                 pending: true,
-                videoUrl: videoResult?.videoUrl || videoResult?.video_url,
                 videoResultId: videoResult?.id
               };
 
@@ -498,6 +544,9 @@ export class CoursesComponent implements OnInit, OnDestroy {
 
           this.closeSubmitModal();
           this.showToast('Nộp video thành công! Video đã lưu trữ trên MinIO và đang chờ hệ thống AI xử lý.');
+          if (videoResult?.id) {
+            this.pollSubmission(videoResult.id, courseId);
+          }
         }
       },
       error: (err) => {
@@ -516,8 +565,8 @@ export class CoursesComponent implements OnInit, OnDestroy {
     if (attempt.videoResultId && !attempt.videoUrl) {
       this.videoResultService.getVideoStreamUrl(attempt.videoResultId).subscribe({
         next: (res) => {
-          if (res?.data?.video_url) {
-            this.selectedAttempt.update(curr => curr ? { ...curr, videoUrl: res.data.video_url } : null);
+          if (res?.data?.videoUrl) {
+            this.selectedAttempt.update(curr => curr ? { ...curr, videoUrl: res.data.videoUrl } : null);
           }
         },
         error: () => {}

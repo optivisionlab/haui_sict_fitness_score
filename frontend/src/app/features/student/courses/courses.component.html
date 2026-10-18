@@ -242,12 +242,14 @@
                   <td>
                     @if (att.pending) {
                       <span class="status-badge-pending">Đang xử lý</span>
+                    } @else if (att.failed) {
+                      <span class="status-badge-failed" [title]="att.error || ''">Thất bại</span>
                     } @else {
                       <span class="status-badge-done">Hoàn thành</span>
                     }
                   </td>
                   <td>
-                    @if (att.pending) {
+                    @if (att.pending || att.failed) {
                       <span class="text-muted">--</span>
                     } @else {
                       <span class="score-highlight">{{ att.score }}</span>
@@ -364,14 +366,22 @@
           <span>Trạng thái:</span>
           @if (att.pending) {
             <span class="status-badge-pending">⏳ Chờ AI xử lý</span>
+          } @else if (att.failed) {
+            <span class="status-badge-failed">❌ Chấm điểm thất bại{{ att.error ? ' (' + att.error + ')' : '' }}</span>
           } @else {
             <span class="status-badge-done">✅ Đã chấm điểm</span>
           }
         </div>
         <div class="review-row">
           <span>Điểm số:</span>
-          <strong class="score-large">{{ att.score !== undefined ? att.score + ' điểm' : 'Đang chờ chấm' }}</strong>
+          <strong class="score-large">{{ att.score !== undefined ? att.score + ' điểm' : (att.failed ? '—' : 'Đang chờ chấm') }}</strong>
         </div>
+        @if (att.feedback) {
+          <div class="review-row">
+            <span>Nhận xét:</span>
+            <strong>{{ att.feedback }}</strong>
+          </div>
+        }
       </div>
 
       <div class="video-container-box">

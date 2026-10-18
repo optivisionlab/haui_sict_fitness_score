@@ -301,17 +301,17 @@ export class TeacherClassDetailComponent implements OnInit {
 
   private fetchVideoResult(student: GradebookStudentItem, taskId: string): void {
     const sid = student.user_id;
-    this.videoResultService.getVideoResults({ student_id: sid, exercise_id: taskId }).subscribe({
+    this.videoResultService.getVideoResults({ student_id: sid, exercise_id: taskId, page_size: 100 }).subscribe({
       next: (res) => {
-        const videos = res?.data || [];
+        const videos = [...(res?.data?.items || [])].sort((a, b) => b.attemptNo - a.attemptNo);
         if (videos.length > 0) {
           const latestVideo = videos[0];
           this.currentSubmissionDetail.set({
-            submittedAt: new Date(latestVideo.created_at).toLocaleString('vi-VN'),
-            videoUrl: latestVideo.video_url,
-            aiScore: latestVideo.score !== null && latestVideo.score !== undefined ? latestVideo.score : undefined,
-            aiFeedback: latestVideo.feedback || undefined,
-            status: latestVideo.status === 'completed' ? 'graded' : 'pending'
+            submittedAt: new Date(latestVideo.submittedAt).toLocaleString('vi-VN'),
+            videoUrl: latestVideo.videoUrl || undefined,
+            aiScore: latestVideo.aiScore ?? undefined,
+            aiFeedback: latestVideo.aiComment || undefined,
+            status: latestVideo.status === 'completed' || latestVideo.aiScore != null ? 'graded' : 'pending'
           });
         } else {
           this.currentSubmissionDetail.set(null);

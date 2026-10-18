@@ -1,5 +1,6 @@
+from datetime import datetime, timezone
 from typing import Any, Generic, Optional, TypeVar
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_serializer
 from pydantic.alias_generators import to_camel
 
 from app.models.base import PyObjectId
@@ -16,6 +17,13 @@ class BaseSchema(BaseModel):
         arbitrary_types_allowed=True,
         from_attributes=True,
     )
+
+    @field_serializer("*", mode="wrap")
+    def _serialize_utc_datetime(self, value: Any, handler):
+        # MongoDB trả datetime naive (UTC); gắn tzinfo để JSON có "+00:00" và FE hiển thị đúng giờ địa phương
+        if isinstance(value, datetime) and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return handler(value)
 
 
 class MessageResponse(BaseSchema):
