@@ -1,0 +1,159 @@
+<div class="teacher-classes-page">
+  <!-- Breadcrumb -->
+  <div class="breadcrumb">
+    <span>Cổng thông tin Giảng viên</span>
+    <span class="separator">/</span>
+    <span class="current">Lớp học phần</span>
+  </div>
+
+  <!-- Page Header -->
+  <div class="page-header-row">
+    <div>
+      <h1 class="page-title">Quản lý Lớp học phần</h1>
+      <p class="page-subtitle">Theo dõi tiến độ giảng dạy, kiểm soát nộp bài, luyện tập và thực hiện chốt điểm học phần.</p>
+    </div>
+  </div>
+
+  <!-- Stat Cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon blue">
+        <svg lucideBookOpen [size]="24"></svg>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ stats().total }}</div>
+        <div class="stat-label">Tổng số lớp giảng dạy</div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon indigo">
+        <svg lucideClock [size]="24"></svg>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ stats().active }}</div>
+        <div class="stat-label">Lớp đang diễn ra</div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon green">
+        <svg lucideCheckCircle2 [size]="24"></svg>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ stats().finalized }}</div>
+        <div class="stat-label">Lớp đã kết thúc</div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon purple">
+        <svg lucideUsers [size]="24"></svg>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ stats().totalStudents }}</div>
+        <div class="stat-label">Tổng sinh viên phụ trách</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Card -->
+  <div class="card">
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'all'"
+        (click)="setTab('all')">
+        Tất cả lớp học ({{ stats().total }})
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'in_progress'"
+        (click)="setTab('in_progress')">
+        Đang diễn ra ({{ stats().active }})
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="selectedTab() === 'completed'"
+        (click)="setTab('completed')">
+        Đã kết thúc ({{ stats().finalized }})
+      </button>
+    </div>
+
+    <!-- Filters Row -->
+    <div class="filters-row">
+      <div class="filter-search">
+        <app-search-input
+          label="Tìm kiếm lớp học phần"
+          placeholder="Nhập tên môn học, mã lớp (FIT-PB01...)..."
+          [(value)]="searchKeyword">
+        </app-search-input>
+      </div>
+    </div>
+
+    <!-- Classes Grid -->
+    <div class="classes-grid">
+      @for (classItem of filteredClasses(); track classItem.id) {
+        <div class="class-card" (click)="goToClassDetail(classItem)">
+          <!-- Top Row: Icon & Status -->
+          <div class="class-header">
+            <div class="class-thumb">
+                <svg lucideActivity [size]="28"></svg>
+            </div>
+
+            <div class="class-meta-badges">
+              <span class="badge" [ngClass]="getStatusBadgeClass(classItem.status)">
+                @if (classItem.status === 'completed') {
+                  <svg lucideCheckCircle2 [size]="14"></svg>
+                } @else {
+                  <svg lucideClock [size]="14"></svg>
+                }
+                {{ getStatusText(classItem.status) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Class Info -->
+          <div class="class-content">
+            <div class="class-code-tag">{{ classItem.code || 'Chưa có mã' }}</div>
+            <h3 class="class-title">{{ classItem.name }}</h3>
+
+            <div class="info-list">
+              <div class="info-item">
+                <svg lucideCalendar class="info-icon" [size]="15"></svg>
+                <span>Bắt đầu: {{ classItem.start_date ? (classItem.start_date | date:'dd/MM/yyyy') : '—' }}</span>
+              </div>
+              <div class="info-item">
+                <svg lucideUsers class="info-icon" [size]="15"></svg>
+                <span>Sĩ số: <strong>{{ classItem.student_total }}</strong> sinh viên</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card Footer Action -->
+          <div class="class-footer">
+            <button
+              type="button"
+              class="btn btn-primary btn-block"
+              (click)="goToClassDetail(classItem); $event.stopPropagation()">
+              <span>Thông tin lớp học</span>
+              <svg lucideArrowRight [size]="16"></svg>
+            </button>
+          </div>
+        </div>
+      } @empty {
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg lucideBookOpen [size]="48"></svg>
+          </div>
+          <h3>Không tìm thấy lớp học phần phù hợp</h3>
+          <p>Thử thay đổi từ khóa tìm kiếm hoặc chuyển tab bộ lọc khác.</p>
+        </div>
+      }
+    </div>
+  </div>
+</div>

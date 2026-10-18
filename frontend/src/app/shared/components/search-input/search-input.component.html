@@ -1,0 +1,24 @@
+<div class="search-field-container">
+  @if (label()) {
+    <label class="search-label">{{ label() }}</label>
+  }
+  <div class="search-input-wrapper">
+    <svg lucideSearch class="search-icon" [size]="16"></svg>
+    <input
+      type="text"
+      class="search-input"
+      [placeholder]="placeholder()"
+      [ngModel]="value()"
+      (ngModelChange)="onValueChange($event)"
+    />
+    @if (showClear() && value()) {
+      <button
+        type="button"
+        class="clear-btn"
+        (click)="onClear()"
+        title="Xóa tìm kiếm">
+        <svg lucideX [size]="14"></svg>
+      </button>
+    }
+  </div>
+</div>

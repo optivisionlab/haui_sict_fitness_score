@@ -1,0 +1,187 @@
+<div class="teacher-profile-page">
+  <!-- Breadcrumb -->
+  <div class="breadcrumb">
+    <span>Cổng Giảng viên</span>
+    <span class="separator">/</span>
+    <span class="current">Hồ sơ giảng viên</span>
+  </div>
+
+  <div class="page-header">
+    <h1 class="page-title">Hồ sơ & Thông tin Giảng viên</h1>
+    <p class="page-subtitle">Quản lý thông tin công tác, thông tin cá nhân và cài đặt bảo mật tài khoản.</p>
+  </div>
+
+  <!-- Hero Card -->
+  <div class="card profile-hero-card">
+    <div class="hero-left">
+      <div class="avatar-container">
+        <img [src]="profile().avatarUrl" alt="Avatar Giảng viên" class="profile-avatar" />
+      </div>
+
+      <div class="hero-info">
+        <div class="name-row">
+          <h2 class="teacher-name">{{ profile().fullName }}</h2>
+          <span class="status-badge">
+            <span class="status-dot"></span>
+            {{ profile().status }}
+          </span>
+        </div>
+        <div class="teacher-meta">
+          <span class="meta-tag">
+            <svg lucideAward [size]="14"></svg>
+            {{ profile().teacherId }}
+          </span>
+          <span class="meta-divider">&bull;</span>
+          <span class="meta-email">{{ profile().email }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Tabs Card -->
+  <div class="card">
+    <div class="tab-bar">
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab() === 'info'"
+        (click)="setTab('info')">
+        <svg lucideUser [size]="16"></svg>
+        <span>Thông tin cá nhân & Công tác</span>
+      </button>
+
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab() === 'security'"
+        (click)="setTab('security')">
+        <svg lucideLock [size]="16"></svg>
+        <span>Bảo mật & Đổi mật khẩu</span>
+      </button>
+    </div>
+
+    <!-- TAB 1: THÔNG TIN CÁ NHÂN -->
+    @if (activeTab() === 'info') {
+      <div class="tab-pane">
+        <div class="form-grid">
+          <!-- Readonly System info -->
+          <div class="form-group">
+            <label>Mã Giảng viên:</label>
+            <input type="text" [value]="profile().teacherId" disabled class="form-control disabled" />
+          </div>
+
+          <div class="form-group">
+            <label>Email cơ quan (@haui.edu.vn):</label>
+            <input type="text" [value]="profile().email" disabled class="form-control disabled" />
+          </div>
+
+          <div class="form-group">
+            <label>Trạng thái:</label>
+            <input type="text" [value]="profile().status" disabled class="form-control disabled" />
+          </div>
+
+          <!-- Editable fields -->
+          <div class="form-group">
+            <label>Họ và tên:</label>
+            <input type="text" [(ngModel)]="editForm.fullName" class="form-control" />
+          </div>
+
+          <div class="form-group">
+            <label>Giới tính:</label>
+            <select [(ngModel)]="editForm.gender" class="form-control">
+              <option value="Nam">Nam</option>
+              <option value="Nữ">Nữ</option>
+              <option value="Khác">Khác</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Số điện thoại liên hệ:</label>
+            <input type="text" [(ngModel)]="editForm.phone" class="form-control" />
+          </div>
+
+          <div class="form-group">
+            <label>Email cá nhân:</label>
+            <input type="email" [(ngModel)]="editForm.personalEmail" class="form-control" />
+          </div>
+
+          <div class="form-group full-width">
+            <label>Quê quán:</label>
+            <input type="text" [(ngModel)]="editForm.hometown" class="form-control" />
+          </div>
+
+          <div class="form-group full-width">
+            <label>Nơi ở hiện nay:</label>
+            <input type="text" [(ngModel)]="editForm.address" class="form-control" />
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="isSaving()"
+            (click)="saveProfile()">
+            <svg lucideSave [size]="16"></svg>
+            <span>{{ isSaving() ? 'Đang lưu...' : 'Lưu thay đổi' }}</span>
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- TAB 2: ĐỔI MẬT KHẨU -->
+    @if (activeTab() === 'security') {
+      <div class="tab-pane security-pane">
+        <div class="security-intro">
+          <div class="security-icon">
+            <svg lucideShieldCheck [size]="28"></svg>
+          </div>
+          <div>
+            <h3>Đổi mật khẩu tài khoản Giảng viên</h3>
+            <p>Mật khẩu cần tối thiểu 6 ký tự để đảm bảo an toàn cho dữ liệu điểm số của học phần.</p>
+          </div>
+        </div>
+
+        <div class="form-vertical">
+          <div class="form-group">
+            <label>Mật khẩu hiện tại:</label>
+            <input
+              type="password"
+              class="form-control"
+              [(ngModel)]="passwordForm.currentPassword"
+              placeholder="Nhập mật khẩu đang dùng" />
+          </div>
+
+          <div class="form-group">
+            <label>Mật khẩu mới:</label>
+            <input
+              type="password"
+              class="form-control"
+              [(ngModel)]="passwordForm.newPassword"
+              placeholder="Tối thiểu 6 ký tự" />
+          </div>
+
+          <div class="form-group">
+            <label>Xác nhận mật khẩu mới:</label>
+            <input
+              type="password"
+              class="form-control"
+              [(ngModel)]="passwordForm.confirmPassword"
+              placeholder="Nhập lại mật khẩu mới" />
+          </div>
+
+          <div class="form-actions">
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="isChangingPassword()"
+              (click)="changePassword()">
+              <svg lucideCheck [size]="16"></svg>
+              <span>{{ isChangingPassword() ? 'Đang xử lý...' : 'Cập nhật mật khẩu' }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

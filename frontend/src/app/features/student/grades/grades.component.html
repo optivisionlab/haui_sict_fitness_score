@@ -1,0 +1,204 @@
+<div class="grades-page">
+  <div class="grades-card">
+
+    <!-- VIEW 1: DANH SÁCH HỌC PHẦN -->
+    @if (activeView() === 'list') {
+    <div class="view-list">
+      <h1 class="page-title">Kết quả học tập</h1>
+
+      <!-- Bộ lọc -->
+      <div class="filters-row">
+        <div class="filter-col flex-1">
+          <app-search-input label="Học phần" placeholder="Nhập từ khóa..." [(value)]="searchKeyword"
+            (search)="onFilterChange()">
+          </app-search-input>
+        </div>
+
+        <div class="filter-col w-48">
+          <app-select label="Trạng thái" [options]="statusOptions" [(value)]="statusFilter" (change)="onFilterChange()">
+          </app-select>
+        </div>
+
+        <div class="filter-col w-48">
+          <app-select label="Điều kiện dự thi" [options]="conditionOptions" [(value)]="conditionFilter"
+            (change)="onFilterChange()">
+          </app-select>
+        </div>
+      </div>
+
+      <!-- Bảng danh sách -->
+      <div class="table-container custom-scrollbar">
+        <table class="grades-table">
+          <thead>
+            <tr>
+              <th class="text-left col-subject">Học phần</th>
+              <th class="text-left col-class">Lớp học phần</th>
+              <th class="text-center col-score-regular">Điểm thường xuyên</th>
+              <th class="text-center col-score-num">Điểm tổng kết (thang 10)</th>
+              <th class="text-center col-score-letter">Điểm tổng kết (chữ)</th>
+              <th class="text-center col-condition leading-tight">Điều kiện<br />dự thi</th>
+              <th class="text-center col-action">Chi tiết</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of paginatedSubjects(); track item.id; let odd = $odd) {
+            <tr [class.odd-row]="odd">
+              <td class="text-left font-medium subject-name" (click)="openDetail(item)">
+                {{ item.name }}
+              </td>
+              <td class="text-left text-muted">{{ item.classCode }}</td>
+
+              <!-- Điểm thường xuyên -->
+              <td class="text-center">
+                @if (item.regularScore != null) {
+                <span class="score-val">{{ item.regularScore }}</span>
+                } @else {
+                <span class="text-muted">—</span>
+                }
+              </td>
+
+              <!-- Điểm tổng kết (thang 10) -->
+              <td class="text-center">
+                @if (item.score != null) {
+                <span class="score-val">{{ item.score }}</span>
+                } @else {
+                <span class="text-muted">—</span>
+                }
+              </td>
+
+              <!-- Điểm tổng kết (chữ) -->
+              <td class="text-center">
+                @if (item.letterGrade) {
+                <span class="grade-letter-text">{{ item.letterGrade }}</span>
+                } @else {
+                <span class="text-muted">—</span>
+                }
+              </td>
+
+              <td class="text-center">
+                @if (item.examCondition === 'eligible') {
+                <span class="condition-text eligible">Đủ điều kiện</span>
+                } @else if (item.examCondition === 'ineligible') {
+                <span class="condition-text ineligible">Không đủ ĐK</span>
+                } @else {
+                <span class="text-muted">-</span>
+                }
+              </td>
+              <td class="text-center">
+                <button type="button" class="btn-link" (click)="openDetail(item)">
+                  Xem thêm
+                </button>
+              </td>
+            </tr>
+            } @empty {
+            <tr>
+              <td colspan="7" class="empty-state">
+                Không tìm thấy học phần phù hợp.
+              </td>
+            </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Phân trang dùng Shared Component -->
+      <app-pagination [(currentPage)]="currentPage" [totalItems]="filteredSubjects().length" [pageSize]="pageSize()"
+        (pageChange)="setPage($event)">
+      </app-pagination>
+    </div>
+    }
+
+    <!-- VIEW 2: CHI TIẾT HỌC PHẦN (DANH SÁCH BÀI KIỂM TRA THEO TEMPLATE THÔ) -->
+    @if (activeView() === 'detail' && selectedSubject(); as subject) {
+    <div class="view-detail">
+      <!-- Header chi tiết -->
+      <div class="detail-header">
+        <button type="button" class="btn-back" (click)="backToList()" title="Quay lại danh sách">
+          <svg lucideArrowLeft [size]="20"></svg>
+        </button>
+        <div>
+          <h1 class="page-title">{{ subject.name }}</h1>
+          <p class="detail-subtitle">Mã lớp học phần: {{ subject.classCode }}</p>
+        </div>
+      </div>
+
+      <!-- Bảng chi tiết theo từng bài kiểm tra (template ảnh thô) -->
+      <div class="table-container custom-scrollbar">
+        <table class="grades-table detail-table">
+          <thead>
+            <tr>
+              <th class="text-left border-col">Bài kiểm tra</th>
+              <th class="text-left border-col">Thời gian nộp</th>
+              <th class="text-center border-col leading-tight">Hình thức</th>
+              <th class="text-center border-col leading-tight">Trạng thái</th>
+              <th class="text-center border-col leading-tight">Điểm số</th>
+              <th class="text-center">Điều kiện dự thi</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (task of selectedSubjectTasks(); track task.taskId || $index; let odd = $odd) {
+            <tr [class.odd-row]="odd">
+              <td class="text-left font-medium">{{ task.taskTitle }}</td>
+              <td class="text-left text-muted">{{ formatDate(task.submittedAt) }}</td>
+              <td class="text-center text-muted">Video thực hành</td>
+              <td class="text-center">
+                @if (task.status === 'graded' || (task.score !== null && task.score !== undefined)) {
+                  <span class="condition-text eligible">Đã chấm</span>
+                } @else if (task.status === 'pending') {
+                  <span class="condition-text">Đang chấm</span>
+                } @else {
+                  <span class="text-muted">Chưa nộp</span>
+                }
+              </td>
+              <td class="text-center font-bold">
+                {{ task.score !== null && task.score !== undefined ? task.score : '-' }}
+              </td>
+              <td class="text-center">
+                @if (task.score !== null && task.score !== undefined && task.score >= 5.0) {
+                  <span class="condition-text eligible">Đạt</span>
+                } @else if (task.score !== null && task.score !== undefined) {
+                  <span class="condition-text ineligible">Không đạt</span>
+                } @else {
+                  <span class="text-muted">-</span>
+                }
+              </td>
+            </tr>
+            } @empty {
+            <tr>
+              <td colspan="6" class="empty-state" style="padding: 24px; text-align: center; color: var(--color-text-secondary, #64748b);">
+                @if (isLoadingDetail()) {
+                  Đang tải danh sách bài kiểm tra...
+                } @else {
+                  Chưa có dữ liệu bài kiểm tra cho học phần này.
+                }
+              </td>
+            </tr>
+            }
+
+            <!-- Dòng Tổng -->
+            @if (subject.summary) {
+            <tr class="summary-row">
+              <td class="text-left font-bold">Tổng</td>
+              <td class="text-left font-medium">{{ subject.summary.period }}</td>
+              <td class="text-center font-bold">{{ subject.summary.practiceCompleted }}</td>
+              <td class="text-center font-bold">{{ subject.summary.liveClassCompleted }}</td>
+              <td class="text-center font-bold">{{ subject.summary.testCompleted }}</td>
+              <td class="text-center">
+                @if (subject.summary.examCondition === 'Đủ điều kiện') {
+                <span class="condition-text font-bold eligible">Đủ điều kiện</span>
+                } @else if (subject.summary.examCondition === 'Không đủ điều kiện') {
+                <span class="condition-text font-bold ineligible">Không đủ ĐK</span>
+                } @else {
+                <span class="condition-text font-bold">{{ subject.summary.examCondition }}</span>
+                }
+              </td>
+            </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+    }
+
+  </div>
+</div>

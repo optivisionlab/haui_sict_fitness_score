@@ -1,0 +1,240 @@
+.teacher-profile-page {
+  padding-bottom: 50px;
+}
+
+.toast-alert {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+
+  &.success {
+    background: #15803d;
+    color: #ffffff;
+  }
+
+  &.error {
+    background: #b91c1c;
+    color: #ffffff;
+  }
+}
+
+.page-header {
+  margin-bottom: 20px;
+}
+
+.page-subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-top: -12px;
+}
+
+.profile-hero-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 24px;
+  margin-bottom: 24px;
+
+  .hero-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .avatar-container {
+    width: 80px;
+    height: 80px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 8px 16px -4px rgba(37, 99, 235, 0.2);
+    border: 3px solid #ffffff;
+
+    .profile-avatar {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .hero-info {
+    .name-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 6px;
+
+      .teacher-name {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: var(--text-main);
+      }
+
+      .status-badge {
+        background: #dcfce7;
+        color: #15803d;
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+
+        .status-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #16a34a;
+        }
+      }
+    }
+
+    .teacher-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.88rem;
+      color: #475569;
+
+      .meta-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--accent-blue);
+        font-weight: 600;
+      }
+
+      .meta-divider {
+        color: #cbd5e1;
+      }
+    }
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 14px;
+
+    .stat-pill {
+      background: #f8fafc;
+      border: 1px solid var(--border-color-light);
+      border-radius: 12px;
+      padding: 12px 18px;
+      text-align: center;
+
+      .stat-num {
+        display: block;
+        font-size: 1.4rem;
+        font-weight: 800;
+
+        &.text-blue { color: #2563eb; }
+        &.text-green { color: #16a34a; }
+      }
+
+      .stat-label {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+    }
+  }
+}
+
+.tab-pane {
+  padding-top: 10px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 24px;
+
+  .full-width {
+    grid-column: 1 / -1;
+  }
+}
+
+.form-group {
+  label {
+    display: block;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 6px;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.92rem;
+    font-family: inherit;
+    transition: all 0.2s ease;
+
+    &:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    &.disabled {
+      background: #f8fafc;
+      color: #64748b;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.security-pane {
+  max-width: 540px;
+
+  .security-intro {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+
+    .security-icon {
+      color: var(--accent-blue);
+      flex-shrink: 0;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    p {
+      font-size: 0.84rem;
+      color: #1e40af;
+    }
+  }
+
+  .form-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+}

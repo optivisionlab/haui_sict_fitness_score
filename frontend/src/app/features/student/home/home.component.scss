@@ -1,0 +1,375 @@
+$primary-green: #2563eb;
+$primary-green-hover: #1d4ed8;
+$primary-green-light: #eff6ff;
+$primary-green-soft: #f0f7ff;
+$text-main: #0f172a;
+$text-muted: #64748b;
+$border-color: #cbd5e1;
+
+.home-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* --- 1. BANNER LỜI CHÀO (GREETING BANNER) --- */
+.welcome-banner {
+  background-color: #cbe2fe;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 16px;
+  padding: 24px 30px;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  box-shadow: 0 4px 16px -2px rgba(37, 99, 235, 0.08);
+}
+
+.banner-content {
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.banner-title {
+  font-size: 1.65rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #0f172a;
+
+  .highlight {
+    color: #1d4ed8;
+  }
+}
+
+.banner-desc {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #334155;
+  margin: 0;
+}
+
+.banner-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: #475569;
+  flex-wrap: wrap;
+  margin-top: 2px;
+
+  .meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+
+    svg {
+      color: #1d4ed8;
+    }
+  }
+
+  .meta-dot {
+    opacity: 0.5;
+  }
+}
+
+/* --- 2. BỐ CỤC NỘI DUNG CHÍNH (2 CỘT) --- */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 24px;
+  align-items: stretch;
+
+  @media (max-width: 1040px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Thẻ Card Chung --- */
+.card {
+  background-color: #ffffff;
+  border-radius: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.05);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(37, 99, 235, 0.12);
+  gap: 12px;
+}
+
+.header-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  &.schedule-box {
+    background-color: #fef3c7;
+    color: #d97706;
+  }
+
+  &.notif-box {
+    background-color: #e0f2fe;
+    color: #0284c7;
+  }
+}
+
+.card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: $text-main;
+  margin: 0;
+}
+
+.btn-link-action {
+  background: none;
+  border: none;
+  color: $primary-green;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background-color: #eff6ff;
+    color: $primary-green-hover;
+  }
+}
+
+/* --- KHỐI 1: LỊCH HỌC (MINIMALIST TIMELINE AS IN SCREENSHOT) --- */
+.schedule-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.timeline-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  position: relative;
+}
+
+.timeline-date-col {
+  width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 14px;
+  flex-shrink: 0;
+
+  .day-of-week {
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: #334155;
+    line-height: 1.1;
+  }
+
+  .date-label {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: #94a3b8;
+    margin-top: 3px;
+  }
+}
+
+.timeline-axis {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 14px;
+  flex-shrink: 0;
+  position: relative;
+  padding-top: 20px;
+
+  .timeline-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #14b8a6;
+    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.25);
+    z-index: 2;
+  }
+
+  .timeline-line {
+    position: absolute;
+    top: 28px;
+    bottom: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1.5px;
+    background-color: #e2e8f0;
+    z-index: 1;
+  }
+}
+
+.schedule-simple-card {
+  flex: 1;
+  background-color: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  padding: 12px 16px 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+
+  /* The green/teal vertical accent bar on the left inside the card */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 12px;
+    bottom: 12px;
+    left: 0;
+    width: 3.5px;
+    background-color: #0d9488;
+    border-radius: 0 3px 3px 0;
+  }
+
+  padding-left: 18px;
+
+  &:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    transform: translateX(2px);
+  }
+
+  .card-session {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #0d9488;
+    line-height: 1.3;
+  }
+
+  .card-subject {
+    font-size: 0.92rem;
+    font-weight: 800;
+    color: #1e293b;
+    line-height: 1.35;
+    margin: 1px 0 2px 0;
+  }
+
+  .card-instructor {
+    font-size: 0.8rem;
+    color: #475569;
+    line-height: 1.35;
+  }
+
+  .card-room {
+    font-size: 0.8rem;
+    color: #475569;
+    line-height: 1.35;
+  }
+}
+
+/* --- KHỐI 2: THÔNG BÁO MỚI (RECENT NOTIFICATIONS) --- */
+.recent-notifs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.recent-notif-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background-color: #ffffff;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background-color: #f0f7ff;
+    border-color: rgba(37, 99, 235, 0.25);
+    transform: translateX(3px);
+  }
+
+  .notif-icon-circle {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    &.course {
+      background-color: #eff6ff;
+      color: #2563eb;
+    }
+
+    &.exam {
+      background-color: #fef3c7;
+      color: #d97706;
+    }
+
+    &.system {
+      background-color: #e0f2fe;
+      color: #0284c7;
+    }
+  }
+
+  .notif-text-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    .notif-item-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: $text-main;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin: 0;
+    }
+
+    .notif-item-time {
+      font-size: 0.72rem;
+      color: #94a3b8;
+    }
+  }
+
+  .unread-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #2563eb;
+    flex-shrink: 0;
+  }
+}
