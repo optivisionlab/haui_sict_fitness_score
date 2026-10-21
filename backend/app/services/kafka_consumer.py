@@ -85,11 +85,11 @@ class KafkaResultConsumerService:
                                 ai_score=data.get("aiScore"),
                                 ai_comment=data.get("aiComment"),
                             )
-                            video_result_service.ai_callback(result_id, ai_update)
+                            await asyncio.to_thread(video_result_service.ai_callback, result_id, ai_update)
                             logger.info("✅ Kafka Consumer: Successfully processed result for resultId=%s", result_id)
                         elif status == "failed":
                             error_code = str(data.get("errorCode") or "ai_processing_failed")[:100]
-                            video_result_service.ai_failure(result_id, error_code)
+                            await asyncio.to_thread(video_result_service.ai_failure, result_id, error_code)
                             logger.warning(
                                 "Kafka Consumer: job failed for resultId=%s, code=%s",
                                 result_id,

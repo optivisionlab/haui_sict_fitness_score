@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 from typing import Any
 
@@ -119,7 +120,8 @@ class AIGradingClient:
         }
 
     async def grade(self, job: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
-        request_data = self.build_request(job)
+        # build_request ký presigned URL qua MinIO SDK (đồng bộ, lần đầu có gọi mạng lấy region)
+        request_data = await asyncio.to_thread(self.build_request, job)
         if self.mock_mode:
             return {
                 "jobId": request_data["job_id"],

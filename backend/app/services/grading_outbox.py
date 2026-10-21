@@ -54,7 +54,8 @@ class GradingOutboxDispatcher:
         dispatched = 0
         for _ in range(OUTBOX_BATCH_SIZE):
             now = datetime.now(timezone.utc)
-            document = collection.find_one_and_update(
+            document = await asyncio.to_thread(
+                collection.find_one_and_update,
                 {
                     "gradingJob": {"$exists": True},
                     "$or": [
@@ -84,7 +85,8 @@ class GradingOutboxDispatcher:
 
             job = document["gradingJob"]
             if await kafka_producer.publish_grading_job(job):
-                collection.update_one(
+                await asyncio.to_thread(
+                    collection.update_one,
                     {"_id": document["_id"], "gradingJobStatus": "processing"},
                     {
                         "$set": {
@@ -111,7 +113,8 @@ class GradingOutboxDispatcher:
             else:
                 delay = min(2 ** attempts, 60)
                 update["$set"]["gradingJobNextAttemptAt"] = datetime.now(timezone.utc) + timedelta(seconds=delay)
-            collection.update_one(
+            await asyncio.to_thread(
+                collection.update_one,
                 {"_id": document["_id"], "gradingJobStatus": "processing"},
                 update,
             )
@@ -128,7 +131,8 @@ class GradingOutboxDispatcher:
         dispatched = 0
         now = datetime.now(timezone.utc)
         for _ in range(OUTBOX_BATCH_SIZE):
-            document = collection.find_one_and_update(
+            document = await asyncio.to_thread(
+                collection.find_one_and_update,
                 {
                     "gradingJob": {"$exists": True},
                     "$or": [
@@ -166,8 +170,9 @@ class GradingOutboxDispatcher:
                     ai_score=ai_res.get("aiScore"),
                     ai_comment=ai_res.get("aiComment"),
                 )
-                video_result_service.ai_callback(result_id, ai_update)
-                collection.update_one(
+                await asyncio.to_thread(video_result_service.ai_callback, result_id, ai_update)
+                await asyncio.to_thread(
+                    collection.update_one,
                     {"_id": document["_id"]},
                     {
                         "$set": {
@@ -198,7 +203,7 @@ class GradingOutboxDispatcher:
                 else:
                     delay = min(2 ** attempts, 60)
                     update["$set"]["gradingJobNextAttemptAt"] = datetime.now(timezone.utc) + timedelta(seconds=delay)
-                collection.update_one({"_id": document["_id"]}, update)
+                await asyncio.to_thread(collection.update_one, {"_id": document["_id"]}, update)
 
         return dispatched
 
