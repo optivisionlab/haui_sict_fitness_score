@@ -24,6 +24,17 @@ class AIGradingError(Exception):
 class AIGradingClient:
     def __init__(self, mock_mode: bool | None = None):
         self.mock_mode = settings.AI_MOCK_MODE if mock_mode is None else mock_mode
+        self._http: httpx.AsyncClient | None = None
+
+    def bind_http_client(self, client: httpx.AsyncClient | None) -> None:
+        """Gắn HTTP client dùng chung (do lifespan tạo và đóng) để tái sử dụng kết nối tới AI."""
+        self._http = client
+
+    def _get_http(self) -> httpx.AsyncClient:
+        # Ngoài lifespan (script, test) thì tự tạo 1 client và dùng lại cho các lần gọi sau
+        if self._http is None or self._http.is_closed:
+            self._http = httpx.AsyncClient(timeout=settings.AI_API_TIMEOUT_SECONDS)
+        return self._http
 
     def resolve_endpoint(self, sport_code: str | None, mode: str | None) -> str:
         """
@@ -107,7 +118,7 @@ class AIGradingClient:
             "detail": AIGradingClient._build_detail(job.get("detail")),
         }
 
-    async def grade(self, job: dict[str, Any]) -> dict[str, Any]:
+    async def grade(self, job: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
         request_data = self.build_request(job)
         if self.mock_mode:
             return {
@@ -129,8 +140,12 @@ class AIGradingClient:
 
         headers = {"Authorization": f"Bearer {settings.AI_API_KEY}"} if settings.AI_API_KEY else {}
         try:
-            async with httpx.AsyncClient(timeout=settings.AI_API_TIMEOUT_SECONDS) as client:
-                response = await client.post(endpoint, json=request_data, headers=headers)
+            response = await self._get_http().post(
+                endpoint,
+                json=request_data,
+                headers=headers,
+                timeout=timeout if timeout is not None else settings.AI_API_TIMEOUT_SECONDS,
+            )
         except httpx.HTTPError as exc:
             # Timeout / không kết nối được AI: lỗi tạm thời, retry được
             raise AIGradingError("ai_unreachable", retryable=True) from exc

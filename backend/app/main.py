@@ -134,6 +134,7 @@ async def lifespan(app: FastAPI):
         # 2. HTTP client dùng chung cho các lời gọi AI
         http_client = httpx.AsyncClient(timeout=settings.AI_API_TIMEOUT_SECONDS)
         app.state.http_client = http_client
+        ai_grading_client.bind_http_client(http_client)
         _register_stop(stack, "http client", http_client.aclose)
 
         # 3. Kafka producer: tùy chọn, lỗi thì chạy ở chế độ degraded (outbox dùng direct fallback)
