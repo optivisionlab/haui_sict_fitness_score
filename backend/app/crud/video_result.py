@@ -58,7 +58,11 @@ class CRUDVideoResult(CRUDBase[VideoResult, VideoResultCreate, VideoResultAIUpda
         result_id: str | ObjectId,
         update_data: VideoResultAIUpdate | dict[str, Any],
     ) -> Optional[VideoResult]:
-        """AI Worker cập nhật kết quả sau khi phân tích video xong."""
+        """
+        AI Worker cập nhật kết quả sau khi phân tích video xong.
+        Chỉ cập nhật khi bài nộp chưa completed: trả None nếu không tìm thấy hoặc đã có kết quả
+        (kết quả trùng do Kafka giao lại).
+        """
         oid = to_object_id(result_id)
         if oid is None:
             return None
@@ -72,11 +76,12 @@ class CRUDVideoResult(CRUDBase[VideoResult, VideoResultCreate, VideoResultAIUpda
         is_pending = bool(fields.get("pending", False))
         fields["pending"] = is_pending
         fields["status"] = "processing" if is_pending else "completed"
-        fields.pop("error", None)
+        # Có kết quả thì xóa lỗi của lần chấm thất bại trước (nếu có)
+        fields["error"] = None
         fields["updatedAt"] = datetime.now(timezone.utc)
 
         updated_doc = self.collection.find_one_and_update(
-            {"_id": oid},
+            {"_id": oid, "status": {"$ne": "completed"}},
             {"$set": fields},
             return_document=ReturnDocument.AFTER,
         )
@@ -89,8 +94,9 @@ class CRUDVideoResult(CRUDBase[VideoResult, VideoResultCreate, VideoResultAIUpda
         if oid is None:
             return None
 
+        # Kết quả failed đến muộn không được ghi đè kết quả completed
         updated_doc = self.collection.find_one_and_update(
-            {"_id": oid},
+            {"_id": oid, "status": {"$ne": "completed"}},
             {
                 "$set": {
                     "pending": False,

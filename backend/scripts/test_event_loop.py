@@ -118,8 +118,8 @@ async def test_result_consumer():
     vrs_module = importlib.import_module("app.services.video_result_service")
 
     messages = [
-        SimpleNamespace(value={"resultId": "r1", "status": "completed", "aiScore": 8, "metrics": {}}),
-        SimpleNamespace(value={"resultId": "r2", "status": "failed", "errorCode": "ai_http_500"}),
+        SimpleNamespace(topic="t", partition=0, offset=0, value={"resultId": "r1", "status": "completed", "aiScore": 8, "metrics": {}}),
+        SimpleNamespace(topic="t", partition=0, offset=1, value={"resultId": "r2", "status": "failed", "errorCode": "ai_http_500"}),
     ]
     service = consumer_module.KafkaResultConsumerService()
 
@@ -131,6 +131,9 @@ async def test_result_consumer():
             for m in messages:
                 yield m
             service._is_running = False
+
+        async def commit(self, offsets=None):
+            pass
 
     service._consumer = FakeConsumer()
     service._is_running = True

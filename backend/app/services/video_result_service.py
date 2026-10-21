@@ -654,10 +654,9 @@ class VideoResultService:
 
         updated = crud_video_result.update_ai_result(result_id, ai_in)
         if not updated:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cập nhật kết quả AI thất bại",
-            )
+            # Bài nộp đã có kết quả (kết quả trùng): không tính lại điểm, không gửi thông báo lần nữa
+            logger.info("Ignoring duplicate AI result for resultId=%s (already completed)", result_id)
+            return self.get_by_id(result_id)
 
         # Tính điểm đại diện (effective score) dựa trên gradingMethod của task
         effective_score = self._compute_effective_score(result.task_id, result.user_id, task)
@@ -684,10 +683,10 @@ class VideoResultService:
         """Persist a terminal AI failure without exposing worker exception details."""
         updated = crud_video_result.mark_failed(result_id, error_code[:100])
         if not updated:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Không tìm thấy kết quả bài nộp",
-            )
+            # Không tìm thấy (404) hoặc đã completed thì giữ nguyên kết quả completed
+            existing = self.get_by_id(result_id)
+            logger.info("Ignoring late AI failure for resultId=%s (status=%s)", result_id, existing.status)
+            return existing
         return updated
 
     def teacher_grade(

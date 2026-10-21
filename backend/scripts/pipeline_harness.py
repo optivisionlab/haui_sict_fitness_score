@@ -19,6 +19,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from bson import ObjectId
 
+# Nạp .env vào os.environ trước khi Pipeline sao chép biến môi trường cho subprocess
+from app.core.config import settings  # noqa: F401
+
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = Path(__file__).resolve().parent
 TEST_DB = os.getenv("MONGODB_DB", "fitness_score_test")
