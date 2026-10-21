@@ -48,6 +48,9 @@ class Settings:
     )
     MINIO_BUCKET_NAME: str = os.getenv("MINIO_BUCKET_NAME", "videos")
     MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "False").lower() == "true"
+    # POST /video-results/upload (luồng cũ) đi qua backend: Starlette ghi body vào /tmp (tmpfs 64MB trong container,
+    # nằm trên RAM) nên giới hạn nhỏ hơn hẳn; video lớn dùng upload-url (presigned PUT thẳng lên MinIO)
+    LEGACY_UPLOAD_MAX_BYTES: int = int(os.getenv("LEGACY_UPLOAD_MAX_BYTES", str(50 * 1024 * 1024)))
     # Dọn video đã upload nhưng không confirm (không có video_results) sau UPLOAD_ORPHAN_MAX_AGE_SEC
     UPLOAD_CLEANUP_ENABLED: bool = os.getenv("UPLOAD_CLEANUP_ENABLED", "true").lower() == "true"
     UPLOAD_CLEANUP_INTERVAL_SEC: float = float(os.getenv("UPLOAD_CLEANUP_INTERVAL_SEC", "3600"))

@@ -172,6 +172,7 @@ Khi khởi động:
 | `AI_TIMEOUT_MAX_SEC` | `1800` | Trần timeout; job không có cả `durationSec` lẫn `fileSize` dùng `AI_API_TIMEOUT_SECONDS` |
 | `AI_TIMEOUT_PER_MB_SEC` | `1` | Số giây timeout cộng thêm cho mỗi MB video (AI phải tải video từ MinIO trước khi chấm) |
 | `AI_BUSY_MAX_WAIT_SEC` | `1800` | AI trả `429`/`503` kèm `Retry-After` (đang bận): chờ và gửi lại tối đa chừng này giây, không tính vào `AI_MAX_RETRIES` |
+| `LEGACY_UPLOAD_MAX_BYTES` | `52428800` (50MB) | Giới hạn của `POST /video-results/upload` (luồng cũ đi qua backend). Vượt thì `413`, chặn theo `Content-Length` trước khi đọc body. Video lớn dùng `upload-url` |
 | `UPLOAD_CLEANUP_ENABLED` | `true` | Bật job xóa video đã upload nhưng không confirm |
 | `UPLOAD_CLEANUP_INTERVAL_SEC` | `3600` | Chu kỳ chạy job dọn dẹp |
 | `UPLOAD_ORPHAN_MAX_AGE_SEC` | `86400` | Chỉ xóa object cũ hơn ngưỡng này (24h) |
@@ -215,6 +216,7 @@ MONGODB_DB=fitness_score_test python scripts/test_lanes.py
 MONGODB_DB=fitness_score_test python scripts/test_fallback.py
 MONGODB_DB=fitness_score_test python scripts/test_result_access.py
 MONGODB_DB=fitness_score_test python scripts/test_submission_limits.py
+MONGODB_DB=fitness_score_test python scripts/test_legacy_upload.py
 python scripts/test_guards.py
 docker build -t haui-fitness-backend:worker-test . && MONGODB_DB=fitness_score_test python scripts/test_worker_container.py
 ```

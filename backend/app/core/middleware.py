@@ -3,7 +3,7 @@ import logging
 from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
@@ -75,6 +75,36 @@ class ResponseWrapperMiddleware(BaseHTTPMiddleware):
         )
 
 
+class LegacyUploadSizeLimitMiddleware:
+    """
+    Chặn POST /api/video-results/upload vượt LEGACY_UPLOAD_MAX_BYTES theo Content-Length,
+    trước khi Starlette đọc body vào file tạm. Request không có Content-Length được kiểm tra lại trong service.
+    """
+
+    PATH = "/api/video-results/upload"
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["method"] == "POST" and scope["path"] == self.PATH:
+            headers = dict(scope.get("headers") or [])
+            try:
+                length = int(headers.get(b"content-length", b"0"))
+            except ValueError:
+                length = 0
+            if length > settings.LEGACY_UPLOAD_MAX_BYTES:
+                from app.services.video_result_service import LEGACY_UPLOAD_TOO_LARGE_MESSAGE
+
+                response = JSONResponse(
+                    status_code=413,
+                    content={"success": False, "code": 413, "message": LEGACY_UPLOAD_TOO_LARGE_MESSAGE, "data": None},
+                )
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
 def setup_cors(app: FastAPI) -> None:
     """Cấu hình CORS middleware."""
     app.add_middleware(
@@ -92,4 +122,5 @@ def setup_middlewares(app: FastAPI) -> None:
     """Đăng ký tất cả middlewares cho ứng dụng."""
     # Thứ tự: CORS -> ResponseWrapper
     app.add_middleware(ResponseWrapperMiddleware)
+    app.add_middleware(LegacyUploadSizeLimitMiddleware)
     setup_cors(app)

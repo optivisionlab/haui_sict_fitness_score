@@ -37,6 +37,10 @@ from app.services.sports.registry import sport_registry
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov"}
 MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500 MB
 UPLOAD_URL_TTL_SECONDS = 600
+LEGACY_UPLOAD_TOO_LARGE_MESSAGE = (
+    f"Video quá lớn cho POST /video-results/upload (tối đa {settings.LEGACY_UPLOAD_MAX_BYTES // (1024 * 1024)}MB). "
+    "Hãy dùng upload-url + confirm-upload để tải video lớn."
+)
 
 logger = logging.getLogger(__name__)
 
@@ -451,27 +455,29 @@ class VideoResultService:
 
         task, course, next_attempt = self._validate_submission_guards(task_id, user_id, sport_id)
 
-        # Đọc dữ liệu file và kiểm tra dung lượng
-        file_bytes = file.file.read()
-        file_size = len(file_bytes)
+        # Lấy dung lượng từ file tạm (không đọc cả file vào RAM) rồi stream lên MinIO theo từng part
+        file.file.seek(0, 2)
+        file_size = file.file.tell()
+        file.file.seek(0)
         if file_size == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="File video rỗng",
             )
-        if file_size > MAX_VIDEO_SIZE:
+        if file_size > settings.LEGACY_UPLOAD_MAX_BYTES:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Dung lượng video vượt quá giới hạn cho phép (500MB)",
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=LEGACY_UPLOAD_TOO_LARGE_MESSAGE,
             )
 
         # Định danh file trên MinIO: {sport_id}/{task_id}/{user_id}_attempt{next_attempt}_{timestamp}{ext}
         timestamp = int(datetime.now(timezone.utc).timestamp())
         object_name = f"{sport_id}/{task_id}/{user_id}_attempt{next_attempt}_{timestamp}{ext}"
 
-        minio_path = minio_service.upload_bytes(
-            data=file_bytes,
+        minio_path = minio_service.upload_file(
+            file_data=file.file,
             object_name=object_name,
+            length=file_size,
             content_type=file.content_type or "video/mp4",
         )
 
