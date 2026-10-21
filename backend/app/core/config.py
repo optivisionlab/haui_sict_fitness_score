@@ -57,6 +57,12 @@ class Settings:
     AI_ROUTER_ENABLED: bool = os.getenv("AI_ROUTER_ENABLED", "true").lower() == "true"
     AI_MOCK_MODE: bool = os.getenv("AI_MOCK_MODE", "false").lower() == "true"
     AI_WORKER_ENABLED: bool = os.getenv("AI_WORKER_ENABLED", "true").lower() == "true"
+    # Worker pool: 1 consumer + queue + N worker
+    AI_WORKER_CONCURRENCY: int = int(os.getenv("AI_WORKER_CONCURRENCY", "3"))
+    # Số request đồng thời tối đa tới AI (theo sức GPU), dùng chung mọi pool trong process
+    AI_MAX_CONCURRENCY: int = int(os.getenv("AI_MAX_CONCURRENCY", "3"))
+    AI_WORKER_SHUTDOWN_GRACE: float = float(os.getenv("AI_WORKER_SHUTDOWN_GRACE", "30"))
+    AI_MAX_RETRIES: int = int(os.getenv("AI_MAX_RETRIES", "3"))
     # Gọi thẳng AI khi Kafka không sẵn sàng (outbox fallback)
     AI_DIRECT_FALLBACK: bool = os.getenv("AI_DIRECT_FALLBACK", "true").lower() == "true"
     # MinIO endpoint mà AI service dùng để tải video (phải truy cập được từ máy chạy AI)

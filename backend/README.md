@@ -161,3 +161,20 @@ Khi khởi động:
 | Biến | Mặc định | Ý nghĩa |
 | :--- | :--- | :--- |
 | `LOG_LEVEL` | `INFO` | Mức log của ứng dụng |
+| `AI_WORKER_CONCURRENCY` | `3` | Số worker chấm song song của pool (1 consumer + queue + N worker) |
+| `AI_MAX_CONCURRENCY` | `3` | Số request đồng thời tối đa tới AI (đặt theo sức GPU), dùng chung mọi pool trong 1 process |
+| `AI_WORKER_SHUTDOWN_GRACE` | `30` | Số giây chờ job đang chạy khi tắt; quá hạn thì hủy, job được giao lại sau restart |
+| `AI_MAX_RETRIES` | `3` | Số lần gọi AI tối đa với lỗi tạm thời (timeout, 5xx, 408, 429) |
+
+> Chạy uvicorn với `--workers N` thì mỗi process có pool riêng, tổng request tới AI sẽ là N × `AI_MAX_CONCURRENCY`.
+
+### Kiểm thử pipeline chấm điểm
+
+Các test dùng Kafka/Mongo/MinIO thật nhưng với DB `fitness_score_test` và topic riêng cho từng lần chạy, AI là fake server (`scripts/fake_ai_server.py`):
+
+```bash
+MONGODB_DB=fitness_score_test python scripts/test_lifespan.py
+python scripts/test_ai_client.py
+python scripts/test_event_loop.py
+MONGODB_DB=fitness_score_test python scripts/test_worker_pool.py   # unit k1 k2 k3 k8, ~6 phút
+```

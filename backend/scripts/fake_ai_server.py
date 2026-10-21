@@ -1,14 +1,19 @@
 """
-Fake AI service dùng cho test: HTTP/1.1 keep-alive tối giản, đếm số kết nối TCP.
+Fake AI service dùng cho test: HTTP/1.1 keep-alive tối giản, đếm kết nối và request.
 
 Hành vi theo `detail.title` của request:
 - "sleep:<giây>"  -> chờ rồi trả kết quả completed
 - "status:<mã>"   -> trả HTTP status tương ứng
 - khác            -> trả kết quả completed ngay
+
+`GET /stats` trả số liệu (để test chạy ở process khác đọc được).
+Chạy độc lập: python scripts/fake_ai_server.py <port>
 """
 
 import asyncio
 import json
+import sys
+import time
 
 
 class FakeAIServer:
@@ -20,6 +25,9 @@ class FakeAIServer:
         self.concurrent = 0
         self.max_concurrent = 0
         self.job_ids: list[str] = []
+        self.calls: dict[str, int] = {}
+        self.in_flight: set[str] = set()
+        self.done_at: dict[str, float] = {}
         self._server: asyncio.base_events.Server | None = None
 
     @property
@@ -36,6 +44,16 @@ class FakeAIServer:
             self._server.close()
             await self._server.wait_closed()
 
+    def stats(self) -> dict:
+        return {
+            "connections": self.connections,
+            "requests": self.requests,
+            "max_concurrent": self.max_concurrent,
+            "calls": self.calls,
+            "in_flight": sorted(self.in_flight),
+            "done_at": self.done_at,
+        }
+
     async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         self.connections += 1
         try:
@@ -43,6 +61,8 @@ class FakeAIServer:
                 request_line = await reader.readline()
                 if not request_line:
                     break
+                parts = request_line.decode().split()
+                path = parts[1] if len(parts) > 1 else "/"
                 length = 0
                 while True:
                     line = await reader.readline()
@@ -52,7 +72,10 @@ class FakeAIServer:
                     if name.strip().lower() == "content-length":
                         length = int(value.strip())
                 body = json.loads(await reader.readexactly(length)) if length else {}
-                status, payload = await self._process(body)
+                if path.startswith("/stats"):
+                    status, payload = 200, self.stats()
+                else:
+                    status, payload = await self._process(body)
                 data = json.dumps(payload).encode()
                 writer.write(
                     f"HTTP/1.1 {status} X\r\nContent-Type: application/json\r\n"
@@ -65,8 +88,11 @@ class FakeAIServer:
             writer.close()
 
     async def _process(self, body: dict) -> tuple[int, dict]:
+        job_id = body.get("job_id")
         self.requests += 1
-        self.job_ids.append(body.get("job_id"))
+        self.job_ids.append(job_id)
+        self.calls[job_id] = self.calls.get(job_id, 0) + 1
+        self.in_flight.add(job_id)
         self.concurrent += 1
         self.max_concurrent = max(self.max_concurrent, self.concurrent)
         try:
@@ -75,8 +101,9 @@ class FakeAIServer:
                 return int(title.split(":", 1)[1]), {"detail": "fake error"}
             if title.startswith("sleep:"):
                 await asyncio.sleep(float(title.split(":", 1)[1]))
+            self.done_at[job_id] = time.time()
             return 200, {
-                "job_id": body.get("job_id"),
+                "job_id": job_id,
                 "result_id": body.get("result_id"),
                 "status": "completed",
                 "score": 8.0,
@@ -85,3 +112,14 @@ class FakeAIServer:
             }
         finally:
             self.concurrent -= 1
+            self.in_flight.discard(job_id)
+
+
+async def _main(port: int) -> None:
+    server = await FakeAIServer(port=port).start()
+    print(f"Fake AI listening on {server.url}", flush=True)
+    await asyncio.Event().wait()
+
+
+if __name__ == "__main__":
+    asyncio.run(_main(int(sys.argv[1]) if len(sys.argv) > 1 else 18888))

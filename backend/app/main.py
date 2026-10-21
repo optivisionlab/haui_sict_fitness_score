@@ -105,7 +105,7 @@ def _register_stop(stack: AsyncExitStack, name: str, stop: Callable[[], Awaitabl
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.services.ai_grading_client import ai_grading_client
-    from app.services.ai_mock_worker import ai_mock_worker
+    from app.services.ai_worker_pool import build_default_pools
     from app.services.grading_outbox import grading_outbox_dispatcher
     from app.services.kafka_consumer import kafka_result_consumer
     from app.services.kafka_producer import kafka_producer
@@ -122,6 +122,7 @@ async def lifespan(app: FastAPI):
         "outbox": "starting",
     }
     components = app.state.components
+    app.state.worker_pools = []
 
     async with AsyncExitStack() as stack:
         # 1. Hạ tầng bắt buộc: lỗi thì exception nổi lên, app không khởi động
@@ -156,11 +157,18 @@ async def lifespan(app: FastAPI):
             _register_stop(stack, "result consumer", kafka_result_consumer.stop)
             components["result_consumer"] = "ok" if kafka_result_consumer.is_running else "error"
 
-            # 5. AI worker
+            # 5. AI worker pool
             if settings.AI_WORKER_ENABLED:
-                await ai_mock_worker.start()
-                _register_stop(stack, "ai worker", ai_mock_worker.stop)
-                components["ai_worker"] = "ok" if ai_mock_worker.is_running else "error"
+                components["ai_worker"] = "ok"
+                for pool in build_default_pools():
+                    try:
+                        await pool.start()
+                    except Exception as exc:
+                        logger.warning("Could not start AI worker pool %s: %s", pool.name, exc)
+                        components["ai_worker"] = "error"
+                        continue
+                    _register_stop(stack, f"ai worker pool {pool.name}", pool.stop)
+                    app.state.worker_pools.append(pool)
 
         # 6. Outbox dispatcher khởi động cuối cùng, sau khi bên nhận việc đã sẵn sàng
         await grading_outbox_dispatcher.start()
@@ -203,7 +211,8 @@ def readiness_check(request: Request):
     components = dict(getattr(state, "components", {}))
     if ready and components.get("kafka") == "ok" and not kafka_producer.is_ready:
         components["kafka"] = "degraded"
+    pools = {pool.name: pool.health() for pool in getattr(state, "worker_pools", [])}
     return JSONResponse(
         status_code=200 if ready else 503,
-        content={"ready": ready, "components": components},
+        content={"ready": ready, "components": components, "worker_pools": pools},
     )
