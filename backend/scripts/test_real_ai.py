@@ -123,6 +123,38 @@ def run(video: Path):
         pipe.cleanup()
 
 
+def run_load(jobs: int, object_key: str):
+    """Gửi nhiều job hơn sức chứa của AI: AI trả 429 + Retry-After, backend chờ rồi gửi lại."""
+    print(f"\n[REAL AI LOAD] {jobs} job đồng thời → {AI_REAL_URL} (object {object_key})")
+    pipe = Pipeline(
+        FakeAIProcess(),
+        AI_PICKLEBALL_VIDEO_URL=AI_REAL_URL,
+        AI_POOL_SMALL_CONCURRENCY=str(jobs),
+        AI_MAX_CONCURRENCY=str(jobs),
+        AI_MAX_RETRIES="1",
+    )
+    try:
+        pipe.create_topics()
+        pipe.start_app()
+        t0 = time.time()
+        ids = [pipe.insert_job("load", duration_sec=45, object_key=object_key) for _ in range(jobs)]
+        docs = pipe.wait_status(ids, timeout=900)
+        elapsed = time.time() - t0
+        statuses = [d["status"] for d in docs.values()]
+        log = pipe.log()
+        busy = log.count("AI busy for resultId=")
+        assert statuses.count("completed") == jobs, {s: statuses.count(s) for s in set(statuses)}
+        assert busy > 0, "AI không trả 429 nào: tăng số job vượt PICKLEBALL_MAX_PENDING_JOBS"
+        print(f"  ✓ {jobs}/{jobs} job completed sau {elapsed:.0f}s; backend nhận {busy} lần 429 và tự chờ gửi lại "
+              f"(AI_MAX_RETRIES=1 nên nếu 429 bị tính là thất bại thì job đã failed)")
+        pipe.sigterm()
+    finally:
+        pipe.cleanup()
+
+
 if __name__ == "__main__":
-    run(Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_VIDEO)
+    if len(sys.argv) > 1 and sys.argv[1] == "load":
+        run_load(int(sys.argv[2]) if len(sys.argv) > 2 else 12, os.getenv("LOAD_OBJECT_KEY", "bench/bench_45s_270p.mp4"))
+    else:
+        run(Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_VIDEO)
     print("\n>>> TEST REAL AI PASSED")

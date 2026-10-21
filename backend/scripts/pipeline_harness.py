@@ -215,11 +215,13 @@ class Pipeline:
         return self.log_path.read_text()
 
     # ---- Dữ liệu ----
-    def insert_job(self, title: str = "ok", duration_sec: int | None = None) -> ObjectId:
+    def insert_job(
+        self, title: str = "ok", duration_sec: int | None = None, object_key: str | None = None
+    ) -> ObjectId:
         result_id = ObjectId()
         now = datetime.now(timezone.utc)
         task_id, course_id, sport_id, user_id = (str(ObjectId()) for _ in range(4))
-        object_key = f"submissions/{task_id}/{result_id}.mp4"
+        object_key = object_key or f"submissions/{task_id}/{result_id}.mp4"
         job = {
             "jobId": str(result_id),
             "resultId": str(result_id),
