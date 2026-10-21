@@ -28,6 +28,20 @@ BLOCK_SEC = 0.3
 MAX_LAG_SEC = 0.1
 
 
+def aslow(return_value=None):
+    """I/O async chậm: chờ không chặn loop (như AsyncMongoClient)."""
+
+    async def _fn(*args, **kwargs):
+        await asyncio.sleep(BLOCK_SEC)
+        return return_value
+
+    return _fn
+
+
+def forbidden(*args, **kwargs):
+    raise AssertionError("Hàm đồng bộ không được gọi từ coroutine")
+
+
 def slow(return_value=None):
     def _fn(*args, **kwargs):
         time.sleep(BLOCK_SEC)
@@ -71,12 +85,12 @@ async def test_outbox():
     collection = MagicMock()
     calls = {"n": 0}
 
-    def find_one_and_update(*args, **kwargs):
+    async def find_one_and_update(*args, **kwargs):
         calls["n"] += 1
-        return slow(doc if calls["n"] == 1 else None)()
+        return await aslow(doc if calls["n"] == 1 else None)()
 
     collection.find_one_and_update = find_one_and_update
-    collection.update_one = slow()
+    collection.update_one = aslow()
     fake_db = SimpleNamespace(video_results=collection)
 
     producer = MagicMock()
@@ -86,12 +100,13 @@ async def test_outbox():
         return True
 
     producer.publish_grading_job = publish
-    with patch.object(grading_outbox, "get_db", return_value=fake_db), \
+    with patch.object(grading_outbox, "get_async_db", return_value=fake_db), \
+         patch("app.core.database.db", new=forbidden), \
          patch.object(grading_outbox, "kafka_producer", producer):
         async with LagMonitor() as monitor:
             dispatched = await grading_outbox.grading_outbox_dispatcher.dispatch_pending()
     assert dispatched == 1
-    check("outbox (Kafka) — 3 lời gọi Mongo chậm", monitor)
+    check("outbox (Kafka) — 3 lời gọi Mongo async chậm", monitor)
 
     calls["n"] = 0
     producer.is_ready = False
@@ -103,7 +118,7 @@ async def test_outbox():
     client_module = importlib.import_module("app.services.ai_grading_client")
     vrs_module = importlib.import_module("app.services.video_result_service")
 
-    with patch.object(grading_outbox, "get_db", return_value=fake_db), \
+    with patch.object(grading_outbox, "get_async_db", return_value=fake_db), \
          patch.object(grading_outbox, "kafka_producer", producer), \
          patch.object(client_module.ai_grading_client, "grade", fake_grade), \
          patch.object(vrs_module.video_result_service, "ai_callback", slow()):
@@ -116,7 +131,7 @@ async def test_outbox():
         finally:
             dispatcher._running = False
     assert dispatched == 1
-    check("outbox (direct fallback) — ai_callback + Mongo chậm", monitor)
+    check("outbox (direct fallback) — ai_callback đồng bộ chậm + Mongo async", monitor)
 
 
 async def test_result_consumer():
@@ -172,7 +187,8 @@ async def test_auth_dependencies():
     user = User(id=str(ObjectId()), name="T", email="t@example.com", role=UserRole.TEACHER, password="x")
     token = auth_service.create_access_token({"sub": user.id})
     creds = SimpleNamespace(credentials=token)
-    with patch.object(auth_service.crud_user, "get", slow(user)):
+    with patch.object(auth_service.crud_user, "aget", aslow(user)), \
+         patch.object(auth_service.crud_user, "get", forbidden):
         async with LagMonitor() as monitor:
             current = await auth_service.get_current_user(creds)
             assert current.id == user.id
@@ -181,8 +197,10 @@ async def test_auth_dependencies():
 
     course = SimpleNamespace(teacher_id=user.id)
     enrollment = SimpleNamespace(status=SimpleNamespace(value="active"))
-    with patch("app.crud.course.crud_course.get", slow(course)), \
-         patch("app.crud.enrollment.crud_enrollment.get_by_user_and_course", slow(enrollment)):
+    with patch("app.crud.course.crud_course.aget", aslow(course)), \
+         patch("app.crud.course.crud_course.get", forbidden), \
+         patch("app.crud.enrollment.crud_enrollment.aget_by_user_and_course", aslow(enrollment)), \
+         patch("app.crud.enrollment.crud_enrollment.get_by_user_and_course", forbidden):
         async with LagMonitor() as monitor:
             assert await auth_service.verify_course_teacher("c1", current_user=user) is course
             assert await auth_service.verify_student_in_course("c1", current_user=user) is enrollment
@@ -190,7 +208,7 @@ async def test_auth_dependencies():
 
 
 async def run():
-    print("\n[TEST T7] Event loop không bị chặn bởi I/O đồng bộ")
+    print("\n[TEST T7] Event loop không bị chặn: Mongo async ở outbox/auth, to_thread ở service đồng bộ")
     await test_outbox()
     await test_result_consumer()
     await test_ai_client_build_request()

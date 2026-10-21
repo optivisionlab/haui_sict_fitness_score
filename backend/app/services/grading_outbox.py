@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from pymongo import ReturnDocument
 
-from app.core.database import get_db
+from app.core.database import get_async_db
 from app.services.grading_lanes import job_duration_sec, lane_topic, resolve_lane
 from app.services.kafka_producer import kafka_producer
 
@@ -63,12 +63,11 @@ class GradingOutboxDispatcher:
                 return await self._dispatch_direct_fallback()
             return 0
 
-        collection = get_db().video_results
+        collection = get_async_db().video_results
         dispatched = 0
         for _ in range(OUTBOX_BATCH_SIZE):
             now = datetime.now(timezone.utc)
-            document = await asyncio.to_thread(
-                collection.find_one_and_update,
+            document = await collection.find_one_and_update(
                 {
                     "gradingJob": {"$exists": True},
                     "$or": [
@@ -102,8 +101,7 @@ class GradingOutboxDispatcher:
             if duration is not None and job.get("durationSec") is None:
                 job = {**job, "durationSec": duration}
             if await kafka_producer.publish_grading_job(job, topic=lane_topic(lane)):
-                await asyncio.to_thread(
-                    collection.update_one,
+                await collection.update_one(
                     {"_id": document["_id"], "gradingJobStatus": "processing"},
                     {
                         "$set": {
@@ -131,8 +129,7 @@ class GradingOutboxDispatcher:
             else:
                 delay = min(2 ** attempts, 60)
                 update["$set"]["gradingJobNextAttemptAt"] = datetime.now(timezone.utc) + timedelta(seconds=delay)
-            await asyncio.to_thread(
-                collection.update_one,
+            await collection.update_one(
                 {"_id": document["_id"], "gradingJobStatus": "processing"},
                 update,
             )
@@ -147,13 +144,12 @@ class GradingOutboxDispatcher:
         """
         from app.core.config import settings
 
-        collection = get_db().video_results
+        collection = get_async_db().video_results
         started = 0
         lease = max(OUTBOX_LEASE_SECONDS, settings.AI_TIMEOUT_MAX_SEC + 60)
         while self._running and len(self._fallback_tasks) < settings.AI_MAX_CONCURRENCY:
             now = datetime.now(timezone.utc)
-            document = await asyncio.to_thread(
-                collection.find_one_and_update,
+            document = await collection.find_one_and_update(
                 {
                     "gradingJob": {"$exists": True},
                     "$or": [
@@ -193,7 +189,7 @@ class GradingOutboxDispatcher:
         from app.services.grading_lanes import compute_ai_timeout
         from app.services.video_result_service import video_result_service
 
-        collection = get_db().video_results
+        collection = get_async_db().video_results
         job = document["gradingJob"]
         if job.get("durationSec") is None and document.get("durationSec") is not None:
             job = {**job, "durationSec": document["durationSec"]}
@@ -208,8 +204,7 @@ class GradingOutboxDispatcher:
                 ai_comment=ai_res.get("aiComment"),
             )
             await asyncio.to_thread(video_result_service.ai_callback, result_id, ai_update)
-            await asyncio.to_thread(
-                collection.update_one,
+            await collection.update_one(
                 {"_id": document["_id"]},
                 {
                     "$set": {
@@ -221,8 +216,7 @@ class GradingOutboxDispatcher:
             )
         except asyncio.CancelledError:
             # Bị hủy khi tắt app: trả job về pending ngay, không bắt chờ hết lease mới được chấm lại
-            await asyncio.to_thread(
-                collection.update_one,
+            await collection.update_one(
                 {"_id": document["_id"], "gradingJobStatus": "processing"},
                 {"$set": {"gradingJobStatus": "pending"}, "$unset": {"gradingJobLeaseUntil": ""}},
             )
@@ -247,6 +241,6 @@ class GradingOutboxDispatcher:
             else:
                 delay = min(2 ** attempts, 60)
                 update["$set"]["gradingJobNextAttemptAt"] = datetime.now(timezone.utc) + timedelta(seconds=delay)
-            await asyncio.to_thread(collection.update_one, {"_id": document["_id"]}, update)
+            await collection.update_one({"_id": document["_id"]}, update)
 
 grading_outbox_dispatcher = GradingOutboxDispatcher()

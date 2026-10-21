@@ -19,6 +19,16 @@ class CRUDEnrollment(CRUDBase[Enrollment, EnrollmentCreate, EnrollmentUpdate]):
             return None
         return self.model.model_validate(doc)
 
+    async def aget_by_user_and_course(self, user_id: str, course_id: str) -> Optional[Enrollment]:
+        """Bản async của get_by_user_and_course(), dùng trong coroutine."""
+        doc = await self.async_collection.find_one({
+            "userId": str(user_id),
+            "courseId": str(course_id),
+        })
+        if not doc:
+            return None
+        return self.model.model_validate(doc)
+
     def is_enrolled(self, user_id: str, course_id: str) -> bool:
         """Kiểm tra user đã đăng ký khóa học này hay chưa."""
         return self.collection.count_documents({

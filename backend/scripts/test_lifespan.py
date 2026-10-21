@@ -117,7 +117,7 @@ def test_full_startup_and_shutdown_order():
         out = _stop(proc)
 
     assert "Traceback" not in out, out[-3000:]
-    expected = ["outbox dispatcher", "upload cleanup", "ai worker pool large", "ai worker pool small", "result consumer", "kafka producer", "http client"]
+    expected = ["outbox dispatcher", "upload cleanup", "ai worker pool large", "ai worker pool small", "result consumer", "kafka producer", "http client", "async mongo client"]
     positions = []
     for name in expected:
         marker = f"Stopping {name}"

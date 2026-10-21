@@ -3,9 +3,10 @@ from typing import Any, Generic, Optional, TypeVar
 from bson import ObjectId
 from pydantic import BaseModel
 from pymongo import ReturnDocument
+from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.collection import Collection
 
-from app.core.database import get_db
+from app.core.database import get_async_db, get_db
 from app.models.base import BaseDocument
 
 ModelType = TypeVar("ModelType", bound=BaseDocument)
@@ -34,6 +35,23 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         if not collection_name:
             raise ValueError(f"Model {self.model.__name__} chưa định nghĩa __collection__")
         return get_db()[collection_name]
+
+    @property
+    def async_collection(self) -> AsyncCollection:
+        collection_name = getattr(self.model, "__collection__", "")
+        if not collection_name:
+            raise ValueError(f"Model {self.model.__name__} chưa định nghĩa __collection__")
+        return get_async_db()[collection_name]
+
+    async def aget(self, id: str | ObjectId) -> Optional[ModelType]:
+        """Bản async của get(), dùng trong coroutine."""
+        oid = to_object_id(id)
+        if oid is None:
+            return None
+        doc = await self.async_collection.find_one({"_id": oid})
+        if not doc:
+            return None
+        return self.model.model_validate(doc)
 
     def get(self, id: str | ObjectId) -> Optional[ModelType]:
         """Lấy 1 document theo ID."""

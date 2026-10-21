@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 import bcrypt
@@ -89,7 +88,7 @@ async def get_current_user(
     if not user_id:
         raise credentials_exception
 
-    user = await asyncio.to_thread(crud_user.get, user_id)
+    user = await crud_user.aget(user_id)
     if not user:
         raise credentials_exception
 
@@ -125,7 +124,7 @@ async def verify_course_teacher(
     """
     from app.crud.course import crud_course
 
-    course = await asyncio.to_thread(crud_course.get, course_id)
+    course = await crud_course.aget(course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -150,8 +149,7 @@ async def verify_student_in_course(
     """
     from app.crud.enrollment import crud_enrollment
 
-    enrollment = await asyncio.to_thread(
-        crud_enrollment.get_by_user_and_course,
+    enrollment = await crud_enrollment.aget_by_user_and_course(
         user_id=str(current_user.id),
         course_id=course_id,
     )
@@ -182,7 +180,7 @@ async def verify_internal_api_key(
         if payload:
             user_id = payload.get("sub")
             if user_id:
-                user = await asyncio.to_thread(crud_user.get, user_id)
+                user = await crud_user.aget(user_id)
                 if user and user.role in (UserRole.ADMIN, UserRole.TEACHER):
                     return True
 

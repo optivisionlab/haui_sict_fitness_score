@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse
 
 from app.api import api_router
 from app.core import (
+    close_async_db,
+    get_async_db,
     get_db,
     settings,
     setup_exception_handlers,
@@ -130,6 +132,9 @@ async def lifespan(app: FastAPI):
         # 1. Hạ tầng bắt buộc: lỗi thì exception nổi lên, app không khởi động
         await asyncio.to_thread(init_db_indexes)
         await asyncio.to_thread(sport_service.sync_sports_from_definitions)
+        await get_async_db().command("ping")
+        # Đăng ký sớm nhất để đóng sau cùng, khi outbox/worker đã dừng
+        _register_stop(stack, "async mongo client", close_async_db)
         components["mongo"] = "ok"
         await asyncio.to_thread(minio_service.ensure_bucket)
         components["minio"] = "ok"

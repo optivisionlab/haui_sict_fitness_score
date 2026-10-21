@@ -8,7 +8,7 @@ from aiokafka import AIOKafkaConsumer, ConsumerRebalanceListener, TopicPartition
 from bson import ObjectId
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import get_async_db
 from app.services.ai_grading_client import AIGradingError, ai_grading_client
 from app.services.grading_lanes import LANE_LARGE, LANE_SMALL, compute_ai_timeout
 from app.services.kafka_producer import kafka_producer
@@ -276,9 +276,7 @@ class AIWorkerPool:
     async def _is_already_graded(self, result_id: Optional[str]) -> bool:
         if not result_id or not ObjectId.is_valid(str(result_id)):
             return False
-        doc = await asyncio.to_thread(
-            get_db().video_results.find_one, {"_id": ObjectId(str(result_id))}, {"status": 1}
-        )
+        doc = await get_async_db().video_results.find_one({"_id": ObjectId(str(result_id))}, {"status": 1})
         return bool(doc and doc.get("status") in TERMINAL_STATUSES)
 
     async def _handle(self, job: dict[str, Any]) -> bool:
