@@ -188,4 +188,5 @@ python scripts/test_event_loop.py
 MONGODB_DB=fitness_score_test python scripts/test_worker_pool.py   # unit k1 k2 k3 k8, ~6 phút
 MONGODB_DB=fitness_score_test python scripts/test_result_consumer.py
 MONGODB_DB=fitness_score_test python scripts/test_lanes.py
+MONGODB_DB=fitness_score_test python scripts/test_fallback.py
 ```

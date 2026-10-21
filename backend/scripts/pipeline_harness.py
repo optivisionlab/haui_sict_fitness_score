@@ -142,12 +142,13 @@ class Pipeline:
             await admin.start()
             try:
                 await admin.delete_topics(names)
-            except Exception:
-                pass
             finally:
                 await admin.close()
 
-        asyncio.run(_delete())
+        try:
+            asyncio.run(asyncio.wait_for(_delete(), timeout=20))
+        except Exception:
+            pass  # Kafka không truy cập được (test chế độ degraded) hoặc topic chưa tạo
 
     def publish_raw_job(self, job: dict, topic: str | None = None) -> None:
         import asyncio

@@ -19,6 +19,8 @@ class GradingOutboxDispatcher:
     def __init__(self):
         self._task: asyncio.Task | None = None
         self._running = False
+        # Job chấm theo direct fallback đang chạy (mỗi job 1 task, không chặn vòng lặp poll)
+        self._fallback_tasks: set[asyncio.Task] = set()
 
     async def start(self) -> None:
         if self._task and not self._task.done():
@@ -35,6 +37,16 @@ class GradingOutboxDispatcher:
             except asyncio.CancelledError:
                 pass
             self._task = None
+        if self._fallback_tasks:
+            from app.core.config import settings
+
+            logger.info("Waiting for %s direct-fallback job(s)", len(self._fallback_tasks))
+            _, still_running = await asyncio.wait(self._fallback_tasks, timeout=settings.AI_WORKER_SHUTDOWN_GRACE)
+            for task in still_running:
+                task.cancel()
+            if still_running:
+                logger.warning("Cancelled %s direct-fallback job(s) after grace period", len(still_running))
+                await asyncio.gather(*still_running, return_exceptions=True)
 
     async def _run(self) -> None:
         while self._running:
@@ -128,15 +140,18 @@ class GradingOutboxDispatcher:
         return dispatched
 
     async def _dispatch_direct_fallback(self) -> int:
-        """Fallback: Nếu Kafka broker chưa chạy, trực tiếp gọi AI client để chấm điểm bài nộp."""
-        from app.services.ai_grading_client import AIGradingError, ai_grading_client
-        from app.services.video_result_service import video_result_service
-        from app.schemas.video_result import VideoResultAIUpdate
+        """
+        Fallback: Kafka chưa sẵn sàng thì gọi thẳng AI. Mỗi job chạy trong 1 task riêng, dùng chung
+        semaphore AI_MAX_CONCURRENCY với worker pool, nên vòng lặp outbox không bị chặn tới khi AI trả về.
+        Chỉ claim thêm job khi còn slot để job đã claim không phải nằm chờ semaphore.
+        """
+        from app.core.config import settings
 
         collection = get_db().video_results
-        dispatched = 0
-        now = datetime.now(timezone.utc)
-        for _ in range(OUTBOX_BATCH_SIZE):
+        started = 0
+        lease = max(OUTBOX_LEASE_SECONDS, settings.AI_TIMEOUT_MAX_SEC + 60)
+        while self._running and len(self._fallback_tasks) < settings.AI_MAX_CONCURRENCY:
+            now = datetime.now(timezone.utc)
             document = await asyncio.to_thread(
                 collection.find_one_and_update,
                 {
@@ -158,60 +173,80 @@ class GradingOutboxDispatcher:
                 {
                     "$set": {
                         "gradingJobStatus": "processing",
-                        "gradingJobLeaseUntil": now + timedelta(seconds=OUTBOX_LEASE_SECONDS),
+                        "gradingJobLeaseUntil": now + timedelta(seconds=lease),
                     }
                 },
                 return_document=ReturnDocument.AFTER,
             )
             if not document:
                 break
+            task = asyncio.create_task(self._grade_direct(document))
+            self._fallback_tasks.add(task)
+            task.add_done_callback(self._fallback_tasks.discard)
+            started += 1
+        return started
 
-            job = document["gradingJob"]
-            result_id = str(document["_id"])
-            try:
-                ai_res = await ai_grading_client.grade(job)
-                ai_update = VideoResultAIUpdate(
-                    pending=False,
-                    metrics=ai_res.get("metrics", {}),
-                    ai_score=ai_res.get("aiScore"),
-                    ai_comment=ai_res.get("aiComment"),
-                )
-                await asyncio.to_thread(video_result_service.ai_callback, result_id, ai_update)
-                await asyncio.to_thread(
-                    collection.update_one,
-                    {"_id": document["_id"]},
-                    {
-                        "$set": {
-                            "gradingJobStatus": "completed",
-                            "gradingJobSentAt": datetime.now(timezone.utc),
-                        },
-                        "$unset": {"gradingJobLeaseUntil": "", "gradingJobNextAttemptAt": ""},
-                    },
-                )
-                dispatched += 1
-            except Exception as exc:
-                logger.warning("Direct grading fallback attempt failed for resultId=%s: %s", result_id, exc)
-                attempts = int(document.get("gradingJobAttempts", 0)) + 1
-                # Lỗi vĩnh viễn (request/video không hợp lệ) thì không retry
-                terminal = attempts >= OUTBOX_MAX_ATTEMPTS or (
-                    isinstance(exc, AIGradingError) and not exc.retryable
-                )
-                error_code = exc.code if isinstance(exc, AIGradingError) else "ai_grading_failed"
-                update = {
+    async def _grade_direct(self, document: dict) -> None:
+        from app.schemas.video_result import VideoResultAIUpdate
+        from app.services.ai_grading_client import AIGradingError, ai_grading_client
+        from app.services.ai_worker_pool import get_ai_semaphore
+        from app.services.grading_lanes import compute_ai_timeout
+        from app.services.video_result_service import video_result_service
+
+        collection = get_db().video_results
+        job = document["gradingJob"]
+        if job.get("durationSec") is None and document.get("durationSec") is not None:
+            job = {**job, "durationSec": document["durationSec"]}
+        result_id = str(document["_id"])
+        try:
+            async with get_ai_semaphore():
+                ai_res = await ai_grading_client.grade(job, timeout=compute_ai_timeout(job))
+            ai_update = VideoResultAIUpdate(
+                pending=False,
+                metrics=ai_res.get("metrics", {}),
+                ai_score=ai_res.get("aiScore"),
+                ai_comment=ai_res.get("aiComment"),
+            )
+            await asyncio.to_thread(video_result_service.ai_callback, result_id, ai_update)
+            await asyncio.to_thread(
+                collection.update_one,
+                {"_id": document["_id"]},
+                {
                     "$set": {
-                        "gradingJobStatus": "failed" if terminal else "pending",
-                        "gradingJobAttempts": attempts,
+                        "gradingJobStatus": "completed",
+                        "gradingJobSentAt": datetime.now(timezone.utc),
                     },
-                    "$unset": {"gradingJobLeaseUntil": ""},
-                }
-                if terminal:
-                    update["$set"].update({"status": "failed", "pending": False, "error": error_code})
-                else:
-                    delay = min(2 ** attempts, 60)
-                    update["$set"]["gradingJobNextAttemptAt"] = datetime.now(timezone.utc) + timedelta(seconds=delay)
-                await asyncio.to_thread(collection.update_one, {"_id": document["_id"]}, update)
-
-        return dispatched
-
+                    "$unset": {"gradingJobLeaseUntil": "", "gradingJobNextAttemptAt": ""},
+                },
+            )
+        except asyncio.CancelledError:
+            # Bị hủy khi tắt app: trả job về pending ngay, không bắt chờ hết lease mới được chấm lại
+            await asyncio.to_thread(
+                collection.update_one,
+                {"_id": document["_id"], "gradingJobStatus": "processing"},
+                {"$set": {"gradingJobStatus": "pending"}, "$unset": {"gradingJobLeaseUntil": ""}},
+            )
+            raise
+        except Exception as exc:
+            logger.warning("Direct grading fallback attempt failed for resultId=%s: %s", result_id, exc)
+            attempts = int(document.get("gradingJobAttempts", 0)) + 1
+            # Lỗi vĩnh viễn (request/video không hợp lệ) thì không retry
+            terminal = attempts >= OUTBOX_MAX_ATTEMPTS or (
+                isinstance(exc, AIGradingError) and not exc.retryable
+            )
+            error_code = exc.code if isinstance(exc, AIGradingError) else "ai_grading_failed"
+            update = {
+                "$set": {
+                    "gradingJobStatus": "failed" if terminal else "pending",
+                    "gradingJobAttempts": attempts,
+                },
+                "$unset": {"gradingJobLeaseUntil": ""},
+            }
+            if terminal:
+                update["$set"].update({"status": "failed", "pending": False, "error": error_code})
+            else:
+                delay = min(2 ** attempts, 60)
+                update["$set"]["gradingJobNextAttemptAt"] = datetime.now(timezone.utc) + timedelta(seconds=delay)
+            await asyncio.to_thread(collection.update_one, {"_id": document["_id"]}, update)
 
 grading_outbox_dispatcher = GradingOutboxDispatcher()

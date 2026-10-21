@@ -82,7 +82,7 @@ async def test_outbox():
     producer = MagicMock()
     producer.is_ready = True
 
-    async def publish(job):
+    async def publish(job, topic=None):
         return True
 
     producer.publish_grading_job = publish
@@ -107,8 +107,14 @@ async def test_outbox():
          patch.object(grading_outbox, "kafka_producer", producer), \
          patch.object(client_module.ai_grading_client, "grade", fake_grade), \
          patch.object(vrs_module.video_result_service, "ai_callback", slow()):
-        async with LagMonitor() as monitor:
-            dispatched = await grading_outbox.grading_outbox_dispatcher.dispatch_pending()
+        dispatcher = grading_outbox.grading_outbox_dispatcher
+        dispatcher._running = True
+        try:
+            async with LagMonitor() as monitor:
+                dispatched = await dispatcher.dispatch_pending()
+                await asyncio.gather(*dispatcher._fallback_tasks)
+        finally:
+            dispatcher._running = False
     assert dispatched == 1
     check("outbox (direct fallback) — ai_callback + Mongo chậm", monitor)
 
