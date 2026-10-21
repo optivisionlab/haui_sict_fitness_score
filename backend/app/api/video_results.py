@@ -23,6 +23,10 @@ from app.services.video_result_service import video_result_service
 router = APIRouter(prefix="/video-results", tags=["Video Results"])
 
 
+def _role_value(user: User) -> str:
+    return str(user.role.value if hasattr(user.role, "value") else user.role)
+
+
 @router.post("/upload-url", response_model=VideoUploadUrlResponse)
 def create_video_upload_url(
     upload_in: VideoUploadUrlRequest,
@@ -135,7 +139,7 @@ def get_presigned_url(
     url = video_result_service.get_presigned_url(
         result_id=result_id,
         current_user_id=str(current_user.id),
-        role=str(current_user.role.value if hasattr(current_user.role, "value") else current_user.role),
+        role=_role_value(current_user),
     )
     return PresignedUrlResponse(video_url=url, expires_in_seconds=7200)
 
@@ -147,7 +151,7 @@ def get_submission_status(
     current_user: User = Depends(get_current_user),
 ):
     """Kiểm tra trạng thái bài nộp (Status Polling siêu nhẹ < 15ms)."""
-    return video_result_service.get_status(result_id)
+    return video_result_service.get_status(result_id, str(current_user.id), _role_value(current_user))
 
 
 @router.get("", response_model=PaginatedResponse[VideoResultRead])
@@ -196,7 +200,7 @@ def get_video_result(
     current_user: User = Depends(get_current_user),
 ):
     """Xem chi tiết một bài nộp video và kết quả AI/GV chấm."""
-    result = video_result_service.get_by_id(result_id)
+    result = video_result_service.get_for_user(result_id, str(current_user.id), _role_value(current_user))
     return VideoResultRead.model_validate(result)
 
 

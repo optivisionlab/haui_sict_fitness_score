@@ -17,6 +17,7 @@ from app.models.course import Course
 from app.models.notification import NotificationType
 from app.models.sport import SportMode
 from app.models.task import GradingMethod, Task, TaskCategory
+from app.models.user import UserRole
 from app.models.video_result import VideoResult
 from app.schemas.video_result import (
     SubmissionItemResponse,
@@ -555,7 +556,36 @@ class VideoResultService:
             )
         return result
 
-    def get_status(self, result_id: str) -> VideoResultStatusResponse:
+    def ensure_can_view(
+        self,
+        user_id: str,
+        role: str,
+        owner_id: Optional[str],
+        course_id: Optional[str],
+        task_id: Optional[str] = None,
+    ) -> None:
+        """Chỉ chủ bài nộp, giáo viên của khóa học hoặc admin được xem bài nộp."""
+        if role == UserRole.ADMIN.value or (owner_id and str(owner_id) == str(user_id)):
+            return
+        if role == UserRole.TEACHER.value:
+            if not course_id and task_id:
+                task = crud_task.get(task_id)
+                course_id = task.course_id if task else None
+            course = crud_course.get(course_id) if course_id else None
+            if course and str(course.teacher_id) == str(user_id):
+                return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không có quyền xem bài nộp này",
+        )
+
+    def get_for_user(self, result_id: str, user_id: str, role: str) -> VideoResult:
+        """Lấy chi tiết bài nộp có kiểm tra quyền xem."""
+        result = self.get_by_id(result_id)
+        self.ensure_can_view(user_id, role, result.user_id, result.course_id, result.task_id)
+        return result
+
+    def get_status(self, result_id: str, user_id: str, role: str) -> VideoResultStatusResponse:
         """Endpoint polling siêu nhẹ kiểm tra trạng thái bài nộp."""
         obj_id = to_object_id(result_id)
         if not obj_id:
@@ -563,10 +593,14 @@ class VideoResultService:
 
         doc = crud_video_result.collection.find_one(
             {"_id": obj_id},
-            {"_id": 1, "pending": 1, "status": 1, "error": 1, "aiScore": 1, "finalScore": 1},
+            {
+                "_id": 1, "pending": 1, "status": 1, "error": 1, "aiScore": 1, "finalScore": 1,
+                "userId": 1, "courseId": 1, "taskId": 1,
+            },
         )
         if not doc:
             raise HTTPException(status_code=404, detail="Không tìm thấy bài nộp")
+        self.ensure_can_view(user_id, role, doc.get("userId"), doc.get("courseId"), doc.get("taskId"))
 
         return VideoResultStatusResponse(
             id=str(doc["_id"]),

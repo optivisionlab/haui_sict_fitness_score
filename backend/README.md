@@ -189,4 +189,5 @@ MONGODB_DB=fitness_score_test python scripts/test_worker_pool.py   # unit k1 k2 
 MONGODB_DB=fitness_score_test python scripts/test_result_consumer.py
 MONGODB_DB=fitness_score_test python scripts/test_lanes.py
 MONGODB_DB=fitness_score_test python scripts/test_fallback.py
+MONGODB_DB=fitness_score_test python scripts/test_result_access.py
 ```
