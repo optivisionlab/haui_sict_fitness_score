@@ -37,6 +37,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
+    # Lớn hơn AI_WORKER_SHUTDOWN_GRACE + 10s để kịp drain job đang chấm trước khi bị SIGKILL
+    stop_grace_period: 45s
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     env_file:
@@ -236,6 +238,8 @@ services:
     command:
       - >-
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic video-grading-jobs --partitions 3 --replication-factor 1 &&
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic video-grading-jobs-small --partitions 3 --replication-factor 1 &&
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic video-grading-jobs-large --partitions 3 --replication-factor 1 &&
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic video-grading-results --partitions 3 --replication-factor 1 &&
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic video-grading-dlq --partitions 1 --replication-factor 1
     networks:

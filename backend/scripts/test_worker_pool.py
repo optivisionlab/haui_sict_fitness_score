@@ -65,7 +65,7 @@ def test_k1_parallel_and_k7_latency(fake_ai: FakeAIProcess):
     from datetime import datetime, timezone
     from app.services.auth_service import create_access_token
 
-    pipe = Pipeline(fake_ai, AI_WORKER_CONCURRENCY="3", AI_MAX_CONCURRENCY="3")
+    pipe = Pipeline(fake_ai, AI_POOL_SMALL_CONCURRENCY="3", AI_MAX_CONCURRENCY="3")
     user_id = ObjectId()
     try:
         pipe.create_topics()
@@ -115,7 +115,7 @@ def test_k1_parallel_and_k7_latency(fake_ai: FakeAIProcess):
 
 def test_k2_no_head_of_line_blocking(fake_ai: FakeAIProcess):
     print("\n[K2] 1 job dài 120s + 6 job ngắn 10s, 2 worker")
-    pipe = Pipeline(fake_ai, AI_WORKER_CONCURRENCY="2", AI_MAX_CONCURRENCY="2")
+    pipe = Pipeline(fake_ai, AI_POOL_SMALL_CONCURRENCY="2", AI_MAX_CONCURRENCY="2")
     try:
         pipe.create_topics()
         pipe.start_app()
@@ -138,7 +138,7 @@ def test_k2_no_head_of_line_blocking(fake_ai: FakeAIProcess):
 
 def test_k3_kill9_no_loss_no_duplicate(fake_ai: FakeAIProcess):
     print("\n[K3] kill -9 khi 3 job đang chạy")
-    pipe = Pipeline(fake_ai, AI_WORKER_CONCURRENCY="3", AI_MAX_CONCURRENCY="3")
+    pipe = Pipeline(fake_ai, AI_POOL_SMALL_CONCURRENCY="3", AI_MAX_CONCURRENCY="3")
     try:
         pipe.create_topics()
         pipe.start_app()
@@ -161,7 +161,7 @@ def test_k3_kill9_no_loss_no_duplicate(fake_ai: FakeAIProcess):
         deadline = time.time() + 30
         skipped = 0
         while time.time() < deadline:
-            skipped = pipe.ready()[1]["worker_pools"]["default"]["skipped_duplicate"]
+            skipped = pipe.ready()[1]["worker_pools"]["small"]["skipped_duplicate"]
             if skipped:
                 break
             time.sleep(0.5)
@@ -175,7 +175,7 @@ def test_k3_kill9_no_loss_no_duplicate(fake_ai: FakeAIProcess):
 
 def test_k8_sigterm_drain(fake_ai: FakeAIProcess):
     print("\n[K8] SIGTERM khi đang có job (grace 8s): job 3s chạy xong, job 40s bị giao lại")
-    pipe = Pipeline(fake_ai, AI_WORKER_CONCURRENCY="2", AI_MAX_CONCURRENCY="2", AI_WORKER_SHUTDOWN_GRACE="8")
+    pipe = Pipeline(fake_ai, AI_POOL_SMALL_CONCURRENCY="2", AI_MAX_CONCURRENCY="2", AI_WORKER_SHUTDOWN_GRACE="8")
     try:
         pipe.create_topics()
         pipe.start_app()

@@ -57,12 +57,18 @@ class Settings:
     AI_ROUTER_ENABLED: bool = os.getenv("AI_ROUTER_ENABLED", "true").lower() == "true"
     AI_MOCK_MODE: bool = os.getenv("AI_MOCK_MODE", "false").lower() == "true"
     AI_WORKER_ENABLED: bool = os.getenv("AI_WORKER_ENABLED", "true").lower() == "true"
-    # Worker pool: 1 consumer + queue + N worker
-    AI_WORKER_CONCURRENCY: int = int(os.getenv("AI_WORKER_CONCURRENCY", "3"))
     # Số request đồng thời tối đa tới AI (theo sức GPU), dùng chung mọi pool trong process
     AI_MAX_CONCURRENCY: int = int(os.getenv("AI_MAX_CONCURRENCY", "3"))
     AI_WORKER_SHUTDOWN_GRACE: float = float(os.getenv("AI_WORKER_SHUTDOWN_GRACE", "30"))
     AI_MAX_RETRIES: int = int(os.getenv("AI_MAX_RETRIES", "3"))
+    # 2 làn theo thời lượng video: video dài không chặn video ngắn
+    AI_LANE_THRESHOLD_SEC: float = float(os.getenv("AI_LANE_THRESHOLD_SEC", "90"))
+    AI_POOL_SMALL_CONCURRENCY: int = int(os.getenv("AI_POOL_SMALL_CONCURRENCY", "2"))
+    AI_POOL_LARGE_CONCURRENCY: int = int(os.getenv("AI_POOL_LARGE_CONCURRENCY", "1"))
+    # Timeout gọi AI = min(BASE + PER_VIDEO_SEC x durationSec, MAX); thiếu durationSec thì dùng AI_API_TIMEOUT_SECONDS
+    AI_TIMEOUT_BASE_SEC: float = float(os.getenv("AI_TIMEOUT_BASE_SEC", "60"))
+    AI_TIMEOUT_PER_VIDEO_SEC: float = float(os.getenv("AI_TIMEOUT_PER_VIDEO_SEC", "4"))
+    AI_TIMEOUT_MAX_SEC: float = float(os.getenv("AI_TIMEOUT_MAX_SEC", "1800"))
     # Gọi thẳng AI khi Kafka không sẵn sàng (outbox fallback)
     AI_DIRECT_FALLBACK: bool = os.getenv("AI_DIRECT_FALLBACK", "true").lower() == "true"
     # MinIO endpoint mà AI service dùng để tải video (phải truy cập được từ máy chạy AI)
@@ -75,6 +81,8 @@ class Settings:
     # Kafka
     KAFKA_BOOTSTRAP_SERVERS: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
     KAFKA_TOPIC_GRADING_JOBS: str = os.getenv("KAFKA_TOPIC_GRADING_JOBS", "video-grading-jobs")
+    KAFKA_TOPIC_GRADING_JOBS_SMALL: str = os.getenv("KAFKA_TOPIC_GRADING_JOBS_SMALL", "video-grading-jobs-small")
+    KAFKA_TOPIC_GRADING_JOBS_LARGE: str = os.getenv("KAFKA_TOPIC_GRADING_JOBS_LARGE", "video-grading-jobs-large")
     KAFKA_TOPIC_GRADING_RESULTS: str = os.getenv("KAFKA_TOPIC_GRADING_RESULTS", "video-grading-results")
     KAFKA_TOPIC_GRADING_DLQ: str = os.getenv("KAFKA_TOPIC_GRADING_DLQ", "video-grading-dlq")
     KAFKA_CONSUMER_GROUP_BACKEND: str = os.getenv("KAFKA_CONSUMER_GROUP_BACKEND", "backend-result-consumer")

@@ -10,6 +10,7 @@ from bson import ObjectId
 from app.core.config import settings
 from app.core.database import get_db
 from app.services.ai_grading_client import AIGradingError, ai_grading_client
+from app.services.grading_lanes import LANE_LARGE, LANE_SMALL, compute_ai_timeout
 from app.services.kafka_producer import kafka_producer
 
 logger = logging.getLogger(__name__)
@@ -335,11 +336,23 @@ class AIWorkerPool:
 
 
 def build_default_pools() -> list[AIWorkerPool]:
+    """
+    2 làn: small (video ngắn, thiếu durationSec) và large (video dài).
+    Pool small giữ group cũ và đọc thêm topic cũ để consume nốt job tồn đọng (chuyển đổi topic).
+    """
     return [
         AIWorkerPool(
-            name="default",
-            topics=[settings.KAFKA_TOPIC_GRADING_JOBS],
+            name=LANE_SMALL,
+            topics=[settings.KAFKA_TOPIC_GRADING_JOBS_SMALL, settings.KAFKA_TOPIC_GRADING_JOBS],
             group_id=settings.KAFKA_CONSUMER_GROUP_AI,
-            concurrency=settings.AI_WORKER_CONCURRENCY,
-        )
+            concurrency=settings.AI_POOL_SMALL_CONCURRENCY,
+            timeout_fn=compute_ai_timeout,
+        ),
+        AIWorkerPool(
+            name=LANE_LARGE,
+            topics=[settings.KAFKA_TOPIC_GRADING_JOBS_LARGE],
+            group_id=f"{settings.KAFKA_CONSUMER_GROUP_AI}-large",
+            concurrency=settings.AI_POOL_LARGE_CONCURRENCY,
+            timeout_fn=compute_ai_timeout,
+        ),
     ]

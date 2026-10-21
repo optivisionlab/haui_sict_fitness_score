@@ -85,7 +85,7 @@ class KafkaProducerService:
     def is_ready(self) -> bool:
         return self._producer is not None and self._is_ready
 
-    async def publish_grading_job(self, message: dict[str, Any]) -> bool:
+    async def publish_grading_job(self, message: dict[str, Any], topic: Optional[str] = None) -> bool:
         """Publish a persisted grading job without rebuilding its metadata."""
         if not self.is_ready:
             return False
@@ -96,12 +96,13 @@ class KafkaProducerService:
             return False
 
         try:
+            target = topic or settings.KAFKA_TOPIC_GRADING_JOBS
             await self._producer.send_and_wait(
-                topic=settings.KAFKA_TOPIC_GRADING_JOBS,
+                topic=target,
                 value=message,
                 key=result_id,
             )
-            logger.info("Kafka Producer: sent grading job -> resultId=%s", result_id)
+            logger.info("Kafka Producer: sent grading job -> resultId=%s topic=%s", result_id, target)
             return True
         except Exception as e:
             logger.exception("Kafka Producer error sending job for resultId=%s: %s", result_id, e)

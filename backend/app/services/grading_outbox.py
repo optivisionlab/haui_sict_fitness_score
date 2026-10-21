@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pymongo import ReturnDocument
 
 from app.core.database import get_db
+from app.services.grading_lanes import job_duration_sec, lane_topic, resolve_lane
 from app.services.kafka_producer import kafka_producer
 
 logger = logging.getLogger(__name__)
@@ -84,7 +85,11 @@ class GradingOutboxDispatcher:
                 break
 
             job = document["gradingJob"]
-            if await kafka_producer.publish_grading_job(job):
+            duration = job_duration_sec(job, fallback=document.get("durationSec"))
+            lane = resolve_lane(duration)
+            if duration is not None and job.get("durationSec") is None:
+                job = {**job, "durationSec": duration}
+            if await kafka_producer.publish_grading_job(job, topic=lane_topic(lane)):
                 await asyncio.to_thread(
                     collection.update_one,
                     {"_id": document["_id"], "gradingJobStatus": "processing"},
@@ -92,6 +97,7 @@ class GradingOutboxDispatcher:
                         "$set": {
                             "gradingJobStatus": "sent",
                             "gradingJobSentAt": datetime.now(timezone.utc),
+                            "gradingJobLane": lane,
                         },
                         "$unset": {"gradingJobLeaseUntil": "", "gradingJobNextAttemptAt": ""},
                     },

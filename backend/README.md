@@ -161,11 +161,20 @@ Khi khởi động:
 | Biến | Mặc định | Ý nghĩa |
 | :--- | :--- | :--- |
 | `LOG_LEVEL` | `INFO` | Mức log của ứng dụng |
-| `AI_WORKER_CONCURRENCY` | `3` | Số worker chấm song song của pool (1 consumer + queue + N worker) |
+| `AI_POOL_SMALL_CONCURRENCY` | `2` | Số worker làn small (video ≤ ngưỡng hoặc không rõ thời lượng) |
+| `AI_POOL_LARGE_CONCURRENCY` | `1` | Số worker làn large (video dài) |
+| `AI_LANE_THRESHOLD_SEC` | `90` | Ngưỡng `durationSec` để chia làn |
+| `KAFKA_TOPIC_GRADING_JOBS_SMALL` | `video-grading-jobs-small` | Topic làn small |
+| `KAFKA_TOPIC_GRADING_JOBS_LARGE` | `video-grading-jobs-large` | Topic làn large |
+| `AI_TIMEOUT_BASE_SEC` | `60` | Phần cố định của timeout gọi AI |
+| `AI_TIMEOUT_PER_VIDEO_SEC` | `4` | Số giây timeout cộng thêm cho mỗi giây video |
+| `AI_TIMEOUT_MAX_SEC` | `1800` | Trần timeout; job không có `durationSec` dùng `AI_API_TIMEOUT_SECONDS` |
 | `AI_MAX_CONCURRENCY` | `3` | Số request đồng thời tối đa tới AI (đặt theo sức GPU), dùng chung mọi pool trong 1 process |
 | `AI_WORKER_SHUTDOWN_GRACE` | `30` | Số giây chờ job đang chạy khi tắt; quá hạn thì hủy, job được giao lại sau restart |
 | `AI_MAX_RETRIES` | `3` | Số lần gọi AI tối đa với lỗi tạm thời (timeout, 5xx, 408, 429) |
 
+> Outbox chọn làn theo `durationSec` của bài nộp. Pool small vẫn đọc topic cũ `video-grading-jobs` (cùng consumer group cũ) để xử lý nốt job tồn đọng; có thể bỏ topic này khi lag của group `ai-grading-worker` trên topic cũ về 0.
+>
 > Chạy uvicorn với `--workers N` thì mỗi process có pool riêng, tổng request tới AI sẽ là N × `AI_MAX_CONCURRENCY`.
 
 ### Kiểm thử pipeline chấm điểm
@@ -177,4 +186,6 @@ MONGODB_DB=fitness_score_test python scripts/test_lifespan.py
 python scripts/test_ai_client.py
 python scripts/test_event_loop.py
 MONGODB_DB=fitness_score_test python scripts/test_worker_pool.py   # unit k1 k2 k3 k8, ~6 phút
+MONGODB_DB=fitness_score_test python scripts/test_result_consumer.py
+MONGODB_DB=fitness_score_test python scripts/test_lanes.py
 ```
