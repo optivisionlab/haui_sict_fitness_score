@@ -127,6 +127,10 @@ async def lifespan(app: FastAPI):
     }
     components = app.state.components
     app.state.worker_pools = []
+    run_api = settings.APP_ROLE in ("all", "api")
+    run_worker = settings.APP_ROLE in ("all", "worker") and settings.AI_WORKER_ENABLED
+    if not run_api:
+        components["outbox"] = "disabled"
 
     async with AsyncExitStack() as stack:
         # 1. Hạ tầng bắt buộc: lỗi thì exception nổi lên, app không khởi động
@@ -150,6 +154,9 @@ async def lifespan(app: FastAPI):
         if kafka_producer.is_ready:
             _register_stop(stack, "kafka producer", kafka_producer.stop)
             components["kafka"] = "ok"
+        elif settings.APP_ROLE == "worker":
+            # Worker không có Kafka thì không có việc: thoát để Docker khởi động lại
+            raise RuntimeError(f"Kafka unavailable at {settings.KAFKA_BOOTSTRAP_SERVERS}; worker cannot start")
         else:
             components["kafka"] = "degraded"
             logger.warning(
@@ -160,12 +167,13 @@ async def lifespan(app: FastAPI):
 
         if components["kafka"] == "ok":
             # 4. Result consumer
-            await kafka_result_consumer.start()
-            _register_stop(stack, "result consumer", kafka_result_consumer.stop)
-            components["result_consumer"] = "ok" if kafka_result_consumer.is_running else "error"
+            if run_api:
+                await kafka_result_consumer.start()
+                _register_stop(stack, "result consumer", kafka_result_consumer.stop)
+                components["result_consumer"] = "ok" if kafka_result_consumer.is_running else "error"
 
             # 5. AI worker pool
-            if settings.AI_WORKER_ENABLED:
+            if run_worker:
                 components["ai_worker"] = "ok"
                 for pool in build_default_pools():
                     try:
@@ -177,18 +185,19 @@ async def lifespan(app: FastAPI):
                     _register_stop(stack, f"ai worker pool {pool.name}", pool.stop)
                     app.state.worker_pools.append(pool)
 
-        if settings.UPLOAD_CLEANUP_ENABLED:
+        if run_api and settings.UPLOAD_CLEANUP_ENABLED:
             await orphan_upload_cleaner.start()
             _register_stop(stack, "upload cleanup", orphan_upload_cleaner.stop)
             components["upload_cleanup"] = "ok"
 
         # 6. Outbox dispatcher khởi động cuối cùng, sau khi bên nhận việc đã sẵn sàng
-        await grading_outbox_dispatcher.start()
-        _register_stop(stack, "outbox dispatcher", grading_outbox_dispatcher.stop)
-        components["outbox"] = "ok"
+        if run_api:
+            await grading_outbox_dispatcher.start()
+            _register_stop(stack, "outbox dispatcher", grading_outbox_dispatcher.stop)
+            components["outbox"] = "ok"
 
         app.state.ready = True
-        logger.info("Application ready: %s", components)
+        logger.info("Application ready (role=%s): %s", settings.APP_ROLE, components)
         try:
             yield
         finally:
@@ -205,7 +214,9 @@ app = FastAPI(
 
 setup_middlewares(app)
 setup_exception_handlers(app)
-app.include_router(api_router)
+# Container worker chỉ chạy worker pool và health check, không phục vụ API
+if settings.APP_ROLE != "worker":
+    app.include_router(api_router)
 
 
 @app.get("/", tags=["Health"])
@@ -226,5 +237,5 @@ def readiness_check(request: Request):
     pools = {pool.name: pool.health() for pool in getattr(state, "worker_pools", [])}
     return JSONResponse(
         status_code=200 if ready else 503,
-        content={"ready": ready, "components": components, "worker_pools": pools},
+        content={"ready": ready, "role": settings.APP_ROLE, "components": components, "worker_pools": pools},
     )

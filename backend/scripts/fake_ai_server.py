@@ -7,7 +7,7 @@ Hành vi theo `detail.title` của request:
 - khác            -> trả kết quả completed ngay
 
 `GET /stats` trả số liệu (để test chạy ở process khác đọc được).
-Chạy độc lập: python scripts/fake_ai_server.py <port>
+Chạy độc lập: python scripts/fake_ai_server.py <port> [host]
 """
 
 import asyncio
@@ -115,11 +115,11 @@ class FakeAIServer:
             self.in_flight.discard(job_id)
 
 
-async def _main(port: int) -> None:
-    server = await FakeAIServer(port=port).start()
+async def _main(port: int, host: str) -> None:
+    server = await FakeAIServer(host=host, port=port).start()
     print(f"Fake AI listening on {server.url}", flush=True)
     await asyncio.Event().wait()
 
 
 if __name__ == "__main__":
-    asyncio.run(_main(int(sys.argv[1]) if len(sys.argv) > 1 else 18888))
+    asyncio.run(_main(int(sys.argv[1]) if len(sys.argv) > 1 else 18888, sys.argv[2] if len(sys.argv) > 2 else "127.0.0.1"))

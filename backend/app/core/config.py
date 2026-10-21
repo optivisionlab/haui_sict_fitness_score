@@ -8,6 +8,9 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parents[3] / ".env")
 class Settings:
     APP_TITLE: str = "Lab Fitness API"
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
+    # Vai trò process: all = API + worker (mặc định); api = API, outbox, result consumer, dọn dẹp;
+    # worker = chỉ AI worker pool (chạy container riêng, scale bằng số replica)
+    APP_ROLE: str = os.getenv("APP_ROLE", "all").strip().lower()
 
     # MongoDB
     MONGODB_URI: str = os.getenv(
@@ -102,3 +105,5 @@ class Settings:
 
 
 settings = Settings()
+if settings.APP_ROLE not in ("all", "api", "worker"):
+    raise ValueError(f"APP_ROLE phải là all, api hoặc worker (hiện tại: {settings.APP_ROLE!r})")

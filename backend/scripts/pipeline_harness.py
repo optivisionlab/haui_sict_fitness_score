@@ -37,8 +37,9 @@ def http_json(url: str, timeout: float = 5.0, headers: dict | None = None) -> tu
 
 
 class FakeAIProcess:
-    def __init__(self, port: int = 18888):
+    def __init__(self, port: int = 18888, host: str = "127.0.0.1"):
         self.port = port
+        self.host = host
         self.proc: subprocess.Popen | None = None
 
     @property
@@ -47,7 +48,7 @@ class FakeAIProcess:
 
     def start(self) -> "FakeAIProcess":
         self.proc = subprocess.Popen(
-            [sys.executable, str(SCRIPTS_DIR / "fake_ai_server.py"), str(self.port)],
+            [sys.executable, str(SCRIPTS_DIR / "fake_ai_server.py"), str(self.port), self.host],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )

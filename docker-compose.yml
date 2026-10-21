@@ -45,7 +45,9 @@ services:
       - .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    environment:
+    environment: &backend-environment
+      # Backend chỉ phục vụ API, outbox, result consumer; AI worker chạy ở service ai-worker
+      APP_ROLE: api
       MONGODB_URI: "mongodb://mongodb:27017/${MONGODB_DB:-fitness_score}?authSource=admin"
       MONGODB_USERNAME: ${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME in .env}
       MONGODB_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in .env}
@@ -84,6 +86,53 @@ services:
       mongodb:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    networks:
+      - app
+
+  # AI worker pool chạy container riêng (APP_ROLE=worker), dùng chung image với backend.
+  # Scale: docker compose up -d --scale ai-worker=N (mỗi làn có 3 partition nên tối đa 3 replica có việc;
+  # tổng request tới AI = N x AI_MAX_CONCURRENCY).
+  ai-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Lớn hơn AI_WORKER_SHUTDOWN_GRACE + 10s để kịp drain job đang chấm trước khi bị SIGKILL
+    stop_grace_period: 45s
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      <<: *backend-environment
+      APP_ROLE: worker
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.00
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      mongodb:
         condition: service_healthy
       minio:
         condition: service_healthy
