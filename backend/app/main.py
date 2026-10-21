@@ -111,6 +111,7 @@ async def lifespan(app: FastAPI):
     from app.services.kafka_producer import kafka_producer
     from app.services.minio_service import minio_service
     from app.services.sport_service import sport_service
+    from app.services.upload_cleanup import orphan_upload_cleaner
 
     app.state.ready = False
     app.state.components = {
@@ -120,6 +121,7 @@ async def lifespan(app: FastAPI):
         "result_consumer": "disabled",
         "ai_worker": "disabled",
         "outbox": "starting",
+        "upload_cleanup": "disabled",
     }
     components = app.state.components
     app.state.worker_pools = []
@@ -169,6 +171,11 @@ async def lifespan(app: FastAPI):
                         continue
                     _register_stop(stack, f"ai worker pool {pool.name}", pool.stop)
                     app.state.worker_pools.append(pool)
+
+        if settings.UPLOAD_CLEANUP_ENABLED:
+            await orphan_upload_cleaner.start()
+            _register_stop(stack, "upload cleanup", orphan_upload_cleaner.stop)
+            components["upload_cleanup"] = "ok"
 
         # 6. Outbox dispatcher khởi động cuối cùng, sau khi bên nhận việc đã sẵn sàng
         await grading_outbox_dispatcher.start()

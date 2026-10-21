@@ -45,6 +45,10 @@ class Settings:
     )
     MINIO_BUCKET_NAME: str = os.getenv("MINIO_BUCKET_NAME", "videos")
     MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "False").lower() == "true"
+    # Dọn video đã upload nhưng không confirm (không có video_results) sau UPLOAD_ORPHAN_MAX_AGE_SEC
+    UPLOAD_CLEANUP_ENABLED: bool = os.getenv("UPLOAD_CLEANUP_ENABLED", "true").lower() == "true"
+    UPLOAD_CLEANUP_INTERVAL_SEC: float = float(os.getenv("UPLOAD_CLEANUP_INTERVAL_SEC", "3600"))
+    UPLOAD_ORPHAN_MAX_AGE_SEC: float = float(os.getenv("UPLOAD_ORPHAN_MAX_AGE_SEC", "86400"))
 
     # AI / Worker Auth
     AI_API_KEY: str = os.getenv("AI_API_KEY", "internal-ai-worker-secret-key")

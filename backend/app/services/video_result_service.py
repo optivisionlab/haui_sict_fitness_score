@@ -143,6 +143,21 @@ class VideoResultService:
                     detail="Bài kiểm tra/bài thi chỉ được nộp 1 lần. Bạn đã nộp bài này.",
                 )
 
+        # GUARD 5: Giới hạn số lần nộp theo task.maxAttempts. Lần chấm thất bại (lỗi phía AI/hạ tầng)
+        # không tính; phiên upload còn hạn thì tính để không mở được nhiều phiên vượt giới hạn.
+        max_attempts = getattr(task, "max_attempts", None)
+        if max_attempts:
+            used_attempts = crud_video_result.collection.count_documents({
+                "taskId": str(task_id),
+                "userId": str(user_id),
+                "status": {"$ne": "failed"},
+            }) + active_uploads
+            if used_attempts >= max_attempts:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Bạn đã hết lượt nộp bài ({used_attempts}/{max_attempts} lần)",
+                )
+
         # Kiểm tra sport
         sport = crud_sport.get(sport_id)
         if not sport:
@@ -209,6 +224,11 @@ class VideoResultService:
         task = crud_task.get(task_id)
         if not task:
             raise HTTPException(status_code=404, detail="Không tìm thấy bài tập")
+        if task.time_limit and upload_in.duration_sec and upload_in.duration_sec > task.time_limit:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Video dài {upload_in.duration_sec}s, vượt thời lượng tối đa của bài tập ({task.time_limit}s)",
+            )
         _, _, attempt_no = self._validate_submission_guards(task_id, user_id, task.sport_id)
         sport = crud_sport.get(task.sport_id)
         if not sport:

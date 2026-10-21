@@ -91,6 +91,8 @@ class Pipeline:
                 "AI_PICKLEBALL_VIDEO_URL": fake_ai.url,
                 "AI_DIRECT_FALLBACK": "false",
                 "AI_WORKER_SHUTDOWN_GRACE": "5",
+                # Test dùng bucket thật nhưng DB test: không được chạy job xóa object
+                "UPLOAD_CLEANUP_ENABLED": "false",
             }
         )
         self.env.update(env_overrides)

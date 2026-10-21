@@ -169,6 +169,9 @@ Khi khởi động:
 | `AI_TIMEOUT_BASE_SEC` | `60` | Phần cố định của timeout gọi AI |
 | `AI_TIMEOUT_PER_VIDEO_SEC` | `4` | Số giây timeout cộng thêm cho mỗi giây video |
 | `AI_TIMEOUT_MAX_SEC` | `1800` | Trần timeout; job không có `durationSec` dùng `AI_API_TIMEOUT_SECONDS` |
+| `UPLOAD_CLEANUP_ENABLED` | `true` | Bật job xóa video đã upload nhưng không confirm |
+| `UPLOAD_CLEANUP_INTERVAL_SEC` | `3600` | Chu kỳ chạy job dọn dẹp |
+| `UPLOAD_ORPHAN_MAX_AGE_SEC` | `86400` | Chỉ xóa object cũ hơn ngưỡng này (24h) |
 | `AI_MAX_CONCURRENCY` | `3` | Số request đồng thời tối đa tới AI (đặt theo sức GPU), dùng chung mọi pool trong 1 process |
 | `AI_WORKER_SHUTDOWN_GRACE` | `30` | Số giây chờ job đang chạy khi tắt; quá hạn thì hủy, job được giao lại sau restart |
 | `AI_MAX_RETRIES` | `3` | Số lần gọi AI tối đa với lỗi tạm thời (timeout, 5xx, 408, 429) |
@@ -176,6 +179,13 @@ Khi khởi động:
 > Outbox chọn làn theo `durationSec` của bài nộp. Pool small vẫn đọc topic cũ `video-grading-jobs` (cùng consumer group cũ) để xử lý nốt job tồn đọng; có thể bỏ topic này khi lag của group `ai-grading-worker` trên topic cũ về 0.
 >
 > Chạy uvicorn với `--workers N` thì mỗi process có pool riêng, tổng request tới AI sẽ là N × `AI_MAX_CONCURRENCY`.
+
+### Giới hạn nộp bài & dọn dẹp
+
+- `task.maxAttempts`: giới hạn số lần nộp; lần chấm `failed` không tính, phiên upload đang mở thì tính.
+- `task.timeLimit` (giây): `upload-url` từ chối video có `duration_sec` lớn hơn. Không gửi `duration_sec` thì không kiểm tra.
+- Job dọn dẹp chỉ xóa object `submissions/{taskId}/{resultId}.{ext}` cũ hơn `UPLOAD_ORPHAN_MAX_AGE_SEC`, có `taskId` thuộc DB hiện tại, không có `video_results` và không có phiên upload đang mở. Không dùng MinIO lifecycle rule vì rule sẽ xóa cả video hợp lệ.
+- ⚠️ Không chạy app với DB test trỏ vào bucket thật khi `UPLOAD_CLEANUP_ENABLED=true`.
 
 ### Kiểm thử pipeline chấm điểm
 
@@ -190,4 +200,6 @@ MONGODB_DB=fitness_score_test python scripts/test_result_consumer.py
 MONGODB_DB=fitness_score_test python scripts/test_lanes.py
 MONGODB_DB=fitness_score_test python scripts/test_fallback.py
 MONGODB_DB=fitness_score_test python scripts/test_result_access.py
+MONGODB_DB=fitness_score_test python scripts/test_submission_limits.py
+python scripts/test_guards.py
 ```

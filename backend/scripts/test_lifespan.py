@@ -37,6 +37,9 @@ def _env(**overrides: str) -> dict[str, str]:
     env.setdefault("KAFKA_CONSUMER_GROUP_BACKEND", "test-backend-result-consumer")
     env.setdefault("KAFKA_CONSUMER_GROUP_AI", "test-ai-grading-worker")
     env.setdefault("AI_MOCK_MODE", "true")
+    env["LOG_LEVEL"] = "INFO"  # test đọc log INFO "Stopping ..."
+    # Bucket riêng: lifespan bật job dọn object, không được chạy trên bucket thật với DB test
+    env["MINIO_BUCKET_NAME"] = "test-lifespan"
     env.update(overrides)
     return env
 
@@ -114,7 +117,7 @@ def test_full_startup_and_shutdown_order():
         out = _stop(proc)
 
     assert "Traceback" not in out, out[-3000:]
-    expected = ["outbox dispatcher", "ai worker pool large", "ai worker pool small", "result consumer", "kafka producer", "http client"]
+    expected = ["outbox dispatcher", "upload cleanup", "ai worker pool large", "ai worker pool small", "result consumer", "kafka producer", "http client"]
     positions = []
     for name in expected:
         marker = f"Stopping {name}"
@@ -127,5 +130,12 @@ def test_full_startup_and_shutdown_order():
 if __name__ == "__main__":
     test_minio_down_fails_fast()
     test_kafka_down_runs_degraded()
-    test_full_startup_and_shutdown_order()
+    try:
+        test_full_startup_and_shutdown_order()
+    finally:
+        sys.path.insert(0, str(BACKEND_DIR))
+        from app.services.minio_service import minio_service
+
+        if minio_service.client.bucket_exists("test-lifespan"):
+            minio_service.client.remove_bucket("test-lifespan")
     print("\n>>> TEST LIFESPAN PASSED")

@@ -7,6 +7,7 @@ Kiểm thử tự động các lớp bảo vệ nghiệp vụ (Security & Submis
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 if sys.stdout.encoding != "utf-8":
@@ -28,6 +29,19 @@ from app.services.video_result_service import video_result_service
 
 
 def test_submission_guards():
+    # Các guard nghiệp vụ chạy sau bước kiểm tra ghi danh: giả lập sinh viên đã ghi danh active
+    enrolled = patch(
+        "app.services.video_result_service.crud_enrollment.get_by_user_and_course",
+        return_value=SimpleNamespace(status=SimpleNamespace(value="active")),
+    )
+    enrolled.start()
+    try:
+        _run_submission_guards()
+    finally:
+        enrolled.stop()
+
+
+def _run_submission_guards():
     print("\n[TEST GUARDS] Kiểm thử 4 Lớp Bảo Vệ Nộp Bài Video...")
 
     now = datetime.now(timezone.utc)
