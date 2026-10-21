@@ -330,6 +330,7 @@ class VideoResultService:
             "minioBucket": session["bucket"],
             "attemptNo": session["attemptNo"],
             "durationSec": session.get("durationSec"),
+            "fileSize": object_stat.size,
             "detail": session["taskDetail"],
             "schemaVersion": 1,
         }
@@ -513,6 +514,7 @@ class VideoResultService:
                 "minioBucket": settings.MINIO_BUCKET_NAME,
                 "attemptNo": next_attempt,
                 "durationSec": duration_sec,
+                "fileSize": file_size,
                 "detail": {
                     "title": task.title,
                     "category": task.category.value,

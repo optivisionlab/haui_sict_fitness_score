@@ -88,6 +88,16 @@ async def run():
                 except AIGradingError as exc:
                     assert exc.code == f"ai_http_{code}" and exc.retryable is retryable, (code, exc.code, exc.retryable)
             print(f"  ✓ {', '.join(f'{c}→{r}' for c, r in cases.items())}")
+            try:
+                await client.grade(make_job("busy:1"))
+                raise AssertionError("429 không ném lỗi")
+            except AIGradingError as exc:
+                assert exc.code == "ai_http_429" and exc.busy and exc.retry_after == 1.0, (exc.code, exc.retry_after)
+            try:
+                await client.grade(make_job("status:429"))
+            except AIGradingError as exc:
+                assert not exc.busy, "429 không có Retry-After không phải trạng thái bận"
+            print("  ✓ 429 + Retry-After → busy (retry_after=1s); 429 không có header → lỗi tạm thời thường")
 
             with patch.object(settings, "AI_PICKLEBALL_VIDEO_URL", "http://127.0.0.1:1/x"):
                 try:

@@ -4,6 +4,7 @@ Fake AI service dùng cho test: HTTP/1.1 keep-alive tối giản, đếm kết n
 Hành vi theo `detail.title` của request:
 - "sleep:<giây>"  -> chờ rồi trả kết quả completed
 - "status:<mã>"   -> trả HTTP status tương ứng
+- "busy:<n>"      -> n lần gọi đầu của job trả 429 + Retry-After: 1, sau đó completed
 - khác            -> trả kết quả completed ngay
 
 `GET /stats` trả số liệu (để test chạy ở process khác đọc được).
@@ -72,13 +73,16 @@ class FakeAIServer:
                     if name.strip().lower() == "content-length":
                         length = int(value.strip())
                 body = json.loads(await reader.readexactly(length)) if length else {}
+                extra = ""
                 if path.startswith("/stats"):
                     status, payload = 200, self.stats()
                 else:
                     status, payload = await self._process(body)
+                    if payload.get("detail") == "Server busy":
+                        extra = "Retry-After: 1\r\n"
                 data = json.dumps(payload).encode()
                 writer.write(
-                    f"HTTP/1.1 {status} X\r\nContent-Type: application/json\r\n"
+                    f"HTTP/1.1 {status} X\r\nContent-Type: application/json\r\n{extra}"
                     f"Content-Length: {len(data)}\r\nConnection: keep-alive\r\n\r\n".encode() + data
                 )
                 await writer.drain()
@@ -97,6 +101,8 @@ class FakeAIServer:
         self.max_concurrent = max(self.max_concurrent, self.concurrent)
         try:
             title = (body.get("detail") or {}).get("title", "")
+            if title.startswith("busy:") and self.calls[job_id] <= int(title.split(":", 1)[1]):
+                return 429, {"detail": "Server busy"}
             if title.startswith("status:"):
                 return int(title.split(":", 1)[1]), {"detail": "fake error"}
             if title.startswith("sleep:"):

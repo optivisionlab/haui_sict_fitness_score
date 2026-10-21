@@ -292,13 +292,23 @@ class AIWorkerPool:
         result = None
         error_code = "ai_api_error"
         attempt = 0
-        for attempt in range(1, settings.AI_MAX_RETRIES + 1):
+        busy_waited = 0.0
+        while attempt < settings.AI_MAX_RETRIES:
+            attempt += 1
             try:
                 async with get_ai_semaphore():
                     result = await ai_grading_client.grade(job, timeout=timeout)
                 break
             except AIGradingError as exc:
                 error_code = exc.code
+                if exc.busy and busy_waited < settings.AI_BUSY_MAX_WAIT_SEC and self._running:
+                    # AI đang bận (429/503 + Retry-After): chờ theo AI yêu cầu, không tính vào AI_MAX_RETRIES
+                    attempt -= 1
+                    wait = min(exc.retry_after, settings.AI_BUSY_MAX_WAIT_SEC - busy_waited)
+                    busy_waited += wait
+                    logger.info("[%s] AI busy for resultId=%s, retrying in %.0fs", self.name, result_id, wait)
+                    await asyncio.sleep(wait)
+                    continue
                 logger.warning("[%s] AI attempt %s failed for resultId=%s: %s", self.name, attempt, result_id, exc.code)
                 if not exc.retryable:
                     break

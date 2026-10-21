@@ -100,6 +100,8 @@ class GradingOutboxDispatcher:
             lane = resolve_lane(duration)
             if duration is not None and job.get("durationSec") is None:
                 job = {**job, "durationSec": duration}
+            if job.get("fileSize") is None and document.get("fileSize") is not None:
+                job = {**job, "fileSize": document["fileSize"]}
             if await kafka_producer.publish_grading_job(job, topic=lane_topic(lane)):
                 await collection.update_one(
                     {"_id": document["_id"], "gradingJobStatus": "processing"},
@@ -191,8 +193,9 @@ class GradingOutboxDispatcher:
 
         collection = get_async_db().video_results
         job = document["gradingJob"]
-        if job.get("durationSec") is None and document.get("durationSec") is not None:
-            job = {**job, "durationSec": document["durationSec"]}
+        for field in ("durationSec", "fileSize"):
+            if job.get(field) is None and document.get(field) is not None:
+                job = {**job, field: document[field]}
         result_id = str(document["_id"])
         try:
             async with get_ai_semaphore():
@@ -223,7 +226,9 @@ class GradingOutboxDispatcher:
             raise
         except Exception as exc:
             logger.warning("Direct grading fallback attempt failed for resultId=%s: %s", result_id, exc)
-            attempts = int(document.get("gradingJobAttempts", 0)) + 1
+            busy = isinstance(exc, AIGradingError) and exc.busy
+            # AI đang bận thì không tính là một lần thất bại
+            attempts = int(document.get("gradingJobAttempts", 0)) + (0 if busy else 1)
             # Lỗi vĩnh viễn (request/video không hợp lệ) thì không retry
             terminal = attempts >= OUTBOX_MAX_ATTEMPTS or (
                 isinstance(exc, AIGradingError) and not exc.retryable
@@ -239,7 +244,7 @@ class GradingOutboxDispatcher:
             if terminal:
                 update["$set"].update({"status": "failed", "pending": False, "error": error_code})
             else:
-                delay = min(2 ** attempts, 60)
+                delay = exc.retry_after if busy else min(2 ** attempts, 60)
                 update["$set"]["gradingJobNextAttemptAt"] = datetime.now(timezone.utc) + timedelta(seconds=delay)
             await collection.update_one({"_id": document["_id"]}, update)
 

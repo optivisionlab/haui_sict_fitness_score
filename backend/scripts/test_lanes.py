@@ -37,7 +37,11 @@ def test_unit():
     assert compute_ai_timeout({"durationSec": "45"}) == 60 + 4 * 45
     assert compute_ai_timeout({"durationSec": 1000}) == 1800
     assert compute_ai_timeout({"durationSec": "abc"}) == settings.AI_API_TIMEOUT_SECONDS
+    mb = 1024 * 1024
+    assert compute_ai_timeout({"durationSec": 60, "fileSize": 52 * mb}) == 60 + 4 * 60 + 1 * 52
+    assert compute_ai_timeout({"fileSize": 100 * mb}) == 60 + 100
     print("  ✓ ≤90s/thiếu → small, >90s → large; timeout 30s→180s, 1000s→1800s (trần), thiếu → 600s")
+    print("  ✓ Timeout cộng thêm theo dung lượng: 60s + 52MB → 352s; chỉ biết 100MB → 160s")
 
 
 def test_long_videos_do_not_block_short(fake_ai: FakeAIProcess):

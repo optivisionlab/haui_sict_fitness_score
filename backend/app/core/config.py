@@ -76,6 +76,9 @@ class Settings:
     AI_TIMEOUT_BASE_SEC: float = float(os.getenv("AI_TIMEOUT_BASE_SEC", "60"))
     AI_TIMEOUT_PER_VIDEO_SEC: float = float(os.getenv("AI_TIMEOUT_PER_VIDEO_SEC", "4"))
     AI_TIMEOUT_MAX_SEC: float = float(os.getenv("AI_TIMEOUT_MAX_SEC", "1800"))
+    AI_TIMEOUT_PER_MB_SEC: float = float(os.getenv("AI_TIMEOUT_PER_MB_SEC", "1"))
+    # AI trả 429/503 kèm Retry-After (đang bận): chờ và gửi lại tối đa chừng này giây, không tính vào AI_MAX_RETRIES
+    AI_BUSY_MAX_WAIT_SEC: float = float(os.getenv("AI_BUSY_MAX_WAIT_SEC", "1800"))
     # Gọi thẳng AI khi Kafka không sẵn sàng (outbox fallback)
     AI_DIRECT_FALLBACK: bool = os.getenv("AI_DIRECT_FALLBACK", "true").lower() == "true"
     # MinIO endpoint mà AI service dùng để tải video (phải truy cập được từ máy chạy AI)

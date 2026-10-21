@@ -31,12 +31,30 @@ def lane_topic(lane: str) -> str:
     return settings.KAFKA_TOPIC_GRADING_JOBS_SMALL
 
 
+def job_file_size_mb(job: dict[str, Any], fallback: Any = None) -> Optional[float]:
+    value = job.get("fileSize")
+    if value is None:
+        value = fallback
+    try:
+        size = float(value)
+    except (TypeError, ValueError):
+        return None
+    return size / (1024 * 1024) if size > 0 else None
+
+
 def compute_ai_timeout(job: dict[str, Any]) -> float:
-    """Timeout gọi AI tỉ lệ theo thời lượng video, có trần AI_TIMEOUT_MAX_SEC."""
+    """
+    Timeout gọi AI = BASE + PER_VIDEO_SEC x durationSec + PER_MB x fileSize(MB), trần AI_TIMEOUT_MAX_SEC.
+    AI phải tải video từ MinIO trước khi chấm, nên dung lượng chiếm phần lớn thời gian khi mạng chậm.
+    Không biết cả thời lượng lẫn dung lượng thì dùng AI_API_TIMEOUT_SECONDS.
+    """
     duration = job_duration_sec(job)
-    if duration is None:
+    size_mb = job_file_size_mb(job)
+    if duration is None and size_mb is None:
         return settings.AI_API_TIMEOUT_SECONDS
-    return min(
-        settings.AI_TIMEOUT_BASE_SEC + settings.AI_TIMEOUT_PER_VIDEO_SEC * duration,
-        settings.AI_TIMEOUT_MAX_SEC,
+    timeout = (
+        settings.AI_TIMEOUT_BASE_SEC
+        + settings.AI_TIMEOUT_PER_VIDEO_SEC * (duration or 0)
+        + settings.AI_TIMEOUT_PER_MB_SEC * (size_mb or 0)
     )
+    return min(timeout, settings.AI_TIMEOUT_MAX_SEC)

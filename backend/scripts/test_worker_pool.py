@@ -227,6 +227,23 @@ def test_k5_ai_500(fake_ai: FakeAIProcess):
         pipe.cleanup()
 
 
+def test_k5b_ai_busy(fake_ai: FakeAIProcess):
+    print("\n[K5b] AI bận: 429 + Retry-After 3 lần, AI_MAX_RETRIES=1")
+    pipe = Pipeline(fake_ai, AI_MAX_RETRIES="1")
+    try:
+        pipe.create_topics()
+        pipe.start_app()
+        rid = pipe.insert_job("busy:3")
+        doc = pipe.wait_status([rid], timeout=60)[str(rid)]
+        assert doc["status"] == "completed" and doc.get("error") is None, doc
+        calls = fake_ai.stats()["calls"][str(rid)]
+        assert calls == 4, calls
+        print(f"  ✓ Chờ theo Retry-After rồi gửi lại ({calls} lần gọi), không tính vào AI_MAX_RETRIES=1 → completed")
+        pipe.sigterm()
+    finally:
+        pipe.cleanup()
+
+
 if __name__ == "__main__":
     selected = set(sys.argv[1:]) or {"unit", "k1", "k2", "k3", "k5", "k8"}
     if "unit" in selected:
@@ -241,6 +258,7 @@ if __name__ == "__main__":
             test_k3_kill9_no_loss_no_duplicate(fake_ai)
         if "k5" in selected:
             test_k5_ai_500(fake_ai)
+            test_k5b_ai_busy(fake_ai)
         if "k8" in selected:
             test_k8_sigterm_drain(fake_ai)
     finally:

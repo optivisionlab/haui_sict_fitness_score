@@ -16,10 +16,16 @@ PICKLEBALL_CODES = {"PICKLE", "PICKLEBALL"}
 class AIGradingError(Exception):
     """Lỗi khi gọi AI. `retryable=False` nghĩa là lỗi vĩnh viễn (request sai, video không hợp lệ...)."""
 
-    def __init__(self, code: str, retryable: bool):
+    def __init__(self, code: str, retryable: bool, retry_after: float | None = None):
         super().__init__(code)
         self.code = code
         self.retryable = retryable
+        # AI báo đang bận (429/503 kèm Retry-After): chờ rồi gửi lại, không tính là một lần thất bại
+        self.retry_after = retry_after
+
+    @property
+    def busy(self) -> bool:
+        return self.retry_after is not None
 
 
 class AIGradingClient:
@@ -155,7 +161,13 @@ class AIGradingClient:
         if response.status_code >= 400:
             # 4xx (trừ 408/429) là lỗi vĩnh viễn: request/video không hợp lệ, retry vô ích
             retryable = response.status_code >= 500 or response.status_code in (408, 429)
-            raise AIGradingError(f"ai_http_{response.status_code}", retryable=retryable)
+            retry_after = None
+            if response.status_code in (429, 503):
+                try:
+                    retry_after = max(1.0, float(response.headers.get("Retry-After", "")))
+                except ValueError:
+                    retry_after = None
+            raise AIGradingError(f"ai_http_{response.status_code}", retryable=retryable, retry_after=retry_after)
 
         result = response.json()
         result.setdefault("jobId", request_data["job_id"])
