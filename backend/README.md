@@ -161,6 +161,7 @@ Khi khởi động:
 | Biến | Mặc định | Ý nghĩa |
 | :--- | :--- | :--- |
 | `LOG_LEVEL` | `INFO` | Mức log của ứng dụng |
+| `APP_ROLE` | `all` | `all`: API + worker trong 1 process; `api`: API, outbox, result consumer, dọn dẹp; `worker`: chỉ AI worker pool (bắt buộc có Kafka, không mount `/api`) |
 | `AI_POOL_SMALL_CONCURRENCY` | `2` | Số worker làn small (video ≤ ngưỡng hoặc không rõ thời lượng) |
 | `AI_POOL_LARGE_CONCURRENCY` | `1` | Số worker làn large (video dài) |
 | `AI_LANE_THRESHOLD_SEC` | `90` | Ngưỡng `durationSec` để chia làn |
@@ -179,6 +180,17 @@ Khi khởi động:
 > Outbox chọn làn theo `durationSec` của bài nộp. Pool small vẫn đọc topic cũ `video-grading-jobs` (cùng consumer group cũ) để xử lý nốt job tồn đọng; có thể bỏ topic này khi lag của group `ai-grading-worker` trên topic cũ về 0.
 >
 > Chạy uvicorn với `--workers N` thì mỗi process có pool riêng, tổng request tới AI sẽ là N × `AI_MAX_CONCURRENCY`.
+
+### Tách AI worker ra container riêng
+
+Trong `docker-compose.yml`, `backend` chạy `APP_ROLE=api`, còn `ai-worker` chạy `APP_ROLE=worker` (cùng image, kế thừa biến môi trường của backend, không publish port).
+
+```bash
+docker compose up -d --build backend ai-worker
+docker compose up -d --scale ai-worker=2   # mỗi làn 3 partition: tối đa 3 replica có việc
+```
+
+Tổng request đồng thời tới AI = số replica × `AI_MAX_CONCURRENCY`.
 
 ### Giới hạn nộp bài & dọn dẹp
 
@@ -202,4 +214,5 @@ MONGODB_DB=fitness_score_test python scripts/test_fallback.py
 MONGODB_DB=fitness_score_test python scripts/test_result_access.py
 MONGODB_DB=fitness_score_test python scripts/test_submission_limits.py
 python scripts/test_guards.py
+docker build -t haui-fitness-backend:worker-test . && MONGODB_DB=fitness_score_test python scripts/test_worker_container.py
 ```
