@@ -39,6 +39,10 @@ class KafkaResultConsumerService:
             self._is_running = False
             logger.error("Failed to start Kafka Result Consumer: %s", e)
 
+    @property
+    def is_running(self) -> bool:
+        return self._is_running
+
     async def stop(self):
         """Dừng Consumer an toàn."""
         self._is_running = False

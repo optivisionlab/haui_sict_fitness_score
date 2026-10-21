@@ -47,6 +47,10 @@ class AIGradingWorker:
             self._running = False
             logger.warning("Could not start AI Grading Worker: %s", exc)
 
+    @property
+    def is_running(self) -> bool:
+        return self._running
+
     async def stop(self) -> None:
         self._running = False
         if self._task:

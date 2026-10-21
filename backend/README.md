@@ -139,3 +139,25 @@ Backend phát hành và lắng nghe các sự kiện chấm điểm qua Kafka:
 - **Topic nhận yêu cầu chấm điểm:** `video-grading-jobs` (Backend gửi sang cho Model AI)
 - **Topic nhận kết quả chấm điểm:** `video-grading-results` (Model AI gửi kết quả về cho Backend cập nhật DB)
 - **Topic lỗi (DLQ):** `video-grading-dlq`
+
+---
+
+## 🩺 Health check & khởi động
+
+| Endpoint | Ý nghĩa |
+| :--- | :--- |
+| `GET /` | Liveness: process đang chạy |
+| `GET /health/ready` | Readiness: `200` khi đã khởi động xong, `503` khi đang khởi động hoặc đang tắt. Body có trạng thái từng thành phần (`mongo`, `minio`, `kafka`, `result_consumer`, `ai_worker`, `outbox`) |
+
+Khi khởi động:
+- **MongoDB và MinIO là bắt buộc.** Nếu không kết nối được, app thoát với lỗi `Application startup failed`.
+- **Kafka là tùy chọn.** Nếu không kết nối được, app vẫn chạy, `kafka` báo `degraded`, result consumer và AI worker không chạy, còn outbox gọi AI trực tiếp (khi `AI_DIRECT_FALLBACK=true`).
+- Khi tắt, các thành phần dừng theo thứ tự ngược lại: outbox → AI worker → result consumer → Kafka producer → HTTP client.
+
+---
+
+## ⚙️ Biến cấu hình bổ sung
+
+| Biến | Mặc định | Ý nghĩa |
+| :--- | :--- | :--- |
+| `LOG_LEVEL` | `INFO` | Mức log của ứng dụng |

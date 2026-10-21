@@ -7,6 +7,7 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parents[3] / ".env")
 
 class Settings:
     APP_TITLE: str = "Lab Fitness API"
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
 
     # MongoDB
     MONGODB_URI: str = os.getenv(
