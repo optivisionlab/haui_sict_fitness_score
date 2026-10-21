@@ -59,8 +59,8 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
       MINIO_SECURE: "False"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9093
-      AI_API_URL: http://host.docker.internal:8888/api/v1/process
-      AI_PICKLEBALL_VIDEO_URL: http://host.docker.internal:8888/api/v1/process
+      AI_API_URL: ${AI_SERVICE_URL:-http://100.95.228.82:8888/api/v1/process}
+      AI_PICKLEBALL_VIDEO_URL: ${AI_SERVICE_URL:-http://100.95.228.82:8888/api/v1/process}
       AI_MINIO_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-100.116.40.89:9000}
     read_only: true
     tmpfs:
