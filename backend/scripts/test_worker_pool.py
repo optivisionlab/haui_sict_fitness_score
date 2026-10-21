@@ -5,6 +5,7 @@ Kiểm thử T4 — AIWorkerPool (1 consumer + queue + N worker).
 K1+K7. 9 job x 20s, 3 worker: tổng ~60s; trong lúc chấm, GET /api/auth/me < 100ms.
 K2. 1 job dài 120s + 6 job ngắn 10s, 2 worker: job ngắn không phải chờ job dài.
 K3. kill -9 khi 3 job đang chạy: restart thì không mất job; job đã chấm xong mà bị giao lại thì skip.
+K5. AI trả 500 liên tục: retry AI_MAX_RETRIES lần rồi failed (ai_http_500); 4xx thì không retry.
 K8. SIGTERM khi đang có job: job ngắn chạy xong trong grace, job dài bị hủy và được giao lại sau restart.
 
 Chạy (cần Kafka/Mongo/MinIO thật, dùng DB/topic riêng):
@@ -204,8 +205,30 @@ def test_k8_sigterm_drain(fake_ai: FakeAIProcess):
         pipe.cleanup()
 
 
+def test_k5_ai_500(fake_ai: FakeAIProcess):
+    print("\n[K5] AI trả 500 liên tục")
+    pipe = Pipeline(fake_ai, AI_MAX_RETRIES="3")
+    try:
+        pipe.create_topics()
+        pipe.start_app()
+        rid = pipe.insert_job("status:500")
+        docs = pipe.wait_status([rid], timeout=60)
+        doc = docs[str(rid)]
+        assert doc["status"] == "failed" and doc.get("error") == "ai_http_500", doc
+        calls = fake_ai.stats()["calls"][str(rid)]
+        assert calls == 3, calls
+        print(f"  ✓ Gọi AI {calls} lần (retry lỗi tạm thời) rồi status=failed, error=ai_http_500")
+        rid_422 = pipe.insert_job("status:422")
+        doc = pipe.wait_status([rid_422], timeout=30)[str(rid_422)]
+        assert doc.get("error") == "ai_http_422" and fake_ai.stats()["calls"][str(rid_422)] == 1, doc
+        print("  ✓ AI trả 422 (lỗi vĩnh viễn): không retry, failed ngay với error=ai_http_422")
+        pipe.sigterm()
+    finally:
+        pipe.cleanup()
+
+
 if __name__ == "__main__":
-    selected = set(sys.argv[1:]) or {"unit", "k1", "k2", "k3", "k8"}
+    selected = set(sys.argv[1:]) or {"unit", "k1", "k2", "k3", "k5", "k8"}
     if "unit" in selected:
         test_offset_tracker()
     fake_ai = FakeAIProcess().start()
@@ -216,6 +239,8 @@ if __name__ == "__main__":
             test_k2_no_head_of_line_blocking(fake_ai)
         if "k3" in selected:
             test_k3_kill9_no_loss_no_duplicate(fake_ai)
+        if "k5" in selected:
+            test_k5_ai_500(fake_ai)
         if "k8" in selected:
             test_k8_sigterm_drain(fake_ai)
     finally:
