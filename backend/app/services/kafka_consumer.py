@@ -84,10 +84,12 @@ class KafkaResultConsumerService:
                             video_result_service.ai_callback(result_id, ai_update)
                             logger.info("✅ Kafka Consumer: Successfully processed result for resultId=%s", result_id)
                         elif status == "failed":
+                            error_code = str(data.get("errorCode") or "ai_processing_failed")[:100]
+                            video_result_service.ai_failure(result_id, error_code)
                             logger.warning(
-                                "❌ Kafka Consumer: Job marked as failed for resultId=%s, error=%s",
+                                "Kafka Consumer: job failed for resultId=%s, code=%s",
                                 result_id,
-                                data.get("error"),
+                                error_code,
                             )
                     except Exception as msg_err:
                         logger.exception("Error processing individual Kafka message: %s", msg_err)

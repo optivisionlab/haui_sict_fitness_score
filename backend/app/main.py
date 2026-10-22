@@ -67,6 +67,8 @@ def init_db_indexes():
         database.video_results.create_index([("taskId", 1), ("userId", 1), ("attemptNo", 1)], unique=True)
         database.video_results.create_index([("taskId", 1), ("userId", 1), ("submittedAt", -1)])
         database.video_results.create_index([("pending", 1), ("submittedAt", 1)])
+        database.video_results.create_index([("gradingJobStatus", 1), ("gradingJobNextAttemptAt", 1)])
+        database.video_upload_sessions.create_index("expiresAt", expireAfterSeconds=0)
 
         database.live_results.create_index([("taskId", 1), ("userId", 1)])
         database.live_results.create_index([("cameraId", 1), ("startedAt", -1)])
@@ -94,8 +96,12 @@ async def lifespan(app: FastAPI):
     try:
         from app.services.kafka_producer import kafka_producer
         from app.services.kafka_consumer import kafka_result_consumer
+        from app.services.grading_outbox import grading_outbox_dispatcher
         await kafka_producer.start()
         await kafka_result_consumer.start()
+        await grading_outbox_dispatcher.start()
+        from app.services.ai_mock_worker import ai_mock_worker
+        await ai_mock_worker.start()
     except Exception as e:
         logger.warning("Could not initialize Kafka services: %s", e)
 
@@ -105,6 +111,10 @@ async def lifespan(app: FastAPI):
     try:
         from app.services.kafka_producer import kafka_producer
         from app.services.kafka_consumer import kafka_result_consumer
+        from app.services.grading_outbox import grading_outbox_dispatcher
+        from app.services.ai_mock_worker import ai_mock_worker
+        await ai_mock_worker.stop()
+        await grading_outbox_dispatcher.stop()
         await kafka_result_consumer.stop()
         await kafka_producer.stop()
     except Exception as e:

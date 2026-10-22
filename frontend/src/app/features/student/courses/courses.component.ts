@@ -21,6 +21,7 @@ import { environment } from '../../../../environments/environment';
 import { ApiResponse } from '../../../core/models/auth.model';
 import { AuthService } from '../../../core/services/auth.service';
 import { VideoResultService } from '../../../core/services/video-result.service';
+import { VideoResult } from '../../../core/models/video-result.model';
 import {
   Course,
   CourseDetailInfo,
@@ -28,6 +29,9 @@ import {
   AssessmentAttempt,
   CourseGradesSummary
 } from './models/course-detail.model';
+
+const STATUS_POLL_INTERVAL_MS = 3000;
+const STATUS_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
 @Component({
   selector: 'app-courses',
@@ -85,6 +89,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
   toastMessage = signal<string>('');
   isToastVisible = signal<boolean>(false);
   private toastTimer: any = null;
+  private pollTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   // Base courses list
   courses = signal<Course[]>([]);
@@ -209,7 +214,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
         if (!data || !data.tasks || data.tasks.length === 0) return;
 
         const mappedAssessments: AssessmentItem[] = data.tasks.map((t: any, idx: number) => {
-          const isExam = t.category === 'exam' || idx === data.tasks.length - 1;
+          const isExam = t.category === 'exam';
           const type = isExam ? 'final' : (idx === 0 ? 'tx1' : 'tx2');
           const hasScore = t.score !== null && t.score !== undefined;
 
@@ -245,8 +250,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
             id: t.taskId || `task-${idx}`,
             name: formattedName,
             type: type as any,
-            category: isExam ? 'exam' : 'practice',
-            gradingMethod: isExam ? 'Lần duy nhất' : 'Lần cao nhất',
+            gradingMethod: 'Lần cao nhất',
             timeLimit: isExam ? '60 phút' : 'Không giới hạn',
             openTime: '01/09/2026 08:00',
             closeTime: '20/11/2026 23:59',
@@ -299,17 +303,17 @@ export class CoursesComponent implements OnInit, OnDestroy {
         const user = this.authService.currentUser();
         const studentId = user?.id || user?.user_code;
         if (studentId) {
-          this.videoResultService.getVideoResults({ student_id: studentId }).subscribe({
+          this.videoResultService.getVideoResults({ student_id: studentId, page_size: 100 }).subscribe({
             next: (vrRes) => {
-              const videoList = vrRes?.data || [];
+              const videoList = vrRes?.data?.items || [];
               if (videoList.length > 0) {
                 this.courseDetails.update((prev) => {
                   const currCourse = prev[courseId];
                   if (!currCourse) return prev;
                   const updatedAssessments = currCourse.assessments.map((ass) => {
-                    const matchingVideos = videoList.filter(
-                      (v) => v.exercise_id === ass.id && (!v.course_id || v.course_id === courseId)
-                    );
+                    const matchingVideos = videoList
+                      .filter((v) => v.taskId === ass.id)
+                      .sort((x, y) => y.attemptNo - x.attemptNo);
                     if (matchingVideos.length > 0) {
                       const videoAttempts: AssessmentAttempt[] = matchingVideos.map((v, i) => ({
                         attemptNo: matchingVideos.length - i,
@@ -317,25 +321,13 @@ export class CoursesComponent implements OnInit, OnDestroy {
                         pending: v.status === 'pending' || v.status === 'processing',
                         score: v.score !== null && v.score !== undefined ? v.score : undefined,
                         videoUrl: v.video_url,
-                        videoResultId: v.id,
-                        isExamSubmission: ass.category === 'exam' || i === 0
+                        videoResultId: v.id
                       }));
                       const isPending = matchingVideos.some((v) => v.status === 'pending' || v.status === 'processing');
-                      const latestScore = matchingVideos.find(v => v.score !== null && v.score !== undefined)?.score;
-
-                      const examAtt = ass.category === 'exam'
-                        ? (videoAttempts.length > 0 ? videoAttempts[0] : null)
-                        : (videoAttempts.find(a => a.isExamSubmission) || null);
-                      const isExamSub = !!examAtt || (ass.category === 'exam' && videoAttempts.length > 0);
-
                       return {
                         ...ass,
                         status: isPending ? ('pending' as const) : ass.status,
-                        attempts: videoAttempts,
-                        practiceAttempts: ass.category === 'exam' ? [] : videoAttempts.filter(a => !a.isExamSubmission),
-                        examAttempt: examAtt,
-                        isExamSubmitted: isExamSub,
-                        aiPredictedScore: latestScore ?? ass.score ?? ass.aiPredictedScore
+                        attempts: videoAttempts
                       };
                     }
                     return ass;
@@ -356,6 +348,53 @@ export class CoursesComponent implements OnInit, OnDestroy {
       },
       error: () => {}
     });
+  }
+
+  /** Map một bài nộp từ API sang dòng lịch sử nộp bài. */
+  private toAttempt(v: VideoResult): AssessmentAttempt {
+    const score = v.finalScore ?? v.aiScore ?? undefined;
+    const failed = v.status === 'failed';
+    // Dữ liệu cũ có thể thiếu status nhưng đã có điểm => coi là đã chấm
+    const pending = !failed && score === undefined && (v.pending || v.status === 'pending' || v.status === 'processing');
+    const duration = v.durationSec ? `${Math.floor(v.durationSec / 60)}:${String(v.durationSec % 60).padStart(2, '0')}` : undefined;
+    return {
+      attemptNo: v.attemptNo,
+      date: new Date(v.submittedAt).toLocaleString('vi-VN'),
+      duration,
+      pending,
+      failed,
+      error: v.error || undefined,
+      score,
+      feedback: v.teacherComment || v.aiComment || undefined,
+      videoResultId: v.id
+    };
+  }
+
+  /** Poll trạng thái chấm điểm sau khi upload cho tới khi completed/failed rồi tải lại kết quả. */
+  private pollSubmission(resultId: string, courseId: string, startedAt = Date.now()): void {
+    if (Date.now() - startedAt > STATUS_POLL_TIMEOUT_MS) return;
+    this.pollTimers.set(
+      resultId,
+      setTimeout(() => {
+        this.videoResultService.getSubmissionStatus(resultId).subscribe({
+          next: (res) => {
+            const st = res?.data;
+            if (st?.status === 'completed' || st?.status === 'failed') {
+              this.pollTimers.delete(resultId);
+              this.loadCourseAssessments(courseId);
+              this.showToast(
+                st.status === 'completed'
+                  ? `Đã có kết quả chấm điểm: ${st.finalScore ?? st.aiScore} điểm.`
+                  : `Chấm điểm thất bại (${st.error || 'lỗi không xác định'}). Vui lòng thử nộp lại.`
+              );
+              return;
+            }
+            this.pollSubmission(resultId, courseId, startedAt);
+          },
+          error: () => this.pollSubmission(resultId, courseId, startedAt)
+        });
+      }, STATUS_POLL_INTERVAL_MS)
+    );
   }
 
   // Fallback course detail if route is loaded before items
@@ -410,6 +449,18 @@ export class CoursesComponent implements OnInit, OnDestroy {
     return course.assessments.find((a: AssessmentItem) => a.id === this.selectedAssessmentId()) || course.assessments[0] || this.defaultAssessment;
   });
 
+  /** Bài kiểm tra giữa kỳ / bài thi cuối kỳ: chỉ được nộp 1 lần. */
+  isExam(assessment: AssessmentItem): boolean {
+    return assessment.type === 'midterm' || assessment.type === 'final';
+  }
+
+  // Bài thi đã có lần nộp hợp lệ (lần chấm thất bại vẫn cho nộp lại)
+  examSubmitted = computed<boolean>(() => {
+    const assessment = this.currentAssessment();
+    if (!this.isExam(assessment)) return false;
+    return assessment.status === 'graded' || assessment.attempts.some((a: AssessmentAttempt) => !a.failed);
+  });
+
   // Highest score for current assessment
   highestScore = computed<number | null>(() => {
     const assessment = this.currentAssessment();
@@ -438,6 +489,8 @@ export class CoursesComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     clearTimeout(this.toastTimer);
+    this.pollTimers.forEach((timer) => clearTimeout(timer));
+    this.pollTimers.clear();
   }
 
   setTab(tab: 'all' | 'active' | 'done'): void {
@@ -467,13 +520,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
   }
 
   // Submit Video Modal handlers
-  openSubmitModal(type: 'practice' | 'exam' = 'practice'): void {
-    const assessment = this.currentAssessment();
-    if (type === 'exam' && assessment.isExamSubmitted) {
-      this.showToast('Bài kiểm tra chính thức chỉ được nộp 1 lần duy nhất và bạn đã hoàn thành nộp bài!');
-      return;
-    }
-    this.submitType.set(type);
+  openSubmitModal(): void {
     this.selectedFile.set(null);
     this.selectedFileName.set('');
     this.hasVideoSelected.set(false);
@@ -523,20 +570,18 @@ export class CoursesComponent implements OnInit, OnDestroy {
 
   submitVideo(): void {
     const file = this.selectedFile();
-    if (!file) return;
+    if (!file || this.examSubmitted()) return;
 
     const courseId = this.selectedCourseId();
     const assessmentId = this.selectedAssessmentId();
     const user = this.authService.currentUser();
     const studentId = user?.id || user?.user_code || '67890';
-    const isExam = this.submitType() === 'exam';
 
     this.isUploading.set(true);
     this.uploadProgress.set(0);
 
     this.videoResultService.uploadVideo({
       file,
-      student_id: studentId,
       exercise_id: assessmentId,
       course_id: courseId
     }).subscribe({
@@ -559,19 +604,12 @@ export class CoursesComponent implements OnInit, OnDestroy {
               const attemptNo = (currentAss.attempts?.length || 0) + 1;
 
               const newAttempt: AssessmentAttempt = {
-                attemptNo: attemptNo,
+                attemptNo: videoResult?.attemptNo || attemptNo,
                 date: dateStr,
                 pending: true,
                 videoUrl: videoResult?.video_url,
-                videoResultId: videoResult?.id,
-                isExamSubmission: isExam
+                videoResultId: videoResult?.id
               };
-
-              const updatedPractice = isExam
-                ? (currentAss.practiceAttempts || [])
-                : [newAttempt, ...(currentAss.practiceAttempts || [])];
-              const updatedExam = isExam ? newAttempt : (currentAss.examAttempt || null);
-              const aiScore = videoResult?.score ?? (isExam ? 8.5 : 8.0);
 
               const updatedAssessments = [...course.assessments];
               updatedAssessments[assessmentIndex] = {
@@ -593,11 +631,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
           }
 
           this.closeSubmitModal();
-          this.showToast(
-            isExam
-              ? 'Nộp video bài kiểm tra thành công! Hệ thống AI đang phân tích và chấm điểm dự kiến bài thi của bạn.'
-              : 'Nộp video luyện tập thành công! Bạn có thể xem lại kết quả phân tích động tác của AI.'
-          );
+          this.showToast('Nộp video thành công! Video đã lưu trữ trên MinIO và đang chờ hệ thống AI xử lý.');
         }
       },
       error: (err) => {
@@ -616,8 +650,8 @@ export class CoursesComponent implements OnInit, OnDestroy {
     if (attempt.videoResultId && !attempt.videoUrl) {
       this.videoResultService.getVideoStreamUrl(attempt.videoResultId).subscribe({
         next: (res) => {
-          if (res?.data?.video_url) {
-            this.selectedAttempt.update(curr => curr ? { ...curr, videoUrl: res.data.video_url } : null);
+          if (res?.data?.videoUrl) {
+            this.selectedAttempt.update(curr => curr ? { ...curr, videoUrl: res.data.videoUrl } : null);
           }
         },
         error: () => {}

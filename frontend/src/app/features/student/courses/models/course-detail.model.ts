@@ -4,6 +4,9 @@ export interface AssessmentAttempt {
   duration?: string;
   score?: number;
   pending?: boolean;
+  failed?: boolean;
+  error?: string;
+  feedback?: string;
   videoUrl?: string;
   videoResultId?: string;
   aiFeedback?: string;

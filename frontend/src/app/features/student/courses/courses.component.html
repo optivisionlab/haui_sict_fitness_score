@@ -2,434 +2,485 @@
 
   <!-- ==================== VIEW 1: DANH SÁCH MÔN HỌC ==================== -->
   @if (activeView() === 'list') {
-    <h1 class="page-title">Khóa học của tôi</h1>
+  <h1 class="page-title">Khóa học của tôi</h1>
 
-    <div class="card">
-      <!-- Tab Bar -->
-      <div class="tab-bar">
-        <button type="button" class="tab-btn" [class.active]="selectedTab() === 'all'" (click)="setTab('all')">
-          Tất cả khóa học
-        </button>
-        <button type="button" class="tab-btn" [class.active]="selectedTab() === 'active'" (click)="setTab('active')">
-          Đang học
-        </button>
-        <button type="button" class="tab-btn" [class.active]="selectedTab() === 'done'" (click)="setTab('done')">
-          Đã hoàn thành
-        </button>
-      </div>
-
-      <!-- Search Input -->
-      <div class="search-wrap">
-        <app-search-input
-          label="Tìm kiếm khóa học"
-          placeholder="Tìm kiếm theo tên môn học, giảng viên..."
-          [(value)]="searchKeyword">
-        </app-search-input>
-      </div>
-
-      <!-- Courses List -->
-      <div class="courses-list">
-        @for (course of filteredCourses(); track course.id) {
-          <div class="course-card">
-            <!-- Thumbnail -->
-            <div class="course-thumb" [class.teal]="course.iconType === 'chay'" (click)="onSelectCourse(course.id)">
-              @if (course.iconType === 'pickleball') {
-                <svg lucideDumbbell [size]="40"></svg>
-              } @else {
-                <svg lucideFootprints [size]="40"></svg>
-              }
-            </div>
-
-            <!-- Course Body -->
-            <div class="course-body">
-              <div class="course-top-info">
-                <span class="course-code-badge">Mã lớp học phần: {{ course.code }}</span>
-              </div>
-
-              <h3 class="course-title" (click)="onSelectCourse(course.id)">{{ course.name }}</h3>
-
-              <div class="course-teacher">
-                <span class="avatar">
-                  <svg lucideUser [size]="14"></svg>
-                </span>
-                <span>Giảng viên: <strong>{{ course.teacher }}</strong></span>
-              </div>
-
-              <!-- Thanh tóm tắt điểm sinh viên (nếu có bất kỳ điểm nào) -->
-              @if (course.gradesSummary?.hasAnyGrade) {
-                <div class="course-grades-summary-bar">
-                  <span class="summary-label">Điểm đã đạt:</span>
-                  <div class="grade-pill-group">
-                    @if (course.gradesSummary?.kt1Score !== undefined) {
-                      <span class="summary-pill">KT1: <strong>{{ course.gradesSummary?.kt1Score }}</strong></span>
-                    }
-                    @if (course.gradesSummary?.kt2Score !== undefined) {
-                      <span class="summary-pill">KT2: <strong>{{ course.gradesSummary?.kt2Score }}</strong></span>
-                    }
-                    @if (course.gradesSummary?.processScore !== undefined) {
-                      <span class="summary-pill">ĐQT: <strong>{{ course.gradesSummary?.processScore }}</strong></span>
-                    }
-                    @if (course.gradesSummary?.examScore !== undefined) {
-                      <span class="summary-pill">Điểm thi: <strong>{{ course.gradesSummary?.examScore }}</strong></span>
-                    }
-                    @if (course.gradesSummary?.finalScore !== undefined) {
-                      <span class="summary-pill highlight">Tổng kết: <strong>{{ course.gradesSummary?.finalScore }}</strong></span>
-                    }
-                  </div>
-                </div>
-              }
-
-              <div class="course-progress-row">
-                <div class="progress-wrap">
-                  <div class="progress-label">Tiến độ hoàn thành: {{ course.progress }}%</div>
-                  <div class="progress-bar-bg">
-                    <div class="progress-bar-fill" [style.width.%]="course.progress"></div>
-                  </div>
-                </div>
-
-                <button type="button" class="btn-primary" (click)="onSelectCourse(course.id)">
-                  Vào học ngay
-                </button>
-              </div>
-            </div>
-          </div>
-        } @empty {
-          <div class="empty-state">
-            Không tìm thấy môn học phù hợp.
-          </div>
-        }
-      </div>
+  <div class="card">
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <button type="button" class="tab-btn" [class.active]="selectedTab() === 'all'" (click)="setTab('all')">
+        Tất cả khóa học
+      </button>
+      <button type="button" class="tab-btn" [class.active]="selectedTab() === 'active'" (click)="setTab('active')">
+        Đang học
+      </button>
+      <button type="button" class="tab-btn" [class.active]="selectedTab() === 'done'" (click)="setTab('done')">
+        Đã hoàn thành
+      </button>
     </div>
+
+    <!-- Search Input -->
+    <div class="search-wrap">
+      <app-search-input label="Tìm kiếm khóa học" placeholder="Tìm kiếm theo tên môn học, giảng viên..."
+        [(value)]="searchKeyword">
+      </app-search-input>
+    </div>
+
+    <!-- Courses List -->
+    <div class="courses-list">
+      @for (course of filteredCourses(); track course.id) {
+      <div class="course-card">
+        <!-- Thumbnail -->
+        <div class="course-thumb" [class.teal]="course.iconType === 'chay'" (click)="onSelectCourse(course.id)">
+          @if (course.iconType === 'pickleball') {
+          <svg lucideDumbbell [size]="40"></svg>
+          } @else {
+          <svg lucideFootprints [size]="40"></svg>
+          }
+        </div>
+
+        <!-- Course Body -->
+        <div class="course-body">
+          <div class="course-top-info">
+            <span class="course-code-badge">Mã lớp học phần: {{ course.code }}</span>
+          </div>
+
+          <h3 class="course-title" (click)="onSelectCourse(course.id)">{{ course.name }}</h3>
+
+          <div class="course-teacher">
+            <span class="avatar">
+              <svg lucideUser [size]="14"></svg>
+            </span>
+            <span>Giảng viên: <strong>{{ course.teacher }}</strong></span>
+          </div>
+
+          <!-- Thanh tóm tắt điểm sinh viên (nếu có bất kỳ điểm nào) -->
+          @if (course.gradesSummary?.hasAnyGrade) {
+          <div class="course-grades-summary-bar">
+            <span class="summary-label">Điểm đã đạt:</span>
+            <div class="grade-pill-group">
+              @if (course.gradesSummary?.kt1Score !== undefined) {
+              <span class="summary-pill">KT1: <strong>{{ course.gradesSummary?.kt1Score }}</strong></span>
+              }
+              @if (course.gradesSummary?.kt2Score !== undefined) {
+              <span class="summary-pill">KT2: <strong>{{ course.gradesSummary?.kt2Score }}</strong></span>
+              }
+              @if (course.gradesSummary?.processScore !== undefined) {
+              <span class="summary-pill">ĐQT: <strong>{{ course.gradesSummary?.processScore }}</strong></span>
+              }
+              @if (course.gradesSummary?.examScore !== undefined) {
+              <span class="summary-pill">Điểm thi: <strong>{{ course.gradesSummary?.examScore }}</strong></span>
+              }
+              @if (course.gradesSummary?.finalScore !== undefined) {
+              <span class="summary-pill highlight">Tổng kết: <strong>{{ course.gradesSummary?.finalScore
+                  }}</strong></span>
+              }
+            </div>
+          </div>
+          }
+
+          <div class="course-progress-row">
+            <div class="progress-wrap">
+              <div class="progress-label">Tiến độ hoàn thành: {{ course.progress }}%</div>
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" [style.width.%]="course.progress"></div>
+              </div>
+            </div>
+
+            <button type="button" class="btn-primary" (click)="onSelectCourse(course.id)">
+              Vào học ngay
+            </button>
+          </div>
+        </div>
+      </div>
+      } @empty {
+      <div class="empty-state">
+        Không tìm thấy môn học phù hợp.
+      </div>
+      }
+    </div>
+  </div>
   }
 
   <!-- ==================== VIEW 2: MÀN HÌNH MÔN HỌC (DANH SÁCH BÀI ĐÁNH GIÁ) ==================== -->
   @if (activeView() === 'course') {
-    @let c = currentCourse();
-    <div class="breadcrumb">
-      <span class="crumb-link" (click)="showView('list')">Khóa học của tôi</span>
-      <span class="crumb-sep">/</span>
-      <span>{{ c.title }}</span>
-    </div>
+  @let c = currentCourse();
+  <div class="breadcrumb">
+    <span class="crumb-link" (click)="showView('list')">Khóa học của tôi</span>
+    <span class="crumb-sep">/</span>
+    <span>{{ c.title }}</span>
+  </div>
 
-    <!-- Thông tin môn học -->
-    <div class="card course-header-card">
-      <div class="course-header-top">
-        <div class="course-thumb small" [class.teal]="c.thumbClass === 'teal'">
-          @if (c.thumbIcon === 'pickleball') {
-            <svg lucideDumbbell [size]="32"></svg>
-          } @else {
-            <svg lucideFootprints [size]="32"></svg>
-          }
-        </div>
-        <div class="course-header-info">
-          <div class="course-code-row">
-            <span class="code-badge">Mã lớp học phần: {{ c.code }}</span>
-            <span class="status-badge">Đang diễn ra</span>
-          </div>
-          <h2 class="course-name">{{ c.title }}</h2>
-          <div class="course-meta-text">
-            <span>Giảng viên: <strong>{{ c.teacher }}</strong></span>
-            <span class="dot-sep">•</span>
-            <span>Thời gian: {{ c.dates }}</span>
-            <span class="dot-sep">•</span>
-            <span>Thi dự kiến: {{ c.examDate }}</span>
-          </div>
-        </div>
-      </div>
-      <p class="course-desc">{{ c.desc }}</p>
-    </div>
-
-    <!-- Danh sách bài kiểm tra & nộp video -->
-    <div class="card">
-      <div class="section-header">
-        <div>
-          <h3 class="section-heading">Danh sách bài kiểm tra & kỹ thuật đánh giá</h3>
-          <p class="section-subdesc">Bao gồm các bài kiểm tra kỹ thuật (KT1, KT2, ...) và bài thi kết thúc học phần</p>
-        </div>
-        <span class="section-sub">{{ c.assessments.length }} bài đánh giá</span>
-      </div>
-
-      <div class="assessment-list">
-        @for (item of c.assessments; track item.id) {
-          <div class="assessment-row" (click)="onSelectAssessment(item.id)">
-            <div class="assessment-icon">
-              <svg lucideFileText [size]="20"></svg>
-            </div>
-
-            <div class="assessment-main">
-              <div class="assessment-name">{{ item.name }}</div>
-              <div class="assessment-info">
-                <span>Hạn nộp: {{ item.closeTime }}</span>
-                <span class="dot-sep">•</span>
-                <span class="mode-badge-practice">Luyện tập: Nộp nhiều lần</span>
-                <span class="dot-sep">•</span>
-                <span class="mode-badge-exam">Kiểm tra: 1 lần duy nhất</span>
-              </div>
-            </div>
-
-            <div class="assessment-right">
-              @if (item.aiPredictedScore !== undefined || item.status === 'graded') {
-                <span class="grade-pill graded">
-                  <svg lucideCheckCircle2 [size]="14"></svg>
-                  <span>Điểm dự kiến AI: {{ item.aiPredictedScore ?? item.score }}</span>
-                </span>
-              } @else if (item.status === 'pending') {
-                <span class="grade-pill pending">
-                  <svg lucideClock [size]="14"></svg>
-                  <span>AI đang chấm</span>
-                </span>
-              } @else {
-                <span class="grade-pill not-submitted">
-                  <span>Chưa nộp</span>
-                </span>
-              }
-
-              <svg lucideChevronRight [size]="18" class="chevron-arrow"></svg>
-            </div>
-          </div>
-        } @empty {
-          <div class="empty-state" style="padding: 28px; text-align: center; color: var(--color-text-secondary, #64748b);">
-            Chưa có bài kiểm tra nào cho môn học này.
-          </div>
+  <!-- Thông tin môn học -->
+  <div class="card course-header-card">
+    <div class="course-header-top">
+      <div class="course-thumb small" [class.teal]="c.thumbClass === 'teal'">
+        @if (c.thumbIcon === 'pickleball') {
+        <svg lucideDumbbell [size]="32"></svg>
+        } @else {
+        <svg lucideFootprints [size]="32"></svg>
         }
       </div>
+      <div class="course-header-info">
+        <div class="course-code-row">
+          <span class="code-badge">Mã lớp học phần: {{ c.code }}</span>
+          <span class="status-badge">Đang diễn ra</span>
+        </div>
+        <h2 class="course-name">{{ c.title }}</h2>
+        <div class="course-meta-text">
+          <span>Giảng viên: <strong>{{ c.teacher }}</strong></span>
+          <span class="dot-sep">•</span>
+          <span>Thời gian: {{ c.dates }}</span>
+          <span class="dot-sep">•</span>
+          <span>Thi dự kiến: {{ c.examDate }}</span>
+        </div>
+      </div>
     </div>
+    <p class="course-desc">{{ c.desc }}</p>
+  </div>
+
+  <!-- Danh sách bài kiểm tra & nộp video -->
+  <div class="card">
+    <div class="section-header">
+      <div>
+        <h3 class="section-heading">Danh sách bài kiểm tra & kỹ thuật đánh giá</h3>
+        <p class="section-subdesc">Bao gồm các bài kiểm tra kỹ thuật (KT1, KT2, ...) và bài thi kết thúc học phần</p>
+      </div>
+      <span class="section-sub">{{ c.assessments.length }} bài đánh giá</span>
+    </div>
+
+    <div class="assessment-list">
+      @for (item of c.assessments; track item.id) {
+      <div class="assessment-row" (click)="onSelectAssessment(item.id)">
+        <div class="assessment-icon">
+          <svg lucideFileText [size]="20"></svg>
+        </div>
+
+        <div class="assessment-main">
+          <div class="assessment-name">{{ item.name }}</div>
+          <div class="assessment-info">
+            <span>Hạn nộp: {{ item.closeTime }}</span>
+            <span class="dot-sep">•</span>
+            <span class="mode-badge-practice">Luyện tập: Nộp nhiều lần</span>
+            <span class="dot-sep">•</span>
+            <span class="mode-badge-exam">Kiểm tra: 1 lần duy nhất</span>
+          </div>
+        </div>
+
+        <div class="assessment-right">
+          @if (item.aiPredictedScore !== undefined || item.status === 'graded') {
+          <span class="grade-pill graded">
+            <svg lucideCheckCircle2 [size]="14"></svg>
+            <span>Điểm dự kiến AI: {{ item.aiPredictedScore ?? item.score }}</span>
+          </span>
+          } @else if (item.status === 'pending') {
+          <span class="grade-pill pending">
+            <svg lucideClock [size]="14"></svg>
+            <span>AI đang chấm</span>
+          </span>
+          } @else {
+          <span class="grade-pill not-submitted">
+            <span>Chưa nộp</span>
+          </span>
+          }
+
+          <svg lucideChevronRight [size]="18" class="chevron-arrow"></svg>
+        </div>
+      </div>
+      } @empty {
+      <div class="empty-state" style="padding: 28px; text-align: center; color: var(--color-text-secondary, #64748b);">
+        Chưa có bài kiểm tra nào cho môn học này.
+      </div>
+      }
+    </div>
+  </div>
   }
 
   <!-- ==================== VIEW 3: CHI TIẾT BÀI KIỂM TRA (LUYỆN TẬP & NỘP BÀI KIỂM TRA) ==================== -->
   @if (activeView() === 'assessment') {
-    @let c = currentCourse();
-    @let a = currentAssessment();
+  @let c = currentCourse();
+  @let a = currentAssessment();
 
-    <div class="breadcrumb">
-      <span class="crumb-link" (click)="showView('list')">Khóa học của tôi</span>
-      <span class="crumb-sep">/</span>
-      <span class="crumb-link" (click)="showView('course')">{{ c.title }}</span>
-      <span class="crumb-sep">/</span>
-      <span>{{ a.name }}</span>
+  <div class="breadcrumb">
+    <span class="crumb-link" (click)="showView('list')">Khóa học của tôi</span>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-link" (click)="showView('course')">{{ c.title }}</span>
+    <span class="crumb-sep">/</span>
+    <span>{{ a.name }}</span>
+  </div>
+
+  <div class="back-action-bar">
+    <button type="button" class="btn-back" (click)="showView('course')">
+      <svg lucideArrowLeft [size]="16"></svg>
+      <span>Quay lại danh sách bài kiểm tra</span>
+    </button>
+  </div>
+
+  <!-- Thông tin bài kiểm tra & Yêu cầu kỹ thuật -->
+  <div class="card">
+    <div class="assessment-detail-header">
+      <div class="assessment-header-title-row">
+        <div>
+          <span class="course-code-badge">Mã lớp học phần: {{ c.code }}</span>
+          <h2 class="assessment-detail-title">{{ a.name }}</h2>
+        </div>
+        @if (a.aiPredictedScore !== undefined) {
+        <div class="predicted-score-badge">
+          <span class="score-label">Điểm đánh giá dự kiến (AI)</span>
+          <span class="score-val">{{ a.aiPredictedScore }} / 10</span>
+        </div>
+        }
+      </div>
+
+      <div class="assessment-detail-facts">
+        <div>Phương pháp chấm: <strong>{{ a.gradingMethod }}</strong></div>
+        <div>Giới hạn thời gian: <strong>{{ a.timeLimit }}</strong></div>
+        <div>Thời gian mở: <strong>{{ a.openTime }}</strong></div>
+        <div>Hạn nộp bài: <strong>{{ a.closeTime }}</strong></div>
+      </div>
+
+      <<<<<<< HEAD @if (a.guidelines) { <div class="guidelines-card">
+        <div class="guidelines-title">📋 Yêu cầu kỹ thuật & Hướng dẫn:</div>
+        <p class="guidelines-text">{{ a.guidelines }}</p>
+        =======
+        <!-- Bài tập: nộp nhiều lần | Bài kiểm tra/thi: nút riêng, chỉ nộp 1 lần -->
+        <div class="assessment-action-row">
+          @if (isExam(a)) {
+          <button type="button" class="btn-primary btn-exam" [disabled]="examSubmitted()" (click)="openSubmitModal()">
+            <svg lucideUploadCloud [size]="18"></svg>
+            <span>{{ examSubmitted() ? 'Đã nộp bài thi' : 'Nộp video bài thi' }}</span>
+          </button>
+          <span class="submit-rule-hint exam">
+            Bài kiểm tra/bài thi chỉ được nộp <strong>1 lần duy nhất</strong> và chấm điểm 1 lần.
+          </span>
+          } @else {
+          <button type="button" class="btn-primary" (click)="openSubmitModal()">
+            <svg lucideUploadCloud [size]="18"></svg>
+            <span>Nộp bài tập</span>
+          </button>
+          <span class="submit-rule-hint">Bài tập được nộp nhiều lần, hệ thống lấy điểm lần cao nhất.</span>
+          }
+        </div>
+    </div>
+  </div>
+
+  <!-- Kết quả & Lịch sử nộp bài -->
+  <div class="card">
+    <div class="section-header">
+      <h3 class="section-heading">{{ isExam(a) ? 'Bài thi đã nộp' : 'Lịch sử các lần nộp bài' }}</h3>
+      @if (highestScore() !== null) {
+      <div class="highest-score-tag">
+        {{ isExam(a) ? 'Điểm bài thi' : 'Điểm cao nhất' }}: <strong>{{ highestScore() }}</strong>
+        >>>>>>> e1c19903cc0cd3bfc598b744e1a47e418003eba5
+      </div>
+      }
+    </div>
+  </div>
+
+  <!-- PHẦN 1: BÀI KIỂM TRA CHÍNH THỨC (CHỈ ĐƯỢC NỘP 1 LẦN DUY NHẤT) -->
+  <div class="card exam-submission-card">
+    <div class="section-header">
+      <div>
+        <h3 class="section-heading">1. Nộp bài kiểm tra chính thức</h3>
+        <p class="section-subdesc">Chỉ được nộp đúng 1 lần duy nhất để lấy điểm kiểm tra chính thức</p>
+      </div>
+      <span class="rule-badge-exam">Chỉ nộp 1 lần</span>
     </div>
 
-    <div class="back-action-bar">
-      <button type="button" class="btn-back" (click)="showView('course')">
-        <svg lucideArrowLeft [size]="16"></svg>
-        <span>Quay lại danh sách bài kiểm tra</span>
+    @if (a.isExamSubmitted || a.examAttempt) {
+    <div class="exam-completed-box">
+      <div class="completed-icon-wrap">
+        <svg lucideCheckCircle2 [size]="28"></svg>
+      </div>
+      <div class="completed-info">
+        <h4 class="completed-title">Đã hoàn thành nộp bài kiểm tra</h4>
+        <p class="completed-sub">
+          Bài nộp đã được ghi nhận vào hệ thống. Điểm số đánh giá dự kiến do AI chấm sẽ được giảng viên xem xét và chốt
+          chính thức.
+        </p>
+        @if (a.aiPredictedScore !== undefined || a.examAttempt?.score !== undefined) {
+        <div class="exam-score-highlight-box">
+          <span>Điểm đánh giá dự kiến của AI:</span>
+          <strong class="score-num">{{ a.aiPredictedScore ?? a.examAttempt?.score }} / 10</strong>
+        </div>
+        }
+      </div>
+      @if (a.examAttempt) {
+      <button type="button" class="btn-secondary" (click)="openAttemptReview(a.examAttempt!)">
+        Xem lại bài thi
+      </button>
+      }
+    </div>
+    } @else {
+    <div class="exam-pending-box">
+      <div class="exam-warning-note">
+        <svg lucideAlertCircle [size]="20"></svg>
+        <div>
+          <strong>Lưu ý quan trọng:</strong> Bài kiểm tra chính thức này <strong>chỉ được nộp 1 lần duy nhất</strong>.
+          Bạn nên luyện tập các lần nộp ở mục bên dưới trước khi thực hiện nộp bài chính thức.
+        </div>
+      </div>
+      <div class="action-submit-exam-wrap">
+        <button type="button" class="btn-primary btn-submit-exam" (click)="openSubmitModal('exam')">
+          <svg lucideUploadCloud [size]="18"></svg>
+          <span>Nộp bài kiểm tra (1 lần duy nhất)</span>
+        </button>
+      </div>
+    </div>
+    }
+  </div>
+
+  <!-- PHẦN 2: LUYỆN TẬP KỸ THUẬT (CÓ THỂ NỘP NHIỀU LẦN ĐẾN KHI HẾT HẠN) -->
+  <div class="card practice-section-card">
+    <div class="section-header">
+      <div>
+        <h3 class="section-heading">2. Luyện tập kỹ thuật & Nộp bài tập</h3>
+        <p class="section-subdesc">Có thể nộp video luyện tập nhiều lần cho đến khi hết hạn để AI phân tích và cải thiện
+          động tác</p>
+      </div>
+      <button type="button" class="btn-secondary btn-submit-practice" (click)="openSubmitModal('practice')">
+        <svg lucideUploadCloud [size]="16"></svg>
+        <span>Nộp bài luyện tập mới</span>
       </button>
     </div>
 
-    <!-- Thông tin bài kiểm tra & Yêu cầu kỹ thuật -->
-    <div class="card">
-      <div class="assessment-detail-header">
-        <div class="assessment-header-title-row">
-          <div>
-            <span class="course-code-badge">Mã lớp học phần: {{ c.code }}</span>
-            <h2 class="assessment-detail-title">{{ a.name }}</h2>
-          </div>
-          @if (a.aiPredictedScore !== undefined) {
-            <div class="predicted-score-badge">
-              <span class="score-label">Điểm đánh giá dự kiến (AI)</span>
-              <span class="score-val">{{ a.aiPredictedScore }} / 10</span>
-            </div>
-          }
-        </div>
-
-        <div class="assessment-detail-facts">
-          <div>Phương pháp chấm: <strong>{{ a.gradingMethod }}</strong></div>
-          <div>Giới hạn thời gian: <strong>{{ a.timeLimit }}</strong></div>
-          <div>Thời gian mở: <strong>{{ a.openTime }}</strong></div>
-          <div>Hạn nộp bài: <strong>{{ a.closeTime }}</strong></div>
-        </div>
-
-        @if (a.guidelines) {
-          <div class="guidelines-card">
-            <div class="guidelines-title">📋 Yêu cầu kỹ thuật & Hướng dẫn:</div>
-            <p class="guidelines-text">{{ a.guidelines }}</p>
-          </div>
-        }
-      </div>
+    @if (!a.practiceAttempts || a.practiceAttempts.length === 0) {
+    <div class="empty-attempts-box">
+      <svg lucideAlertCircle [size]="32" class="empty-icon"></svg>
+      <<<<<<< HEAD <div class="empty-title">Chưa có bài nộp luyện tập nào.
     </div>
-
-    <!-- PHẦN 1: BÀI KIỂM TRA CHÍNH THỨC (CHỈ ĐƯỢC NỘP 1 LẦN DUY NHẤT) -->
-    <div class="card exam-submission-card">
-      <div class="section-header">
-        <div>
-          <h3 class="section-heading">1. Nộp bài kiểm tra chính thức</h3>
-          <p class="section-subdesc">Chỉ được nộp đúng 1 lần duy nhất để lấy điểm kiểm tra chính thức</p>
-        </div>
-        <span class="rule-badge-exam">Chỉ nộp 1 lần</span>
-      </div>
-
-      @if (a.isExamSubmitted || a.examAttempt) {
-        <div class="exam-completed-box">
-          <div class="completed-icon-wrap">
-            <svg lucideCheckCircle2 [size]="28"></svg>
-          </div>
-          <div class="completed-info">
-            <h4 class="completed-title">Đã hoàn thành nộp bài kiểm tra</h4>
-            <p class="completed-sub">
-              Bài nộp đã được ghi nhận vào hệ thống. Điểm số đánh giá dự kiến do AI chấm sẽ được giảng viên xem xét và chốt chính thức.
-            </p>
-            @if (a.aiPredictedScore !== undefined || a.examAttempt?.score !== undefined) {
-              <div class="exam-score-highlight-box">
-                <span>Điểm đánh giá dự kiến của AI:</span>
-                <strong class="score-num">{{ a.aiPredictedScore ?? a.examAttempt?.score }} / 10</strong>
-              </div>
-            }
-          </div>
-          @if (a.examAttempt) {
-            <button type="button" class="btn-secondary" (click)="openAttemptReview(a.examAttempt!)">
-              Xem lại bài thi
-            </button>
-          }
-        </div>
-      } @else {
-        <div class="exam-pending-box">
-          <div class="exam-warning-note">
-            <svg lucideAlertCircle [size]="20"></svg>
-            <div>
-              <strong>Lưu ý quan trọng:</strong> Bài kiểm tra chính thức này <strong>chỉ được nộp 1 lần duy nhất</strong>.
-              Bạn nên luyện tập các lần nộp ở mục bên dưới trước khi thực hiện nộp bài chính thức.
-            </div>
-          </div>
-          <div class="action-submit-exam-wrap">
-            <button type="button" class="btn-primary btn-submit-exam" (click)="openSubmitModal('exam')">
-              <svg lucideUploadCloud [size]="18"></svg>
-              <span>Nộp bài kiểm tra (1 lần duy nhất)</span>
-            </button>
-          </div>
-        </div>
-      }
+    <div class="empty-desc">Nhấn vào nút "Nộp bài luyện tập mới" để gửi video thực hành và nhận phân tích dự kiến từ AI.
     </div>
-
-    <!-- PHẦN 2: LUYỆN TẬP KỸ THUẬT (CÓ THỂ NỘP NHIỀU LẦN ĐẾN KHI HẾT HẠN) -->
-    <div class="card practice-section-card">
-      <div class="section-header">
-        <div>
-          <h3 class="section-heading">2. Luyện tập kỹ thuật & Nộp bài tập</h3>
-          <p class="section-subdesc">Có thể nộp video luyện tập nhiều lần cho đến khi hết hạn để AI phân tích và cải thiện động tác</p>
-        </div>
-        <button type="button" class="btn-secondary btn-submit-practice" (click)="openSubmitModal('practice')">
-          <svg lucideUploadCloud [size]="16"></svg>
-          <span>Nộp bài luyện tập mới</span>
-        </button>
-      </div>
-
-      @if (!a.practiceAttempts || a.practiceAttempts.length === 0) {
-        <div class="empty-attempts-box">
-          <svg lucideAlertCircle [size]="32" class="empty-icon"></svg>
-          <div class="empty-title">Chưa có bài nộp luyện tập nào.</div>
-          <div class="empty-desc">Nhấn vào nút "Nộp bài luyện tập mới" để gửi video thực hành và nhận phân tích dự kiến từ AI.</div>
-        </div>
-      } @else {
-        <div class="table-responsive">
-          <table class="simple-table">
-            <thead>
-              <tr>
-                <th>Lần nộp</th>
-                <th>Thời gian</th>
-                <th>Thời lượng</th>
-                <th>Trạng thái</th>
-                <th>Điểm dự kiến AI</th>
-                <th>Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (att of a.practiceAttempts; track $index) {
-                <tr>
-                  <td><strong>Luyện tập #{{ att.attemptNo }}</strong></td>
-                  <td>{{ att.date }}</td>
-                  <td>{{ att.duration || '—' }}</td>
-                  <td>
-                    @if (att.pending) {
-                      <span class="status-badge-pending">Đang phân tích</span>
-                    } @else {
-                      <span class="status-badge-done">Hoàn thành</span>
-                    }
-                  </td>
-                  <td>
-                    @if (att.pending) {
-                      <span class="text-muted">--</span>
-                    } @else {
-                      <span class="score-highlight">{{ att.score !== undefined ? att.score : '--' }}</span>
-                    }
-                  </td>
-                  <td>
-                    @if (att.pending) {
-                      <button type="button" class="btn-table-action" disabled>Đang xử lý...</button>
-                    } @else {
-                      <button type="button" class="btn-table-action" (click)="openAttemptReview(att)">
-                        Xem lại
-                      </button>
-                    }
-                  </td>
-                </tr>
+    =======
+    <div class="empty-title">Bạn chưa nộp bài lần nào cho mục này.</div>
+    <div class="empty-desc">Nhấn vào nút "{{ isExam(a) ? 'Nộp video bài thi' : 'Nộp bài tập' }}" ở trên để gửi video bài
+      thực hành.</div>
+    >>>>>>> e1c19903cc0cd3bfc598b744e1a47e418003eba5
+  </div>
+  } @else {
+  <div class="table-responsive">
+    <table class="simple-table">
+      <thead>
+        <tr>
+          <th>Lần nộp</th>
+          <th>Thời gian</th>
+          <th>Thời lượng</th>
+          <th>Trạng thái</th>
+          <th>Điểm dự kiến AI</th>
+          <th>Hành động</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (att of a.practiceAttempts; track $index) {
+        <tr>
+          <td><strong>Luyện tập #{{ att.attemptNo }}</strong></td>
+          <td>{{ att.date }}</td>
+          <td>{{ att.duration || '—' }}</td>
+          <td>
+            @if (att.pending) {
+            <<<<<<< HEAD <span class="status-badge-pending">Đang phân tích</span>
+              =======
+              <span class="status-badge-pending">Đang xử lý</span>
+              } @else if (att.failed) {
+              <span class="status-badge-failed" [title]="att.error || ''">Thất bại</span>
+              >>>>>>> e1c19903cc0cd3bfc598b744e1a47e418003eba5
+              } @else {
+              <span class="status-badge-done">Hoàn thành</span>
               }
-            </tbody>
-          </table>
-        </div>
-      }
-    </div>
+          </td>
+          <td>
+            @if (att.pending || att.failed) {
+            <span class="text-muted">--</span>
+            } @else {
+            <span class="score-highlight">{{ att.score !== undefined ? att.score : '--' }}</span>
+            }
+          </td>
+          <td>
+            @if (att.pending) {
+            <button type="button" class="btn-table-action" disabled>Đang xử lý...</button>
+            } @else {
+            <button type="button" class="btn-table-action" (click)="openAttemptReview(att)">
+              Xem lại
+            </button>
+            }
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
   }
+</div>
+}
 
 </div>
 
 <!-- ==================== MODAL: NỘP VIDEO (LUYỆN TẬP HOẶC KIỂM TRA) ==================== -->
 @if (isSubmitModalOpen()) {
-  <div class="modal-overlay" (click)="closeSubmitModal()">
-    <div class="modal-content" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <h3 class="modal-title">
-          @if (submitType() === 'exam') {
-            Nộp video Bài kiểm tra chính thức
-          } @else {
-            Nộp video Luyện tập kỹ thuật
-          }
+<div class="modal-overlay" (click)="closeSubmitModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <<<<<<< HEAD <h3 class="modal-title">
+        @if (submitType() === 'exam') {
+        Nộp video Bài kiểm tra chính thức
+        } @else {
+        Nộp video Luyện tập kỹ thuật
+        }
         </h3>
+        =======
+        <h3 class="modal-title">{{ isExam(currentAssessment()) ? 'Nộp video bài thi' : 'Nộp video bài tập' }}</h3>
+        >>>>>>> e1c19903cc0cd3bfc598b744e1a47e418003eba5
         <button type="button" class="close-btn" (click)="closeSubmitModal()">
           <svg lucideX [size]="20"></svg>
         </button>
-      </div>
+    </div>
 
-      <div class="submit-info-compact">
-        <div class="task-name">{{ currentAssessment().name }}</div>
-        @if (currentAssessment().closeTime) {
-          <div class="task-deadline">Hạn nộp: {{ currentAssessment().closeTime }}</div>
-        }
-      </div>
-
-      <!-- Warning if exam -->
-      @if (submitType() === 'exam') {
-        <div class="modal-exam-warning">
-          <svg lucideAlertCircle [size]="18"></svg>
-          <span>Bài kiểm tra này chỉ được nộp <strong>1 lần duy nhất</strong>. Kết quả sẽ được AI chấm điểm dự kiến gửi giảng viên.</span>
-        </div>
-      } @else {
-        <div class="modal-practice-hint">
-          <span>💡 Bài luyện tập kỹ thuật có thể nộp nhiều lần để AI chấm điểm và sửa lỗi động tác.</span>
-        </div>
+    <div class="submit-info-compact">
+      <div class="task-name">{{ currentAssessment().name }}</div>
+      @if (currentAssessment().closeTime) {
+      <div class="task-deadline">Hạn nộp: {{ currentAssessment().closeTime }}</div>
       }
+    </div>
 
-      <!-- Dropzone -->
-      <div
-        class="upload-dropzone"
-        (click)="fileInput.click()"
-        (dragover)="$event.preventDefault()"
-        (drop)="onFileDropped($event)">
-        <svg lucideUploadCloud [size]="32" class="upload-icon"></svg>
-        <div class="dz-title">Chọn hoặc kéo thả video</div>
-        <div class="dz-hint">MP4, MOV (Tối đa 200MB)</div>
-        @if (selectedFileName()) {
+    <<<<<<< HEAD <!-- Warning if exam -->
+      @if (submitType() === 'exam') {
+      <div class="modal-exam-warning">
+        <svg lucideAlertCircle [size]="18"></svg>
+        <span>Bài kiểm tra này chỉ được nộp <strong>1 lần duy nhất</strong>. Kết quả sẽ được AI chấm điểm dự kiến gửi
+          giảng viên.</span>
+      </div>
+      } @else {
+      <div class="modal-practice-hint">
+        <span>💡 Bài luyện tập kỹ thuật có thể nộp nhiều lần để AI chấm điểm và sửa lỗi động tác.</span>
+        =======
+        @if (isExam(currentAssessment())) {
+        <div class="exam-warning-box">
+          <svg lucideAlertCircle [size]="18"></svg>
+          <span>Bài kiểm tra/bài thi chỉ được nộp <strong>1 lần duy nhất</strong>. Sau khi nộp sẽ không thể nộp lại, hãy
+            kiểm tra kỹ video trước khi xác nhận.</span>
+          >>>>>>> e1c19903cc0cd3bfc598b744e1a47e418003eba5
+        </div>
+        }
+
+        <!-- Dropzone -->
+        <div class="upload-dropzone" (click)="fileInput.click()" (dragover)="$event.preventDefault()"
+          (drop)="onFileDropped($event)">
+          <svg lucideUploadCloud [size]="32" class="upload-icon"></svg>
+          <div class="dz-title">Chọn hoặc kéo thả video</div>
+          <div class="dz-hint">MP4, MOV (Tối đa 200MB)</div>
+          @if (selectedFileName()) {
           <div class="dz-selected-file">
             <span class="dz-filename">🎥 {{ selectedFileName() }}</span>
             <button type="button" class="btn-remove-file" (click)="removeSelectedFile($event)" title="Xóa file">
               <svg lucideX [size]="16"></svg>
             </button>
           </div>
-        }
-      </div>
-      <input #fileInput type="file" accept="video/mp4,video/quicktime,video/webm,video/*" class="hidden" (change)="onFileSelected($event)" />
+          }
+        </div>
+        <input #fileInput type="file" accept="video/mp4,video/quicktime,video/webm,video/*" class="hidden"
+          (change)="onFileSelected($event)" />
 
-      <!-- Progress bar -->
-      @if (isUploading()) {
+        <!-- Progress bar -->
+        @if (isUploading()) {
         <div class="upload-progress-container">
           <div class="progress-bar-wrap">
             <div class="progress-bar-fill" [style.width.%]="uploadProgress()"></div>
@@ -439,25 +490,30 @@
             <span class="progress-percentage">{{ uploadProgress() }}%</span>
           </div>
         </div>
-      }
+        }
 
-      <div class="modal-actions">
-        <button type="button" class="btn-secondary" [disabled]="isUploading()" (click)="closeSubmitModal()">Hủy</button>
-        <button type="button" class="btn-primary btn-submit" [disabled]="!hasVideoSelected() || isUploading()" (click)="submitVideo()">
-          @if (isUploading()) {
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" [disabled]="isUploading()"
+            (click)="closeSubmitModal()">Hủy</button>
+          <button type="button" class="btn-primary btn-submit" [disabled]="!hasVideoSelected() || isUploading()"
+            (click)="submitVideo()">
+            @if (isUploading()) {
             <span class="btn-spinner"></span>
             <span>Đang tải lên...</span>
-          } @else {
-            <span>{{ submitType() === 'exam' ? 'Xác nhận Nộp bài kiểm tra' : 'Nộp bài luyện tập' }}</span>
-          }
-        </button>
+            } @else {
+            <<<<<<< HEAD <span>{{ submitType() === 'exam' ? 'Xác nhận Nộp bài kiểm tra' : 'Nộp bài luyện tập' }}</span>
+              =======
+              <span>{{ isExam(currentAssessment()) ? 'Xác nhận nộp bài thi' : 'Nộp bài' }}</span>
+              >>>>>>> e1c19903cc0cd3bfc598b744e1a47e418003eba5
+              }
+          </button>
+        </div>
       </div>
-    </div>
   </div>
-}
+  }
 
-<!-- ==================== MODAL: XEM LẠI LẦN NỘP ==================== -->
-@if (isReviewModalOpen() && selectedAttempt()) {
+  <!-- ==================== MODAL: XEM LẠI LẦN NỘP ==================== -->
+  @if (isReviewModalOpen() && selectedAttempt()) {
   @let att = selectedAttempt()!;
   <div class="modal-overlay" (click)="closeReviewModal()">
     <div class="modal-content" (click)="$event.stopPropagation()">
@@ -465,9 +521,9 @@
         <h3 class="modal-title">
           Chi tiết lần nộp {{ att.attemptNo }}
           @if (att.isExamSubmission) {
-            <span class="badge-exam-sub">(Bài kiểm tra)</span>
+          <span class="badge-exam-sub">(Bài kiểm tra)</span>
           } @else {
-            <span class="badge-practice-sub">(Luyện tập)</span>
+          <span class="badge-practice-sub">(Luyện tập)</span>
           }
         </h3>
         <button type="button" class="close-btn" (click)="closeReviewModal()">
@@ -487,28 +543,42 @@
         <div class="review-row">
           <span>Trạng thái:</span>
           @if (att.pending) {
-            <span class="status-badge-pending">⏳ Chờ AI xử lý</span>
+          <span class="status-badge-pending">⏳ Chờ AI xử lý</span>
+          } @else if (att.failed) {
+          <span class="status-badge-failed">❌ Chấm điểm thất bại{{ att.error ? ' (' + att.error + ')' : '' }}</span>
           } @else {
-            <span class="status-badge-done">✅ Đã chấm điểm</span>
+          <span class="status-badge-done">✅ Đã chấm điểm</span>
           }
         </div>
         <div class="review-row">
-          <span>Điểm đánh giá dự kiến (AI):</span>
-          <strong class="score-large">{{ att.score !== undefined ? att.score + ' điểm' : 'Đang chờ AI phân tích' }}</strong>
+          <<<<<<< HEAD <span>Điểm đánh giá dự kiến (AI):</span>
+            <strong class="score-large">{{ att.score !== undefined ? att.score + ' điểm' : 'Đang chờ AI phân tích'
+              }}</strong>
+            =======
+            <span>Điểm số:</span>
+            <strong class="score-large">{{ att.score !== undefined ? att.score + ' điểm' : (att.failed ? '—' : 'Đang chờ
+              chấm') }}</strong>
+            >>>>>>> e1c19903cc0cd3bfc598b744e1a47e418003eba5
         </div>
+        @if (att.feedback) {
+        <div class="review-row">
+          <span>Nhận xét:</span>
+          <strong>{{ att.feedback }}</strong>
+        </div>
+        }
       </div>
 
       <div class="video-container-box">
         @if (att.videoUrl) {
-          <video [src]="att.videoUrl" controls class="video-player" preload="metadata" playsinline>
-            Trình duyệt không hỗ trợ phát video trực tiếp.
-          </video>
+        <video [src]="att.videoUrl" controls class="video-player" preload="metadata" playsinline>
+          Trình duyệt không hỗ trợ phát video trực tiếp.
+        </video>
         } @else {
-          <div class="video-mock-placeholder">
-            <svg lucideFileText [size]="36"></svg>
-            <span>Video bài nộp lần {{ att.attemptNo }}</span>
-            <span class="video-subhint">Đang chuẩn bị file xem trước...</span>
-          </div>
+        <div class="video-mock-placeholder">
+          <svg lucideFileText [size]="36"></svg>
+          <span>Video bài nộp lần {{ att.attemptNo }}</span>
+          <span class="video-subhint">Đang chuẩn bị file xem trước...</span>
+        </div>
         }
       </div>
 
@@ -517,11 +587,11 @@
       </div>
     </div>
   </div>
-}
+  }
 
-<!-- Toast Notification -->
-@if (isToastVisible()) {
+  <!-- Toast Notification -->
+  @if (isToastVisible()) {
   <div class="toast-popup">
     {{ toastMessage() }}
   </div>
-}
+  }

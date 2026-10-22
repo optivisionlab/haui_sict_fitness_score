@@ -44,12 +44,14 @@
 
         <!-- Email / Account ID Field -->
         <div class="organic-field" [class.has-error]="emailError()">
-          <div class="field-nature"></div>
-          <input type="text" id="email" name="email" placeholder=" " required [ngModel]="email()"
-            (ngModelChange)="email.set($event)" autocomplete="username" />
-          <label for="email">Email hoặc Mã tài khoản</label>
-          <div class="growth-indicator">
-            <div class="leaf-sprout"></div>
+          <div class="field-control">
+            <div class="field-nature"></div>
+            <input type="text" id="email" name="email" placeholder=" " required [ngModel]="email()"
+              (ngModelChange)="email.set($event)" autocomplete="username" />
+            <label for="email">Email hoặc Mã tài khoản</label>
+            <div class="growth-indicator">
+              <div class="leaf-sprout"></div>
+            </div>
           </div>
           @if (emailError()) {
           <span class="gentle-error">{{ emailError() }}</span>
@@ -58,29 +60,31 @@
 
         <!-- Password Field -->
         <div class="organic-field" [class.has-error]="passwordError()">
-          <div class="field-nature"></div>
-          <input [type]="showPassword() ? 'text' : 'password'" id="password" name="password" placeholder=" " required
-            [ngModel]="password()" (ngModelChange)="password.set($event)" autocomplete="current-password" />
-          <label for="password">Mật khẩu</label>
-          <button type="button" class="nature-toggle" (click)="togglePassword()"
-            [attr.aria-label]="showPassword() ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'"
-            [attr.title]="showPassword() ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'">
-            @if (showPassword()) {
-            <!-- Unbroken eye with complete diagonal slash (no white gaps) -->
-            <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-              <circle cx="12" cy="12" r="3" />
-              <line x1="3" y1="3" x2="21" y2="21" />
-            </svg>
-            } @else {
-            <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-            }
-          </button>
+          <div class="field-control">
+            <div class="field-nature"></div>
+            <input [type]="showPassword() ? 'text' : 'password'" id="password" name="password" placeholder=" " required
+              [ngModel]="password()" (ngModelChange)="password.set($event)" autocomplete="current-password" />
+            <label for="password">Mật khẩu</label>
+            <button type="button" class="nature-toggle" (click)="togglePassword()"
+              [attr.aria-label]="showPassword() ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'"
+              [attr.title]="showPassword() ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'">
+              @if (showPassword()) {
+              <!-- Unbroken eye with complete diagonal slash (no white gaps) -->
+              <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+                <line x1="3" y1="3" x2="21" y2="21" />
+              </svg>
+              } @else {
+              <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              }
+            </button>
+          </div>
           @if (passwordError()) {
           <span class="gentle-error">{{ passwordError() }}</span>
           }

@@ -6,21 +6,32 @@ from .base import MetricSpec, SportDefinition
 def calculate_pickleball_score(metrics: dict[str, Any], criteria: Optional[dict[str, Any]] = None) -> float:
     """
     Tính điểm môn Pickleball:
-    - Tỷ lệ đánh trúng bóng (hitRate) chiếm 70%
-    - Số lượng cú vung vợt tích cực (swingTotal) chiếm 20%
+    - Tỷ lệ đánh trúng bóng (hitRate / accuracy) chiếm 70%
+    - Số lượng cú vung vợt tích cực (swingTotal hoặc hitCount + missCount) chiếm 20%
     - Tỷ lệ bóng vào sân hợp lệ (inCourtRate) chiếm 10%
     """
-    hit_rate = metrics.get("hitRate", metrics.get("hit_rate"))
+    hit_rate = metrics.get("hitRate", metrics.get("hit_rate", metrics.get("accuracy")))
     hit_count = metrics.get("hitCount", metrics.get("hit_count", 0))
-    swing_total = metrics.get("swingTotal", metrics.get("swing_total", 0))
-    in_court_count = metrics.get("inCourtCount", metrics.get("in_court_count", hit_count))
+    miss_count = metrics.get("missCount", metrics.get("miss_count", 0))
+    swing_total = metrics.get("swingTotal", metrics.get("swing_total"))
 
     try:
-        swing_total = float(swing_total)
         hit_count = float(hit_count)
+        miss_count = float(miss_count)
+        if swing_total is not None:
+            swing_total = float(swing_total)
+        elif hit_count > 0 or miss_count > 0:
+            swing_total = hit_count + miss_count
+        else:
+            swing_total = 0.0
+    except (ValueError, TypeError):
+        swing_total, hit_count, miss_count = 0.0, 0.0, 0.0
+
+    in_court_count = metrics.get("inCourtCount", metrics.get("in_court_count", hit_count))
+    try:
         in_court_count = float(in_court_count)
     except (ValueError, TypeError):
-        swing_total, hit_count, in_court_count = 0.0, 0.0, 0.0
+        in_court_count = 0.0
 
     if hit_rate is None and swing_total > 0:
         hit_rate = hit_count / swing_total
@@ -41,9 +52,14 @@ def calculate_pickleball_score(metrics: dict[str, Any], criteria: Optional[dict[
 
 def generate_pickleball_comment(metrics: dict[str, Any], score: float) -> str:
     """Nhận xét chi tiết môn Pickleball."""
-    hit_rate = metrics.get("hitRate", metrics.get("hit_rate", 0.0))
+    hit_rate = metrics.get("hitRate", metrics.get("hit_rate", metrics.get("accuracy", 0.0)))
     hit_count = int(metrics.get("hitCount", metrics.get("hit_count", 0)))
-    swing_total = int(metrics.get("swingTotal", metrics.get("swing_total", 0)))
+    miss_count = int(metrics.get("missCount", metrics.get("miss_count", 0)))
+    swing_total = metrics.get("swingTotal", metrics.get("swing_total"))
+    if swing_total is None:
+        swing_total = hit_count + miss_count
+    else:
+        swing_total = int(swing_total)
 
     try:
         hit_rate_val = float(hit_rate)
@@ -52,13 +68,13 @@ def generate_pickleball_comment(metrics: dict[str, Any], score: float) -> str:
         pct = 0.0
 
     if score >= 8.5:
-        return f"Kỹ thuật xuất sắc! Tỷ lệ chạm bóng trúng tâm vợt {pct}% ({hit_count}/{swing_total} lần). Động tác mở vợt và đón bóng chuẩn mực."
+        return f"Kỹ thuật xuất sắc! Tỷ lệ chạm bóng trúng tâm vợt {pct}% ({hit_count}/{swing_total} lần, trượt {miss_count} lần). Động tác mở vợt và đón bóng chuẩn mực."
     elif score >= 7.0:
-        return f"Khá tốt! Đạt {hit_count} lần trúng bóng ({pct}%). Cần chú ý giữ trọng tâm thấp khi thực hiện các cú dink và volley."
+        return f"Khá tốt! Đạt {hit_count} lần trúng bóng ({pct}%, trượt {miss_count} lần). Cần chú ý giữ trọng tâm thấp khi thực hiện các cú dink và volley."
     elif score >= 5.0:
-        return f"Đạt yêu cầu cơ bản. Tỷ lệ trúng bóng {pct}%. Cần rèn luyện thêm cảm giác tiếp xúc bóng ở khu vực Non-Volley Zone (Kitchen)."
+        return f"Đạt yêu cầu cơ bản. Tỷ lệ trúng bóng {pct}% ({hit_count} trúng, {miss_count} trượt). Cần rèn luyện thêm cảm giác tiếp xúc bóng ở khu vực Non-Volley Zone (Kitchen)."
     else:
-        return f"Chưa đạt yêu cầu (tỷ lệ trúng {pct}%). Đề nghị xem lại video kỹ thuật cầm vợt và tư thế đứng chuẩn bị."
+        return f"Chưa đạt yêu cầu (tỷ lệ trúng {pct}%, trượt {miss_count} lần). Đề nghị xem lại video kỹ thuật cầm vợt và tư thế đứng chuẩn bị."
 
 
 PICKLEBALL_DEFINITION = SportDefinition(
@@ -93,6 +109,15 @@ PICKLEBALL_DEFINITION = SportDefinition(
             description="Tỷ lệ đánh trúng bóng (0.0 - 1.0)",
             unit="%",
             default=0.0,
+        ),
+        MetricSpec(
+            name="miss_count",
+            aliases=["missCount", "misses", "miss"],
+            type="int",
+            required=False,
+            description="Số lần đánh trượt hoặc đánh hỏng bóng",
+            unit="lần",
+            default=0,
         ),
         MetricSpec(
             name="in_court_count",

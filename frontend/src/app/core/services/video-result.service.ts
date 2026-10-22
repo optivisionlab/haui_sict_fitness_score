@@ -1,9 +1,17 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpEvent, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpEvent, HttpHeaders, HttpParams, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { concatMap, map, switchMap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/auth.model';
-import { VideoResult, VideoResultFilter, VideoUploadPayload } from '../models/video-result.model';
+import {
+  Paginated,
+  VideoResult,
+  VideoResultFilter,
+  VideoResultStatusInfo,
+  VideoUploadPayload,
+  VideoUploadUrl
+} from '../models/video-result.model';
 
 @Injectable({
   providedIn: 'root'
@@ -12,41 +20,64 @@ export class VideoResultService {
   private http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiUrl}/video-results`;
 
-  /**
-   * Tải video lên server với theo dõi tiến trình (Progress tracking)
-   */
+  /** Upload directly to MinIO, then confirm the object with the backend. */
   uploadVideo(payload: VideoUploadPayload): Observable<HttpEvent<ApiResponse<VideoResult>>> {
-    const formData = new FormData();
-    formData.append('file', payload.file);
-    formData.append('student_id', payload.student_id);
-    formData.append('exercise_id', payload.exercise_id);
+    return this.http.post<ApiResponse<VideoUploadUrl>>(`${this.baseUrl}/upload-url`, {
+      task_id: payload.exercise_id,
+      course_id: payload.course_id,
+      file_name: payload.file.name,
+      content_type: payload.file.type || 'application/octet-stream',
+      file_size: payload.file.size
+    }).pipe(
+      switchMap((response) => {
+        const upload = response.data;
+        if (!upload?.uploadUrl || !upload.uploadId) {
+          throw new Error('Backend không trả về thông tin upload hợp lệ.');
+        }
 
-    if (payload.class_id) {
-      formData.append('class_id', payload.class_id);
-    }
-    if (payload.course_id) {
-      formData.append('course_id', payload.course_id);
-    }
-
-    return this.http.post<ApiResponse<VideoResult>>(`${this.baseUrl}/upload`, formData, {
-      reportProgress: true,
-      observe: 'events'
-    });
+        return this.http.put(upload.uploadUrl, payload.file, {
+          headers: new HttpHeaders({ 'Content-Type': payload.file.type || 'application/octet-stream' }),
+          observe: 'events',
+          reportProgress: true,
+          responseType: 'text'
+        }).pipe(
+          concatMap((event) => {
+            if (event instanceof HttpResponse) {
+              return this.http.post<ApiResponse<VideoResult>>(`${this.baseUrl}/confirm-upload`, {
+                upload_id: upload.uploadId
+              }).pipe(map((confirmed) => new HttpResponse({
+                body: confirmed,
+                status: 200,
+                url: `${this.baseUrl}/confirm-upload`
+              })));
+            }
+            return [event as HttpEvent<ApiResponse<VideoResult>>];
+          })
+        );
+      })
+    );
   }
 
   /**
    * Lấy danh sách kết quả video nộp bài theo bộ lọc (sinh viên, bài tập, lớp)
    */
-  getVideoResults(filters?: VideoResultFilter): Observable<ApiResponse<VideoResult[]>> {
+  getVideoResults(filters?: VideoResultFilter): Observable<ApiResponse<Paginated<VideoResult>>> {
     let params = new HttpParams();
     if (filters?.student_id) params = params.set('student_id', filters.student_id);
     if (filters?.exercise_id) params = params.set('exercise_id', filters.exercise_id);
     if (filters?.class_id) params = params.set('class_id', filters.class_id);
     if (filters?.status) params = params.set('status', filters.status);
-    if (filters?.skip !== undefined) params = params.set('skip', filters.skip.toString());
-    if (filters?.limit !== undefined) params = params.set('limit', filters.limit.toString());
+    if (filters?.page !== undefined) params = params.set('page', filters.page.toString());
+    if (filters?.page_size !== undefined) params = params.set('page_size', filters.page_size.toString());
 
-    return this.http.get<ApiResponse<VideoResult[]>>(this.baseUrl, { params });
+    return this.http.get<ApiResponse<Paginated<VideoResult>>>(this.baseUrl, { params });
+  }
+
+  /**
+   * Trạng thái chấm điểm của một bài nộp (dùng để polling sau khi upload)
+   */
+  getSubmissionStatus(id: string): Observable<ApiResponse<VideoResultStatusInfo>> {
+    return this.http.get<ApiResponse<VideoResultStatusInfo>>(`${this.baseUrl}/${id}/status`);
   }
 
   /**
@@ -59,7 +90,7 @@ export class VideoResultService {
   /**
    * Lấy link presigned trực tiếp để phát video từ MinIO
    */
-  getVideoStreamUrl(id: string): Observable<ApiResponse<{ video_url: string; expires_in: number }>> {
-    return this.http.get<ApiResponse<{ video_url: string; expires_in: number }>>(`${this.baseUrl}/${id}/video-url`);
+  getVideoStreamUrl(id: string): Observable<ApiResponse<{ videoUrl: string; expiresInSeconds: number }>> {
+    return this.http.get<ApiResponse<{ videoUrl: string; expiresInSeconds: number }>>(`${this.baseUrl}/${id}/video-url`);
   }
 }

@@ -8,6 +8,7 @@
       type="text"
       class="search-input"
       [placeholder]="placeholder()"
+      [attr.maxlength]="maxLength()"
       [ngModel]="value()"
       (ngModelChange)="onValueChange($event)"
     />

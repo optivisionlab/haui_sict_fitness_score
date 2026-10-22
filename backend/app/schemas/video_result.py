@@ -18,6 +18,27 @@ class VideoResultCreate(BaseSchema):
     duration_sec: Optional[int] = None
 
 
+class VideoUploadUrlRequest(BaseSchema):
+    task_id: str
+    course_id: Optional[str] = None
+    file_name: str
+    content_type: str
+    file_size: int = Field(..., gt=0)
+    duration_sec: Optional[int] = Field(default=None, ge=0)
+
+
+class VideoUploadUrlResponse(BaseSchema):
+    upload_id: str
+    result_id: str
+    object_key: str
+    upload_url: str
+    expires_in: int
+
+
+class VideoUploadConfirmRequest(BaseSchema):
+    upload_id: str
+
+
 class VideoResultAIUpdate(BaseSchema):
     pending: bool = False
     metrics: dict[str, Any] = Field(default_factory=dict)
@@ -39,6 +60,8 @@ class VideoResultRead(BaseSchema):
     attempt_no: int = 1
     submitted_at: Optional[datetime] = None
     pending: bool = True
+    status: str = "pending"
+    error: Optional[str] = None
     video_url: Optional[str] = None
     file_name: Optional[str] = None
     file_size: Optional[int] = None
@@ -63,6 +86,8 @@ class PresignedUrlResponse(BaseSchema):
 class VideoResultStatusResponse(BaseSchema):
     id: str
     pending: bool
+    status: str = "pending"
+    error: Optional[str] = None
     ai_score: Optional[float] = None
     final_score: Optional[float] = None
 

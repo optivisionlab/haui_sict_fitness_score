@@ -541,7 +541,44 @@ $primary-blue-light: #eff6ff;
   .assessment-action-row {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 12px;
+  }
+
+  .btn-exam {
+    background-color: #ea580c;
+
+    &:hover:not(:disabled) {
+      background-color: #c2410c;
+    }
+  }
+
+  .submit-rule-hint {
+    font-size: 0.82rem;
+    color: #64748b;
+
+    &.exam {
+      color: #c2410c;
+    }
+  }
+}
+
+.exam-warning-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background-color: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+
+  svg {
+    flex-shrink: 0;
+    margin-top: 1px;
   }
 }
 
@@ -581,6 +618,17 @@ $primary-blue-light: #eff6ff;
   background-color: #f1f5f9;
   color: #334155;
   border: 1px solid #e2e8f0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 4px;
+}
+
+.status-badge-failed {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
   font-size: 0.75rem;
   font-weight: 500;
   border-radius: 4px;
