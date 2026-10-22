@@ -160,6 +160,21 @@ export class TeacherClassDetailComponent implements OnInit {
     this.activeTab.set(tab);
   }
 
+  getSubmittedStudentCount(taskId: string): number {
+    const gb = this.currentGradebook();
+    if (!gb) return 0;
+    return gb.students.filter(
+      (s) => s.task_scores && s.task_scores[taskId] !== undefined && s.task_scores[taskId] !== null
+    ).length;
+  }
+
+  getSubmissionPercentage(taskId: string): number {
+    const gb = this.currentGradebook();
+    if (!gb || !gb.students.length) return 0;
+    const count = this.getSubmittedStudentCount(taskId);
+    return Math.round((count / gb.students.length) * 100);
+  }
+
   // --- ACTIONS: LOCK PRACTICE & LOCK SUBMISSIONS ---
 
   togglePracticeLock(): void {

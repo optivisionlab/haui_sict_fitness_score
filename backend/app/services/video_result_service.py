@@ -106,10 +106,13 @@ class VideoResultService:
             "taskId": str(task_id),
             "userId": str(user_id),
         })
-        if getattr(task, "max_attempts", None) and existing_count >= task.max_attempts:
+        max_limit = getattr(task, "max_attempts", None)
+        if max_limit is None and getattr(task, "category", None) == TaskCategory.EXAM:
+            max_limit = 1
+        if max_limit and existing_count >= max_limit:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Bạn đã hết lượt nộp bài cho phép ({existing_count}/{task.max_attempts} lần)",
+                detail=f"Bài kiểm tra/thi này chỉ được nộp 1 lần duy nhất và bạn đã hoàn thành ({existing_count}/{max_limit} lần)",
             )
 
         # Kiểm tra sport

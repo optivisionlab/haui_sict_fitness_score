@@ -23,7 +23,7 @@
         </div>
 
         <div class="class-title-block">
-          <div class="class-code-badge">{{ cls.code || 'Chưa có mã' }}</div>
+          <div class="class-code-badge">Mã lớp học phần: {{ cls.code || 'Chưa có mã' }}</div>
           <h1 class="class-heading">{{ cls.name }}</h1>
           <div class="class-submeta">
             <span>Sĩ số: <strong>{{ cls.student_total }}</strong> sinh viên</span>
@@ -34,12 +34,12 @@
         <div class="class-status-box">
           @if (cls.is_grade_locked) {
             <div class="finalized-tag">
-              <strong>ĐÃ CHỐT ĐIỂM</strong>
+              <strong>🔒 ĐÃ CHỐT ĐIỂM</strong>
               <small>{{ cls.grade_locked_at ? (cls.grade_locked_at | date:'dd/MM/yyyy HH:mm') : '' }}</small>
             </div>
           } @else {
             <div class="in-progress-tag">
-              <span>Đang trong kỳ học</span>
+              <span>● Đang trong kỳ học</span>
             </div>
           }
         </div>
@@ -62,9 +62,9 @@
               [disabled]="cls.is_grade_locked"
               (click)="togglePracticeLock()">
               @if (!cls.allow_practice_submission) {
-                <svg lucideUnlock [size]="15"></svg> Mở
+                <svg lucideUnlock [size]="15"></svg> Mở luyện tập
               } @else {
-                <svg lucideLock [size]="15"></svg> Khóa
+                <svg lucideLock [size]="15"></svg> Khóa luyện tập
               }
             </button>
           </div>
@@ -83,9 +83,9 @@
               [disabled]="cls.is_grade_locked"
               (click)="toggleSubmissionLock()">
               @if (!cls.allow_exam_submission) {
-                <svg lucideUnlock [size]="15"></svg> Mở
+                <svg lucideUnlock [size]="15"></svg> Mở nộp bài
               } @else {
-                <svg lucideLock [size]="15"></svg> Khóa
+                <svg lucideLock [size]="15"></svg> Khóa nộp bài
               }
             </button>
           </div>
@@ -99,7 +99,7 @@
               class="btn btn-finalize"
               (click)="openFinalizeModal()">
               <svg lucideCheckCircle2 [size]="16"></svg>
-              <span>Chốt điểm</span>
+              <span>Chốt điểm lớp học phần</span>
             </button>
           } @else {
             <button
@@ -266,27 +266,90 @@
           <div class="tab-content-pane assessments-pane">
             <div class="assessments-header-intro">
               <div>
-                <h3>Danh sách các bài kiểm tra & đánh giá thể chất</h3>
-                <p>Giáo viên có thể quản lý thời gian, khóa nộp bài từng đợt và theo dõi số lượng sinh viên đã hoàn thành.</p>
+                <h3>Danh sách các bài kiểm tra & bài luyện tập thể chất</h3>
+                <p>Giáo viên quản lý trạng thái nộp bài, luyện tập từng đợt và theo dõi tiến độ nộp bài của sinh viên.</p>
               </div>
             </div>
 
             <div class="assessments-list">
               @for (item of gb.task_list; track item.id) {
-                <div class="assessment-card" [class.locked]="cls.is_grade_locked || !cls.allow_exam_submission">
+                <div class="assessment-card" [class.locked]="cls.is_grade_locked || (item.category === 'exam' ? !cls.allow_exam_submission : !cls.allow_practice_submission)">
                   <div class="assessment-top">
                     <div class="assessment-title-wrap">
-                      <span class="weight-badge">Loại: {{ item.category === 'exam' ? 'Thi kết thúc' : 'Luyện tập' }}</span>
+                      <span class="weight-badge">
+                        {{ item.category === 'exam' ? 'Bài kiểm tra chính thức (Chỉ nộp 1 lần)' : 'Luyện tập kỹ thuật (Nộp nhiều lần)' }}
+                      </span>
                       <h4>{{ item.title }}</h4>
                     </div>
 
                     <div class="assessment-lock-status">
-                      @if (cls.is_grade_locked || (item.category === 'exam' && !cls.allow_exam_submission) || (item.category === 'practice' && !cls.allow_practice_submission)) {
-                        <span class="lock-status-plain">Đã khóa nộp bài</span>
+                      @if (cls.is_grade_locked) {
+                        <span class="lock-status-badge locked">
+                          <svg lucideLock [size]="14"></svg> Đã chốt điểm lớp
+                        </span>
+                      } @else if (item.category === 'exam' && !cls.allow_exam_submission) {
+                        <span class="lock-status-badge locked">
+                          <svg lucideLock [size]="14"></svg> Đã khóa nộp bài thi
+                        </span>
+                      } @else if (item.category === 'practice' && !cls.allow_practice_submission) {
+                        <span class="lock-status-badge locked">
+                          <svg lucideLock [size]="14"></svg> Đã khóa luyện tập
+                        </span>
                       } @else {
-                        <span class="lock-status-plain">Đang mở</span>
+                        <span class="lock-status-badge open">
+                          <svg lucideCheckCircle2 [size]="14"></svg> Đang mở nhận bài
+                        </span>
                       }
                     </div>
+                  </div>
+
+                  <!-- Thống kê tiến độ nộp bài của sinh viên -->
+                  <div class="submission-stats-row">
+                    <div class="stat-progress-block">
+                      <div class="stat-progress-label">
+                        <span>Tiến độ sinh viên đã nộp bài:</span>
+                        <strong>{{ getSubmittedStudentCount(item.id) }} / {{ gb.students.length }} sinh viên ({{ getSubmissionPercentage(item.id) }}%)</strong>
+                      </div>
+                      <div class="stat-progress-bar">
+                        <div class="stat-progress-fill" [style.width.%]="getSubmissionPercentage(item.id)"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="assessment-bottom-actions">
+                    <button
+                      type="button"
+                      class="btn btn-secondary"
+                      (click)="setTab('students')">
+                      <svg lucideUsers [size]="15"></svg>
+                      <span>Xem danh sách nộp & Chấm điểm</span>
+                    </button>
+
+                    @if (!cls.is_grade_locked) {
+                      @if (item.category === 'exam') {
+                        <button
+                          type="button"
+                          class="btn btn-secondary"
+                          (click)="toggleSubmissionLock()">
+                          @if (cls.allow_exam_submission) {
+                            <svg lucideLock [size]="15"></svg> Khóa nộp bài thi
+                          } @else {
+                            <svg lucideUnlock [size]="15"></svg> Mở nộp bài thi
+                          }
+                        </button>
+                      } @else {
+                        <button
+                          type="button"
+                          class="btn btn-secondary"
+                          (click)="togglePracticeLock()">
+                          @if (cls.allow_practice_submission) {
+                            <svg lucideLock [size]="15"></svg> Khóa luyện tập
+                          } @else {
+                            <svg lucideUnlock [size]="15"></svg> Mở luyện tập
+                          }
+                        </button>
+                      }
+                    }
                   </div>
                 </div>
               }

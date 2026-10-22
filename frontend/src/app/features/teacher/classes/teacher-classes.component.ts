@@ -8,7 +8,8 @@ import {
   LucideClock,
   LucideActivity,
   LucideArrowRight,
-  LucideBookOpen
+  LucideBookOpen,
+  LucideLock
 } from '@lucide/angular';
 import { SearchInputComponent, SelectOption } from '@shared/components';
 import { TeacherClassService } from '../services/teacher-class.service';
@@ -26,6 +27,7 @@ import { TeacherCourseItem, ClassStatus } from '../models/teacher.model';
     LucideActivity,
     LucideArrowRight,
     LucideBookOpen,
+    LucideLock,
     SearchInputComponent
   ],
   templateUrl: './teacher-classes.component.html',

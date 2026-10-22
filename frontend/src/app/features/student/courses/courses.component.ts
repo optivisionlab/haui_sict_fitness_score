@@ -25,7 +25,8 @@ import {
   Course,
   CourseDetailInfo,
   AssessmentItem,
-  AssessmentAttempt
+  AssessmentAttempt,
+  CourseGradesSummary
 } from './models/course-detail.model';
 
 @Component({
@@ -71,6 +72,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
   // Modals & Upload State
   isSubmitModalOpen = signal<boolean>(false);
   isReviewModalOpen = signal<boolean>(false);
+  submitType = signal<'practice' | 'exam'>('practice');
   selectedFile = signal<File | null>(null);
   selectedFileName = signal<string>('');
   hasVideoSelected = signal<boolean>(false);
@@ -119,11 +121,41 @@ export class CoursesComponent implements OnInit, OnDestroy {
           const mappedCourses: Course[] = items.map((e: any) => {
             const courseId = e.courseId || e.id || '';
             const courseName = e.courseName || e.name || 'Giáo dục Thể chất';
-            const isBadminton = courseName.toLowerCase().includes('cầu lông') || courseName.toLowerCase().includes('badminton') || courseName.toLowerCase().includes('pickleball');
+            const isBadminton =
+              courseName.toLowerCase().includes('cầu lông') ||
+              courseName.toLowerCase().includes('badminton') ||
+              courseName.toLowerCase().includes('pickleball');
+            const classCode = e.courseCode || e.code || (courseId.length > 8 ? courseId.substring(0, 10).toUpperCase() : courseId);
             const avg = e.grades?.finalScore ?? e.grades?.processScore ?? e.grades?.attendanceScore ?? null;
+
+            // Xử lý tóm tắt điểm
+            const grades = e.grades || {};
+            const taskScores = e.taskScores || e.task_scores || {};
+            const kt1 = taskScores['tx1'] ?? taskScores['task-0'] ?? (e.grades?.processScore ? e.grades.processScore : undefined);
+            const kt2 = taskScores['tx2'] ?? taskScores['task-1'] ?? undefined;
+            const hasAny = (
+              (grades.finalScore !== null && grades.finalScore !== undefined) ||
+              (grades.processScore !== null && grades.processScore !== undefined) ||
+              (grades.examScore !== null && grades.examScore !== undefined) ||
+              (grades.attendanceScore !== null && grades.attendanceScore !== undefined) ||
+              kt1 !== undefined ||
+              kt2 !== undefined ||
+              Object.keys(taskScores).length > 0
+            );
+            const gradesSummary: CourseGradesSummary = {
+              attendanceScore: grades.attendanceScore ?? undefined,
+              processScore: grades.processScore ?? undefined,
+              examScore: grades.examScore ?? undefined,
+              finalScore: grades.finalScore ?? undefined,
+              kt1Score: kt1 !== undefined ? Number(kt1) : undefined,
+              kt2Score: kt2 !== undefined ? Number(kt2) : undefined,
+              hasAnyGrade: hasAny
+            };
+
             return {
               id: courseId,
               name: courseName,
+              code: classCode,
               teacher: e.teacherName || 'Giảng viên phụ trách',
               startDate: '01/09/2026',
               endDate: '15/12/2026',
@@ -131,7 +163,8 @@ export class CoursesComponent implements OnInit, OnDestroy {
               progress: Math.round(e.progressPercent || 0),
               status: 'active',
               iconType: isBadminton ? 'pickleball' : 'chay',
-              averageScore: avg !== null ? avg : undefined
+              averageScore: avg !== null ? avg : undefined,
+              gradesSummary
             };
           });
           this.courses.set(mappedCourses);
@@ -145,11 +178,12 @@ export class CoursesComponent implements OnInit, OnDestroy {
               dates: `${c.startDate} - ${c.endDate}`,
               examDate: this.formatDate(c.examDate),
               progress: c.progress,
-              code: (c.id || '').substring(0, 10).toUpperCase(),
+              code: c.code,
               desc: 'Học phần giáo dục thể chất đào tạo kỹ thuật chuyên môn và rèn luyện thể lực. Chấm điểm và đánh giá tự động qua video bằng AI.',
               thumbClass: '',
               thumbIcon: c.iconType,
               averageScore: c.averageScore,
+              gradesSummary: c.gradesSummary,
               assessments: []
             };
             this.loadCourseAssessments(c.id);
@@ -175,29 +209,56 @@ export class CoursesComponent implements OnInit, OnDestroy {
         if (!data || !data.tasks || data.tasks.length === 0) return;
 
         const mappedAssessments: AssessmentItem[] = data.tasks.map((t: any, idx: number) => {
-          const isExam = t.category === 'exam';
+          const isExam = t.category === 'exam' || idx === data.tasks.length - 1;
           const type = isExam ? 'final' : (idx === 0 ? 'tx1' : 'tx2');
           const hasScore = t.score !== null && t.score !== undefined;
+
+          let formattedName = t.taskTitle || '';
+          let guidelines = '';
+          if (idx === 0) {
+            formattedName = formattedName.includes('KT1') ? formattedName : `KT1: Kỹ thuật 1 - ${formattedName || 'Giao bóng & Cầm vợt chuẩn'}`;
+            guidelines = 'Yêu cầu kỹ thuật: Tư thế chuẩn bị cân bằng, trọng tâm hạ thấp. Góc tiếp xúc bóng chính xác ở điểm rơi trước người. Thực hiện vung vợt mượt mà và kết thúc động tác qua vai đối diện.';
+          } else if (idx === 1 && !isExam) {
+            formattedName = formattedName.includes('KT2') ? formattedName : `KT2: Kỹ thuật 2 - ${formattedName || 'Di chuyển & Đỡ bóng (Dink shot)'}`;
+            guidelines = 'Yêu cầu kỹ thuật: Di chuyển nhanh nhẹn bằng bước đệm, giữ mặt vợt ổn định khi tiếp xúc bóng. Kiểm soát lực đánh bóng vừa phải, đảm bảo bóng qua lưới an toàn rơi vào khu vực quy định.';
+          } else if (isExam) {
+            formattedName = formattedName.includes('Thi') ? formattedName : `Thi: Nộp bài thi kết thúc học phần`;
+            guidelines = 'Yêu cầu bài thi: Thực hiện chuỗi kỹ thuật tổng hợp trong vòng 2-3 phút theo quy chuẩn thi đấu. Camera ghi hình toàn thân rõ nét từ đầu đến chân. Bài thi chỉ được nộp 1 lần duy nhất.';
+          } else {
+            formattedName = `KT${idx + 1}: Kỹ thuật ${idx + 1} - ${formattedName}`;
+            guidelines = 'Thực hiện động tác chuẩn xác theo hướng dẫn của giảng viên. Ghi hình đủ góc nhìn toàn thân.';
+          }
+
+          const existingAttempt: AssessmentAttempt[] = hasScore
+            ? [
+                {
+                  attemptNo: 1,
+                  date: t.submittedAt ? new Date(t.submittedAt).toLocaleString('vi-VN') : 'Đã hoàn thành',
+                  duration: '0:45',
+                  score: t.score,
+                  isExamSubmission: isExam
+                }
+              ]
+            : [];
+
           return {
             id: t.taskId || `task-${idx}`,
-            name: t.taskTitle || (isExam ? 'Bài cuối kỳ - Thi đấu tính điểm chính thức' : `Bài thường xuyên ${idx + 1}`),
+            name: formattedName,
             type: type as any,
-            gradingMethod: 'Lần cao nhất',
+            category: isExam ? 'exam' : 'practice',
+            gradingMethod: isExam ? 'Lần duy nhất' : 'Lần cao nhất',
             timeLimit: isExam ? '60 phút' : 'Không giới hạn',
             openTime: '01/09/2026 08:00',
             closeTime: '20/11/2026 23:59',
             status: hasScore ? 'graded' : (t.status === 'pending' ? 'pending' : 'not_submitted'),
             score: hasScore ? t.score : undefined,
-            attempts: hasScore
-              ? [
-                  {
-                    attemptNo: 1,
-                    date: t.submittedAt ? new Date(t.submittedAt).toLocaleString('vi-VN') : 'Đã hoàn thành',
-                    duration: '0:45',
-                    score: t.score
-                  }
-                ]
-              : []
+            aiPredictedScore: hasScore ? t.score : undefined,
+            guidelines,
+            maxAttempts: isExam ? 1 : undefined,
+            attempts: existingAttempt,
+            practiceAttempts: isExam ? [] : existingAttempt,
+            examAttempt: isExam && hasScore ? existingAttempt[0] : null,
+            isExamSubmitted: isExam && hasScore
           };
         });
 
@@ -205,11 +266,11 @@ export class CoursesComponent implements OnInit, OnDestroy {
           const existing = prev[courseId] || {
             id: courseId,
             title: data.courseName || 'Pickleball',
-            teacher: data.teacherName || 'Đặng Văn Long',
+            teacher: data.teacherName || 'ThS. Đặng Văn Long',
             dates: '01/09/2026 - 15/11/2026',
             examDate: '20/11/2026',
             progress: 0,
-            code: courseId.substring(0, 10).toUpperCase(),
+            code: courseId.length > 8 ? courseId.substring(0, 10).toUpperCase() : courseId,
             desc: 'Học phần trang bị cho sinh viên kỹ thuật cơ bản môn Pickleball. Đánh giá kết quả học tập qua hình thức nộp video thực hành để hệ thống chấm điểm.',
             thumbClass: '',
             thumbIcon: 'pickleball',
@@ -256,13 +317,25 @@ export class CoursesComponent implements OnInit, OnDestroy {
                         pending: v.status === 'pending' || v.status === 'processing',
                         score: v.score !== null && v.score !== undefined ? v.score : undefined,
                         videoUrl: v.video_url,
-                        videoResultId: v.id
+                        videoResultId: v.id,
+                        isExamSubmission: ass.category === 'exam' || i === 0
                       }));
                       const isPending = matchingVideos.some((v) => v.status === 'pending' || v.status === 'processing');
+                      const latestScore = matchingVideos.find(v => v.score !== null && v.score !== undefined)?.score;
+
+                      const examAtt = ass.category === 'exam'
+                        ? (videoAttempts.length > 0 ? videoAttempts[0] : null)
+                        : (videoAttempts.find(a => a.isExamSubmission) || null);
+                      const isExamSub = !!examAtt || (ass.category === 'exam' && videoAttempts.length > 0);
+
                       return {
                         ...ass,
                         status: isPending ? ('pending' as const) : ass.status,
-                        attempts: videoAttempts
+                        attempts: videoAttempts,
+                        practiceAttempts: ass.category === 'exam' ? [] : videoAttempts.filter(a => !a.isExamSubmission),
+                        examAttempt: examAtt,
+                        isExamSubmitted: isExamSub,
+                        aiPredictedScore: latestScore ?? ass.score ?? ass.aiPredictedScore
                       };
                     }
                     return ass;
@@ -321,6 +394,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
     id: 'tx1',
     name: 'Bài kiểm tra',
     type: 'tx1',
+    category: 'exam',
     gradingMethod: 'Lần cao nhất',
     timeLimit: 'Không giới hạn',
     openTime: '01/09/2026',
@@ -393,7 +467,13 @@ export class CoursesComponent implements OnInit, OnDestroy {
   }
 
   // Submit Video Modal handlers
-  openSubmitModal(): void {
+  openSubmitModal(type: 'practice' | 'exam' = 'practice'): void {
+    const assessment = this.currentAssessment();
+    if (type === 'exam' && assessment.isExamSubmitted) {
+      this.showToast('Bài kiểm tra chính thức chỉ được nộp 1 lần duy nhất và bạn đã hoàn thành nộp bài!');
+      return;
+    }
+    this.submitType.set(type);
     this.selectedFile.set(null);
     this.selectedFileName.set('');
     this.hasVideoSelected.set(false);
@@ -449,6 +529,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
     const assessmentId = this.selectedAssessmentId();
     const user = this.authService.currentUser();
     const studentId = user?.id || user?.user_code || '67890';
+    const isExam = this.submitType() === 'exam';
 
     this.isUploading.set(true);
     this.uploadProgress.set(0);
@@ -482,14 +563,25 @@ export class CoursesComponent implements OnInit, OnDestroy {
                 date: dateStr,
                 pending: true,
                 videoUrl: videoResult?.video_url,
-                videoResultId: videoResult?.id
+                videoResultId: videoResult?.id,
+                isExamSubmission: isExam
               };
+
+              const updatedPractice = isExam
+                ? (currentAss.practiceAttempts || [])
+                : [newAttempt, ...(currentAss.practiceAttempts || [])];
+              const updatedExam = isExam ? newAttempt : (currentAss.examAttempt || null);
+              const aiScore = videoResult?.score ?? (isExam ? 8.5 : 8.0);
 
               const updatedAssessments = [...course.assessments];
               updatedAssessments[assessmentIndex] = {
                 ...currentAss,
                 status: 'pending',
-                attempts: [newAttempt, ...(currentAss.attempts || [])]
+                attempts: [newAttempt, ...(currentAss.attempts || [])],
+                practiceAttempts: updatedPractice,
+                examAttempt: updatedExam,
+                isExamSubmitted: currentAss.isExamSubmitted || isExam,
+                aiPredictedScore: currentAss.aiPredictedScore ?? aiScore
               };
 
               details[courseId] = {
@@ -501,7 +593,11 @@ export class CoursesComponent implements OnInit, OnDestroy {
           }
 
           this.closeSubmitModal();
-          this.showToast('Nộp video thành công! Video đã lưu trữ trên MinIO và đang chờ hệ thống AI xử lý.');
+          this.showToast(
+            isExam
+              ? 'Nộp video bài kiểm tra thành công! Hệ thống AI đang phân tích và chấm điểm dự kiến bài thi của bạn.'
+              : 'Nộp video luyện tập thành công! Bạn có thể xem lại kết quả phân tích động tác của AI.'
+          );
         }
       },
       error: (err) => {

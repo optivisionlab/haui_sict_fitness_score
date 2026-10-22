@@ -123,6 +123,11 @@ $border-color: #cbd5e1;
   justify-content: center;
   flex-shrink: 0;
 
+  &.courses-box {
+    background-color: #dbeafe;
+    color: #2563eb;
+  }
+
   &.schedule-box {
     background-color: #fef3c7;
     color: #d97706;
@@ -139,6 +144,202 @@ $border-color: #cbd5e1;
   font-weight: 700;
   color: $text-main;
   margin: 0;
+}
+
+.card-subtitle {
+  font-size: 0.78rem;
+  color: $text-muted;
+  margin: 3px 0 0;
+}
+
+.side-widgets-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* --- DANH SÁCH MÔN HỌC & TIẾN ĐỘ --- */
+.active-courses-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.home-course-card {
+  background-color: #ffffff;
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  border-radius: 12px;
+  padding: 18px 20px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+
+  &:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 8px 20px -4px rgba(37, 99, 235, 0.12);
+    transform: translateY(-2px);
+  }
+
+  .course-badge-wrap {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .class-code-badge {
+    background-color: #eff6ff;
+    color: #1d4ed8;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #bfdbfe;
+  }
+
+  .score-badge {
+    background-color: #ecfdf5;
+    color: #059669;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #a7f3d0;
+  }
+
+  .course-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 6px;
+    line-height: 1.35;
+  }
+
+  .course-instructor {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: #64748b;
+    margin-bottom: 14px;
+
+    svg {
+      color: #94a3b8;
+    }
+  }
+
+  .course-progress-section {
+    margin-bottom: 14px;
+  }
+
+  .progress-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    margin-bottom: 6px;
+  }
+
+  .progress-title {
+    color: #64748b;
+    font-weight: 500;
+  }
+
+  .progress-percent {
+    font-weight: 700;
+    color: #2563eb;
+
+    &.completed {
+      color: #16a34a;
+    }
+  }
+
+  .progress-bar-track {
+    height: 8px;
+    background-color: #f1f5f9;
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+    border-radius: 99px;
+    transition: width 0.4s ease;
+
+    &.success {
+      background: linear-gradient(90deg, #10b981, #059669);
+    }
+  }
+
+  .course-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 12px;
+    border-top: 1px dashed #e2e8f0;
+  }
+
+  .exam-date-text {
+    font-size: 0.78rem;
+    color: #64748b;
+  }
+
+  .status-active-dot {
+    font-size: 0.78rem;
+    color: #16a34a;
+    font-weight: 600;
+  }
+
+  .btn-enter-course {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background-color: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background-color: #2563eb;
+      color: #ffffff;
+      border-color: #2563eb;
+    }
+  }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 36px 16px;
+  color: #64748b;
+
+  .empty-icon {
+    color: #94a3b8;
+    margin-bottom: 10px;
+  }
+
+  .empty-title {
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 4px;
+  }
+
+  .empty-sub {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin: 0;
+  }
+}
+
+.empty-state-compact {
+  text-align: center;
+  padding: 20px 14px;
+  color: #94a3b8;
+  font-size: 0.82rem;
 }
 
 .btn-link-action {

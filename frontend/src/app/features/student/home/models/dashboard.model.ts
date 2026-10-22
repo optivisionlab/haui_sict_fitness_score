@@ -17,11 +17,14 @@ export interface ActiveCourseSummary {
   code: string;
   instructor: string;
   progress: number;
-  completedLessons: number;
-  totalLessons: number;
-  currentLesson: string;
-  coverImage: string;
-  category: string;
+  completedLessons?: number;
+  totalLessons?: number;
+  currentLesson?: string;
+  coverImage?: string;
+  category?: string;
+  iconType?: 'pickleball' | 'chay';
+  finalScore?: number;
+  examDate?: string;
 }
 
 export interface ScheduleItem {

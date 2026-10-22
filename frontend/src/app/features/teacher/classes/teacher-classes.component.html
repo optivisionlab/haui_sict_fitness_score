@@ -106,20 +106,27 @@
             </div>
 
             <div class="class-meta-badges">
-              <span class="badge" [ngClass]="getStatusBadgeClass(classItem.status)">
-                @if (classItem.status === 'completed') {
-                  <svg lucideCheckCircle2 [size]="14"></svg>
-                } @else {
-                  <svg lucideClock [size]="14"></svg>
-                }
-                {{ getStatusText(classItem.status) }}
-              </span>
+              @if (classItem.is_grade_locked) {
+                <span class="badge badge-locked">
+                  <svg lucideLock [size]="13"></svg>
+                  <span>Đã chốt điểm</span>
+                </span>
+              } @else {
+                <span class="badge" [ngClass]="getStatusBadgeClass(classItem.status)">
+                  @if (classItem.status === 'completed') {
+                    <svg lucideCheckCircle2 [size]="14"></svg>
+                  } @else {
+                    <svg lucideClock [size]="14"></svg>
+                  }
+                  {{ getStatusText(classItem.status) }}
+                </span>
+              }
             </div>
           </div>
 
           <!-- Class Info -->
           <div class="class-content">
-            <div class="class-code-tag">{{ classItem.code || 'Chưa có mã' }}</div>
+            <div class="class-code-tag">Mã lớp học phần: {{ classItem.code || 'Chưa có mã' }}</div>
             <h3 class="class-title">{{ classItem.name }}</h3>
 
             <div class="info-list">
@@ -131,6 +138,16 @@
                 <svg lucideUsers class="info-icon" [size]="15"></svg>
                 <span>Sĩ số: <strong>{{ classItem.student_total }}</strong> sinh viên</span>
               </div>
+            </div>
+
+            <!-- Trạng thái Khóa luyện tập & Khóa nộp bài -->
+            <div class="lock-status-pills">
+              <span class="status-pill" [class.locked]="!classItem.allow_practice_submission">
+                {{ classItem.allow_practice_submission ? '● Luyện tập: Mở' : '🔒 Luyện tập: Khóa' }}
+              </span>
+              <span class="status-pill" [class.locked]="!classItem.allow_exam_submission">
+                {{ classItem.allow_exam_submission ? '● Nộp bài: Mở' : '🔒 Nộp bài: Khóa' }}
+              </span>
             </div>
           </div>
 
