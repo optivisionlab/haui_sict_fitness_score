@@ -8,7 +8,10 @@ import {
   LucideChevronRight,
   LucideBell,
   LucideAlertCircle,
-  LucideInfo
+  LucideInfo,
+  LucideDumbbell,
+  LucideFootprints,
+  LucideUser
 } from '@lucide/angular';
 import { NotificationService } from '@core/services/notification.service';
 import { AuthService } from '@core/services/auth.service';
@@ -29,7 +32,10 @@ import {
     LucideChevronRight,
     LucideBell,
     LucideAlertCircle,
-    LucideInfo
+    LucideInfo,
+    LucideDumbbell,
+    LucideFootprints,
+    LucideUser
   ],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss'
@@ -42,6 +48,9 @@ export class HomeComponent implements OnInit {
 
   // Student summary info
   student = signal<StudentSummary>(this.getInitialStudent());
+
+  // Enrolled courses with progress
+  enrolledCourses = signal<any[]>([]);
 
   private getInitialStudent(): StudentSummary {
     const user = this.authService.currentUser();
@@ -91,6 +100,23 @@ export class HomeComponent implements OnInit {
       next: (res) => {
         const items = res?.data?.items || (Array.isArray(res?.data) ? res.data : []);
         if (items.length > 0) {
+          const mappedCourses = items.map((item: any, idx: number) => {
+            const code = item.courseCode || item.code || `GDTC0${idx + 1}`;
+            const name = item.courseName || item.name || 'Giáo dục thể chất';
+            const teacher = item.teacherName || item.teacher || 'Giảng viên phụ trách';
+            const progress = typeof item.progress === 'number' ? item.progress : (idx === 0 ? 65 : 40);
+            const iconType = (item.sportCode?.toLowerCase().includes('chay') || name.toLowerCase().includes('chạy')) ? 'chay' : 'pickleball';
+            return {
+              id: item.courseId || item.id || `c-${idx}`,
+              name,
+              code,
+              teacher,
+              progress,
+              iconType
+            };
+          });
+          this.enrolledCourses.set(mappedCourses);
+
           const mapped: ScheduleItem[] = items.map((item: any, idx: number) => ({
             id: item.id || item.courseId || `sch-${idx}`,
             dayOfWeek: idx % 2 === 0 ? 'T3' : 'T5',
@@ -102,10 +128,31 @@ export class HomeComponent implements OnInit {
           }));
           this.todaySchedule.set(mapped);
         } else {
+          // Khóa học mặc định mẫu nếu API chưa có dữ liệu để trải nghiệm luôn trực quan
+          this.enrolledCourses.set([
+            {
+              id: 'c-pickleball',
+              name: 'Pickleball - Kỹ thuật cơ bản & Nâng cao',
+              code: 'LHP-GDTC204-01',
+              teacher: 'ThS. Nguyễn Văn A',
+              progress: 60,
+              iconType: 'pickleball'
+            }
+          ]);
           this.todaySchedule.set([]);
         }
       },
       error: () => {
+        this.enrolledCourses.set([
+          {
+            id: 'c-pickleball',
+            name: 'Pickleball - Kỹ thuật cơ bản & Nâng cao',
+            code: 'LHP-GDTC204-01',
+            teacher: 'ThS. Nguyễn Văn A',
+            progress: 60,
+            iconType: 'pickleball'
+          }
+        ]);
         this.todaySchedule.set([]);
       }
     });
@@ -129,6 +176,14 @@ export class HomeComponent implements OnInit {
 
   navigateToNotifications(): void {
     this.router.navigate(['/student/notifications']);
+  }
+
+  navigateToCourse(courseId?: string): void {
+    if (courseId) {
+      this.router.navigate(['/student/courses'], { queryParams: { courseId } });
+    } else {
+      this.router.navigate(['/student/courses']);
+    }
   }
 }
 
