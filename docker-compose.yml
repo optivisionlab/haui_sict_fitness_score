@@ -173,7 +173,8 @@ services:
       - SETUID
     security_opt:
       - no-new-privileges:true
-    pids_limit: 256
+    # MongoDB tạo 1 luồng cho mỗi kết nối: 256 không đủ khi backend chạy nhiều worker
+    pids_limit: 4096
     mem_limit: ${MONGODB_MEM_LIMIT:-2g}
     cpus: ${MONGODB_CPUS:-4}
     healthcheck:

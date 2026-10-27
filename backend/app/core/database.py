@@ -10,10 +10,12 @@ from redis import asyncio as aioredis
 
 from app.core.config import settings
 
-# MongoDB
+# MongoDB. Mỗi worker uvicorn có 2 client (sync + async); maxPoolSize giới hạn số kết nối
+# (MongoDB tạo 1 luồng/kết nối, mặc định 100/client sẽ vượt pids_limit của container mongo)
 _mongo_client = MongoClient(
     settings.MONGODB_URI,
     serverSelectionTimeoutMS=3000,
+    maxPoolSize=settings.MONGODB_MAX_POOL_SIZE,
     username=settings.MONGODB_USERNAME,
     password=settings.MONGODB_PASSWORD,
 )
@@ -42,6 +44,7 @@ def get_async_db() -> AsyncDatabase:
         _async_mongo_client = AsyncMongoClient(
             settings.MONGODB_URI,
             serverSelectionTimeoutMS=3000,
+            maxPoolSize=settings.MONGODB_MAX_POOL_SIZE,
             username=settings.MONGODB_USERNAME,
             password=settings.MONGODB_PASSWORD,
         )

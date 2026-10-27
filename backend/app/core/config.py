@@ -17,6 +17,8 @@ class Settings:
         "MONGODB_URI", "mongodb://127.0.0.1:27018/?authSource=admin"
     )
     MONGODB_DB: str = os.getenv("MONGODB_DB", "fitness_score")
+    # Kết nối tối đa mỗi client MongoDB (mỗi process có 1 client sync + 1 async)
+    MONGODB_MAX_POOL_SIZE: int = int(os.getenv("MONGODB_MAX_POOL_SIZE", "50"))
     MONGODB_USERNAME: str | None = os.getenv("MONGODB_USERNAME") or os.getenv(
         "MONGO_ROOT_USERNAME"
     )
