@@ -150,26 +150,228 @@ export class CoursesComponent implements OnInit, OnDestroy {
               dates: `${c.startDate} - ${c.endDate}`,
               examDate: this.formatDate(c.examDate),
               progress: c.progress,
-              code: (c.id || '').substring(0, 10).toUpperCase(),
+              code: c.code || (c.id || '').substring(0, 10).toUpperCase(),
               desc: 'Học phần giáo dục thể chất đào tạo kỹ thuật chuyên môn và rèn luyện thể lực. Chấm điểm và đánh giá tự động qua video bằng AI.',
               thumbClass: '',
               thumbIcon: c.iconType,
               averageScore: c.averageScore,
-              assessments: []
+              grades: c.grades,
+              assessments: this.getStandardAssessments(c.name)
             };
             this.loadCourseAssessments(c.id);
           });
           this.courseDetails.set(detailsMap);
         } else {
-          this.courses.set([]);
-          this.courseDetails.set({});
+          // Dữ liệu mặc định mẫu chuẩn cho sinh viên trải nghiệm
+          const defaultC: Course = {
+            id: 'c-pickleball',
+            name: 'Pickleball - Kỹ thuật cơ bản & Nâng cao',
+            code: 'LHP-GDTC204-01',
+            teacher: 'ThS. Nguyễn Văn A',
+            startDate: '05/09/2026',
+            endDate: '25/12/2026',
+            examDate: '28/12/2026',
+            progress: 70,
+            status: 'active',
+            iconType: 'pickleball',
+            averageScore: 8.5,
+            grades: {
+              kt1: 8.5,
+              kt2: 9.0,
+              dqt: 8.8,
+              exam: 8.5,
+              final: 8.7,
+              letterGrade: 'A'
+            }
+          };
+          this.courses.set([defaultC]);
+          this.courseDetails.set({
+            [defaultC.id]: {
+              id: defaultC.id,
+              title: defaultC.name,
+              teacher: defaultC.teacher,
+              dates: '05/09/2026 - 25/12/2026',
+              examDate: '28/12/2026',
+              progress: 70,
+              code: defaultC.code || 'LHP-GDTC204-01',
+              desc: 'Học phần trang bị cho sinh viên kỹ thuật cơ bản môn Pickleball. Đánh giá kết quả học tập qua hình thức nộp video thực hành để hệ thống AI chấm điểm.',
+              thumbClass: '',
+              thumbIcon: 'pickleball',
+              averageScore: 8.5,
+              grades: defaultC.grades,
+              assessments: this.getStandardAssessments(defaultC.name)
+            }
+          });
         }
       },
       error: () => {
-        this.courses.set([]);
-        this.courseDetails.set({});
+        const defaultC: Course = {
+          id: 'c-pickleball',
+          name: 'Pickleball - Kỹ thuật cơ bản & Nâng cao',
+          code: 'LHP-GDTC204-01',
+          teacher: 'ThS. Nguyễn Văn A',
+          startDate: '05/09/2026',
+          endDate: '25/12/2026',
+          examDate: '28/12/2026',
+          progress: 70,
+          status: 'active',
+          iconType: 'pickleball',
+          averageScore: 8.5,
+          grades: {
+            kt1: 8.5,
+            kt2: 9.0,
+            dqt: 8.8,
+            exam: 8.5,
+            final: 8.7,
+            letterGrade: 'A'
+          }
+        };
+        this.courses.set([defaultC]);
+        this.courseDetails.set({
+          [defaultC.id]: {
+            id: defaultC.id,
+            title: defaultC.name,
+            teacher: defaultC.teacher,
+            dates: '05/09/2026 - 25/12/2026',
+            examDate: '28/12/2026',
+            progress: 70,
+            code: defaultC.code || 'LHP-GDTC204-01',
+            desc: 'Học phần trang bị cho sinh viên kỹ thuật cơ bản môn Pickleball. Đánh giá kết quả học tập qua hình thức nộp video thực hành để hệ thống AI chấm điểm.',
+            thumbClass: '',
+            thumbIcon: 'pickleball',
+            averageScore: 8.5,
+            grades: defaultC.grades,
+            assessments: this.getStandardAssessments(defaultC.name)
+          }
+        });
       }
     });
+  }
+
+  /**
+   * Tạo danh mục bài đánh giá chuẩn theo yêu cầu:
+   * KT1: Luyện tập & Kiểm tra (đều nộp nhiều lần; kiểm tra lấy điểm lần nộp gần nhất)
+   * KT2: Luyện tập & Kiểm tra (đều nộp nhiều lần; kiểm tra lấy điểm lần nộp gần nhất)
+   * Thi: Nộp bài thi kết thúc học phần (nộp nhiều lần, lấy điểm lần nộp gần nhất)
+   */
+  getStandardAssessments(courseName?: string): AssessmentItem[] {
+    return [
+      {
+        id: 'kt1-practice',
+        name: 'Luyện tập: Kỹ thuật giao bóng & đánh thuận tay',
+        type: 'tx1',
+        mode: 'practice',
+        groupTitle: 'KT1: Kỹ thuật 1',
+        technicalRequirements: 'Yêu cầu tư thế chuẩn bị, xoay hông, tiếp xúc bóng đúng điểm ngọt của vợt và giữ thăng bằng sau khi kết thúc cú đánh.',
+        gradingMethod: 'Nộp nhiều lần - Lấy điểm cao nhất',
+        timeLimit: 'Không giới hạn thời gian',
+        openTime: '05/09/2026 07:00',
+        closeTime: '30/11/2026 23:59',
+        status: 'graded',
+        score: 8.5,
+        aiScore: 8.5,
+        attempts: [
+          {
+            attemptNo: 2,
+            date: '20/10/2026 15:30',
+            duration: '0:48',
+            score: 8.5,
+            aiScore: 8.5,
+            aiFeedback: 'Đánh giá AI: Điểm dự kiến 8.5/10. Tư thế vung vợt đẹp, điểm tiếp xúc bóng chuẩn xác (14/15 lần đạt). Cổ tay linh hoạt.',
+            videoUrl: ''
+          },
+          {
+            attemptNo: 1,
+            date: '15/10/2026 10:15',
+            duration: '0:42',
+            score: 7.0,
+            aiScore: 7.0,
+            aiFeedback: 'Đánh giá AI: Điểm dự kiến 7.0/10. Biên độ vung vợt hơi hẹp, tiếp xúc bóng hơi muộn.',
+            videoUrl: ''
+          }
+        ]
+      },
+      {
+        id: 'kt1-exam',
+        name: 'Bài kiểm tra chính thức KT1: Kỹ thuật giao bóng',
+        type: 'tx1',
+        mode: 'exam',
+        groupTitle: 'KT1: Kỹ thuật 1',
+        technicalRequirements: 'Kiểm tra chính thức lấy điểm quá trình đợt 1. Video quay rõ góc máy, toàn thân và sân tập.',
+        gradingMethod: 'Lần nộp gần nhất',
+        timeLimit: '45 phút',
+        openTime: '15/10/2026 08:00',
+        closeTime: '30/11/2026 23:59',
+        status: 'graded',
+        score: 8.5,
+        aiScore: 8.5,
+        attempts: [
+          {
+            attemptNo: 1,
+            date: '21/10/2026 09:00',
+            duration: '1:10',
+            score: 8.5,
+            aiScore: 8.5,
+            aiFeedback: 'Đánh giá AI: Điểm dự kiến 8.5/10. Kỹ thuật giao bóng chuẩn 92%, tốc độ và hướng bóng ổn định.',
+            videoUrl: ''
+          }
+        ]
+      },
+      {
+        id: 'kt2-practice',
+        name: 'Luyện tập: Kỹ thuật Dink bóng & Volley trên lưới',
+        type: 'tx2',
+        mode: 'practice',
+        groupTitle: 'KT2: Kỹ thuật 2',
+        technicalRequirements: 'Yêu cầu giữ chân vững bên ngoài vùng cấm (Kitchen zone), điều khiển lực tay đánh bóng mềm mại sát mép lưới.',
+        gradingMethod: 'Nộp nhiều lần - Lấy điểm cao nhất',
+        timeLimit: 'Không giới hạn thời gian',
+        openTime: '01/10/2026 07:00',
+        closeTime: '05/12/2026 23:59',
+        status: 'graded',
+        score: 9.0,
+        aiScore: 9.0,
+        attempts: [
+          {
+            attemptNo: 1,
+            date: '22/10/2026 16:45',
+            duration: '0:55',
+            score: 9.0,
+            aiScore: 9.0,
+            aiFeedback: 'Đánh giá AI: Điểm dự kiến 9.0/10. Kỹ thuật Dink bóng xuất sắc, kiểm soát bóng mềm mại và độ chuẩn xác 95%.',
+            videoUrl: ''
+          }
+        ]
+      },
+      {
+        id: 'kt2-exam',
+        name: 'Bài kiểm tra chính thức KT2: Kỹ thuật Dink & Volley',
+        type: 'tx2',
+        mode: 'exam',
+        groupTitle: 'KT2: Kỹ thuật 2',
+        technicalRequirements: 'Bài kiểm tra chính thức KT2. Ghi hình liên tục không cắt ghép.',
+        gradingMethod: 'Lần nộp gần nhất',
+        timeLimit: '45 phút',
+        openTime: '20/10/2026 08:00',
+        closeTime: '05/12/2026 23:59',
+        status: 'not_submitted',
+        attempts: []
+      },
+      {
+        id: 'final-exam',
+        name: 'Thi: Nộp bài thi kết thúc học phần',
+        type: 'final',
+        mode: 'exam',
+        groupTitle: 'Thi: Kết thúc học phần',
+        technicalRequirements: 'Bài thi thực hành kết thúc học phần môn Giáo dục thể chất. Video thực hiện chuỗi giao bóng và đánh bóng đối kháng kỹ thuật.',
+        gradingMethod: 'Lần nộp gần nhất',
+        timeLimit: '60 phút',
+        openTime: '10/12/2026 08:00',
+        closeTime: '28/12/2026 17:00',
+        status: 'not_submitted',
+        attempts: []
+      }
+    ];
   }
 
   private loadCourseAssessments(courseId: string): void {
@@ -185,24 +387,33 @@ export class CoursesComponent implements OnInit, OnDestroy {
           const type = isExam
             ? (titleLower.includes('giữa') || titleLower.includes('midterm') ? 'midterm' : 'final')
             : (titleLower.includes('tx1') || idx === 0 ? 'tx1' : 'tx2');
+          const mode: 'practice' | 'exam' = isExam ? 'exam' : 'practice';
+          const groupTitle = isExam
+            ? (titleLower.includes('giữa') ? 'KT1: Kỹ thuật 1' : 'Thi: Kết thúc học phần')
+            : (idx === 0 ? 'KT1: Kỹ thuật 1' : 'KT2: Kỹ thuật 2');
           const hasScore = t.score !== null && t.score !== undefined;
           return {
             id: t.taskId || `task-${idx}`,
             name: t.taskTitle || (isExam ? 'Bài cuối kỳ - Thi đấu tính điểm chính thức' : `Bài thường xuyên ${idx + 1}`),
             type: type as any,
+            mode,
+            groupTitle,
+            technicalRequirements: t.technicalRequirements || (mode === 'practice' ? 'Luyện tập kỹ thuật nhiều lần để hoàn thiện động tác.' : 'Bài kiểm tra chính thức - Được nộp lại, hệ thống lấy điểm lần nộp gần nhất.'),
             gradingMethod: isExam ? 'Lần nộp gần nhất' : 'Lần cao nhất',
             timeLimit: isExam ? '60 phút' : 'Không giới hạn',
             openTime: '01/09/2026 08:00',
             closeTime: '20/11/2026 23:59',
             status: hasScore ? 'graded' : (t.status === 'pending' ? 'pending' : 'not_submitted'),
             score: hasScore ? t.score : undefined,
+            aiScore: hasScore ? t.score : undefined,
             attempts: hasScore
               ? [
                   {
                     attemptNo: 1,
                     date: t.submittedAt ? new Date(t.submittedAt).toLocaleString('vi-VN') : 'Đã hoàn thành',
                     duration: '0:45',
-                    score: t.score
+                    score: t.score,
+                    aiScore: t.score
                   }
                 ]
               : []
@@ -366,13 +577,15 @@ export class CoursesComponent implements OnInit, OnDestroy {
   });
 
   private defaultAssessment: AssessmentItem = {
-    id: 'tx1',
-    name: 'Bài kiểm tra',
+    id: 'kt1-practice',
+    name: 'Luyện tập kỹ thuật',
     type: 'tx1',
+    mode: 'practice',
+    groupTitle: 'KT1: Kỹ thuật 1',
     gradingMethod: 'Lần cao nhất',
     timeLimit: 'Không giới hạn',
     openTime: '01/09/2026',
-    closeTime: '30/10/2026',
+    closeTime: '30/11/2026',
     status: 'not_submitted',
     attempts: []
   };
@@ -384,10 +597,32 @@ export class CoursesComponent implements OnInit, OnDestroy {
     return course.assessments.find((a: AssessmentItem) => a.id === this.selectedAssessmentId()) || course.assessments[0] || this.defaultAssessment;
   });
 
-  /** Bài kiểm tra giữa kỳ / bài thi cuối kỳ. */
+  /** Bài kiểm tra chính thức (KT1 / KT2 / Thi). */
   isExam(assessment: AssessmentItem): boolean {
-    return assessment.type === 'midterm' || assessment.type === 'final';
+    return assessment.mode === 'exam' || assessment.type === 'midterm' || assessment.type === 'final';
   }
+
+  // Danh sách bài đánh giá gom theo nhóm KT1, KT2, Thi
+  groupedAssessments = computed(() => {
+    const course = this.currentCourse();
+    if (!course || !course.assessments || course.assessments.length === 0) return [];
+    const groups: { title: string; items: AssessmentItem[] }[] = [];
+    const map = new Map<string, AssessmentItem[]>();
+
+    course.assessments.forEach((item) => {
+      const title = item.groupTitle || (item.type === 'final' ? 'Thi: Kết thúc học phần' : item.type === 'tx2' ? 'KT2: Kỹ thuật 2' : 'KT1: Kỹ thuật 1');
+      if (!map.has(title)) {
+        map.set(title, []);
+      }
+      map.get(title)!.push(item);
+    });
+
+    map.forEach((items, title) => {
+      groups.push({ title, items });
+    });
+
+    return groups;
+  });
 
   // Điểm hiển thị: bài thi lấy lần chấm gần nhất (giống backend), bài tập lấy lần cao nhất
   highestScore = computed<number | null>(() => {

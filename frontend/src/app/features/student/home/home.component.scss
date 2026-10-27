@@ -128,6 +128,11 @@ $border-color: #cbd5e1;
     color: #d97706;
   }
 
+  &.courses-box {
+    background-color: #eff6ff;
+    color: #2563eb;
+  }
+
   &.notif-box {
     background-color: #e0f2fe;
     color: #0284c7;
@@ -139,6 +144,13 @@ $border-color: #cbd5e1;
   font-weight: 700;
   color: $text-main;
   margin: 0;
+}
+
+.card-subtitle {
+  font-size: 0.78rem;
+  color: #64748b;
+  display: block;
+  margin-top: 2px;
 }
 
 .btn-link-action {
@@ -373,3 +385,168 @@ $border-color: #cbd5e1;
     flex-shrink: 0;
   }
 }
+
+/* --- KHỐI MÔN HỌC ĐANG HỌC & TIẾN ĐỘ --- */
+.enrolled-courses-section {
+  .courses-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 18px;
+    margin-top: 4px;
+  }
+}
+
+.course-home-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+
+  &:hover {
+    border-color: #93c5fd;
+    box-shadow: 0 8px 24px -4px rgba(37, 99, 235, 0.12);
+    transform: translateY(-2px);
+
+    .btn-enter-course {
+      background-color: #1d4ed8;
+      color: #ffffff;
+    }
+  }
+
+  .course-home-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .course-home-thumb {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    color: #2563eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    &.teal {
+      background: linear-gradient(135deg, #f0fdfa, #ccfbf1);
+      color: #0d9488;
+    }
+  }
+
+  .course-home-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    .class-code-pill {
+      align-self: flex-start;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #1d4ed8;
+      background-color: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      letter-spacing: 0.3px;
+    }
+
+    .course-home-title {
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.35;
+      margin: 2px 0 0 0;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .course-home-teacher {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-top: 2px;
+
+      svg {
+        color: #94a3b8;
+      }
+    }
+  }
+
+  .course-home-progress-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background-color: #f8fafc;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #f1f5f9;
+
+    .progress-info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+
+      .progress-title {
+        color: #64748b;
+        font-weight: 500;
+      }
+
+      .progress-percent {
+        color: #1d4ed8;
+        font-weight: 700;
+      }
+    }
+
+    .progress-bar-track {
+      width: 100%;
+      height: 6px;
+      background-color: #e2e8f0;
+      border-radius: 9999px;
+      overflow: hidden;
+
+      .progress-bar-value {
+        height: 100%;
+        background: linear-gradient(90deg, #3b82f6, #2563eb);
+        border-radius: 9999px;
+        transition: width 0.4s ease;
+      }
+    }
+  }
+
+  .course-home-footer {
+    display: flex;
+    justify-content: flex-end;
+
+    .btn-enter-course {
+      border: none;
+      background-color: #eff6ff;
+      color: #2563eb;
+      font-family: inherit;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+  }
+}

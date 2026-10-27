@@ -30,7 +30,71 @@
     </div>
   </div>
 
-  <!-- 2. NỘI DUNG CHÍNH: LỊCH HỌC VÀ THÔNG BÁO MỚI -->
+  <!-- 2. MÔN HỌC ĐANG HỌC & TIẾN ĐỘ -->
+  <div class="card enrolled-courses-section">
+    <div class="card-header-row">
+      <div class="header-title-wrap">
+        <div class="header-icon-box courses-box">
+          <svg lucideGraduationCap [size]="20"></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Môn học đang học & Tiến độ</h2>
+          <span class="card-subtitle">Theo dõi tiến độ học tập và bài kiểm tra các học phần</span>
+        </div>
+      </div>
+      <button type="button" class="btn-link-action" (click)="navigateToCourse()">
+        <span>Xem tất cả khóa học</span>
+        <svg lucideChevronRight [size]="16"></svg>
+      </button>
+    </div>
+
+    <div class="courses-grid">
+      @for (course of enrolledCourses(); track course.id) {
+        <div class="course-home-card" (click)="navigateToCourse(course.id)">
+          <div class="course-home-top">
+            <div class="course-home-thumb" [class.teal]="course.iconType === 'chay'">
+              @if (course.iconType === 'pickleball') {
+                <svg lucideDumbbell [size]="28"></svg>
+              } @else {
+                <svg lucideFootprints [size]="28"></svg>
+              }
+            </div>
+            <div class="course-home-meta">
+              <span class="class-code-pill">{{ course.code }}</span>
+              <h3 class="course-home-title">{{ course.name }}</h3>
+              <div class="course-home-teacher">
+                <svg lucideUser [size]="13"></svg>
+                <span>Giảng viên: {{ course.teacher }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="course-home-progress-wrap">
+            <div class="progress-info-row">
+              <span class="progress-title">Tiến độ hoàn thành</span>
+              <span class="progress-percent">{{ course.progress }}%</span>
+            </div>
+            <div class="progress-bar-track">
+              <div class="progress-bar-value" [style.width.%]="course.progress"></div>
+            </div>
+          </div>
+
+          <div class="course-home-footer">
+            <button type="button" class="btn-enter-course" (click)="navigateToCourse(course.id); $event.stopPropagation()">
+              <span>Vào học ngay</span>
+              <svg lucideChevronRight [size]="15"></svg>
+            </button>
+          </div>
+        </div>
+      } @empty {
+        <div class="empty-state">
+          Bạn chưa được ghi danh vào môn học nào.
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- 3. LỊCH HỌC VÀ THÔNG BÁO MỚI -->
   <div class="dashboard-main-grid">
     <!-- KHỐI 1: LỊCH HỌC -->
     <div class="card section-card schedule-section">
