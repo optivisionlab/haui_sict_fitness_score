@@ -1,4 +1,4 @@
-import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 import bcrypt
@@ -20,33 +20,42 @@ ph = PasswordHasher(
     memory_cost=settings.PASSWORD_HASH_MEMORY_KIB,
     parallelism=settings.PASSWORD_HASH_PARALLELISM,
 )
-# Giới hạn số lượt băm/kiểm tra mật khẩu chạy cùng lúc: RAM đỉnh = số lượt x memory_cost,
-# các lượt còn lại xếp hàng (đăng nhập chậm hơn một chút thay vì làm sập tiến trình).
-_password_slots = threading.BoundedSemaphore(settings.PASSWORD_HASH_CONCURRENCY)
+# Băm/kiểm tra mật khẩu chạy trên một thread pool riêng, cố định PASSWORD_HASH_CONCURRENCY luồng:
+# - RAM đỉnh = số luồng x memory_cost, các lượt còn lại xếp hàng (chậm hơn chút thay vì sập);
+# - glibc giữ lại bộ đệm Argon2 (vài chục MB) trong arena của từng luồng đã băm: nếu băm trên
+#   threadpool ~40 luồng của FastAPI, mỗi worker giữ tới hàng trăm MB. Pool cố định giới hạn việc đó.
+_password_pool = ThreadPoolExecutor(
+    max_workers=settings.PASSWORD_HASH_CONCURRENCY, thread_name_prefix="password-hash"
+)
+
+
+def _in_password_pool(fn, *args):
+    return _password_pool.submit(fn, *args).result()
+
+
 security = HTTPBearer(auto_error=False)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 def hash_password(password: str) -> str:
     """Hash mật khẩu bằng Argon2."""
-    with _password_slots:
-        return ph.hash(password)
+    return _in_password_pool(ph.hash, password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Xác thực mật khẩu hỗ trợ cả Argon2 và Bcrypt."""
     if hashed_password.startswith("$argon2"):
         try:
-            with _password_slots:
-                return ph.verify(hashed_password, plain_password)
+            return _in_password_pool(ph.verify, hashed_password, plain_password)
         except VerifyMismatchError:
             return False
         except Exception:
             return False
     elif hashed_password.startswith("$2"):
         try:
-            with _password_slots:
-                return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+            return _in_password_pool(
+                bcrypt.checkpw, plain_password.encode("utf-8"), hashed_password.encode("utf-8")
+            )
         except Exception:
             return False
 
