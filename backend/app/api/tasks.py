@@ -43,7 +43,7 @@ def list_tasks(
     total_pages = math.ceil(total / page_size) if page_size > 0 else 0
 
     return PaginatedResponse[TaskRead](
-        items=[task_service.to_read_dto(t) for t in items],
+        items=task_service.to_read_dtos(items),
         total=total,
         page=page,
         page_size=page_size,

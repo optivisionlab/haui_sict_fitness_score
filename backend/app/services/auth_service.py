@@ -1,3 +1,4 @@
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 import bcrypt
@@ -12,33 +13,55 @@ from app.crud.user import crud_user
 from app.models.user import User, UserRole
 from app.schemas.user import TokenData
 
-ph = PasswordHasher()
+# Argon2id theo khuyến nghị OWASP (m=19 MiB, t=2, p=1). Mặc định của argon2-cffi (m=64 MiB, p=4)
+# làm ~40 lượt đăng nhập đồng thời chiếm >2,5 GB RAM và container backend (768 MB) bị OOM-kill.
+ph = PasswordHasher(
+    time_cost=settings.PASSWORD_HASH_TIME_COST,
+    memory_cost=settings.PASSWORD_HASH_MEMORY_KIB,
+    parallelism=settings.PASSWORD_HASH_PARALLELISM,
+)
+# Giới hạn số lượt băm/kiểm tra mật khẩu chạy cùng lúc: RAM đỉnh = số lượt x memory_cost,
+# các lượt còn lại xếp hàng (đăng nhập chậm hơn một chút thay vì làm sập tiến trình).
+_password_slots = threading.BoundedSemaphore(settings.PASSWORD_HASH_CONCURRENCY)
 security = HTTPBearer(auto_error=False)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 def hash_password(password: str) -> str:
     """Hash mật khẩu bằng Argon2."""
-    return ph.hash(password)
+    with _password_slots:
+        return ph.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Xác thực mật khẩu hỗ trợ cả Argon2 và Bcrypt."""
     if hashed_password.startswith("$argon2"):
         try:
-            return ph.verify(hashed_password, plain_password)
+            with _password_slots:
+                return ph.verify(hashed_password, plain_password)
         except VerifyMismatchError:
             return False
         except Exception:
             return False
     elif hashed_password.startswith("$2"):
         try:
-            return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+            with _password_slots:
+                return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
         except Exception:
             return False
-    
+
     # Không cho phép mật khẩu dạng plain text để đảm bảo bảo mật
     return False
+
+
+def password_needs_rehash(hashed_password: str) -> bool:
+    """True nếu hash dùng thuật toán/tham số cũ (bcrypt, Argon2 mặc định cũ) cần băm lại."""
+    if not hashed_password.startswith("$argon2"):
+        return True
+    try:
+        return ph.check_needs_rehash(hashed_password)
+    except Exception:
+        return False
 
 
 def create_access_token(

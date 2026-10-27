@@ -1,7 +1,8 @@
 """
 Fake AI service dùng cho test: HTTP/1.1 keep-alive tối giản, đếm kết nối và request.
 
-Hành vi theo `detail.title` của request:
+Hành vi theo đoạn `fake=<hành vi>` trong `object_key` (vd `submissions/fake=sleep:3/x.mp4`),
+hoặc `detail.title` của request kiểu cũ:
 - "sleep:<giây>"  -> chờ rồi trả kết quả completed
 - "status:<mã>"   -> trả HTTP status tương ứng
 - "busy:<n>"      -> n lần gọi đầu của job trả 429 + Retry-After: 1, sau đó completed
@@ -101,6 +102,9 @@ class FakeAIServer:
         self.max_concurrent = max(self.max_concurrent, self.concurrent)
         try:
             title = (body.get("detail") or {}).get("title", "")
+            for part in str(body.get("object_key") or "").split("/"):
+                if part.startswith("fake="):
+                    title = part[len("fake="):]
             if title.startswith("busy:") and self.calls[job_id] <= int(title.split(":", 1)[1]):
                 return 429, {"detail": "Server busy"}
             if title.startswith("status:"):

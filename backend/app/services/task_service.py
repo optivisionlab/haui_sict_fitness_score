@@ -112,22 +112,49 @@ class TaskService:
 
     def to_read_dto(self, task: Task) -> TaskRead:
         """Chuyển đổi Task entity sang TaskRead DTO kèm thông tin sport và số lượng bài nộp."""
-        sport = crud_sport.get(task.sport_id)
-        sport_name = sport.name if sport else None
-        sport_mode = sport.mode.value if sport else None
+        return self.to_read_dtos([task])[0]
 
-        # Đếm số lượng bài nộp
-        sub_count = crud_video_result.collection.count_documents({"taskId": str(task.id)})
-        graded_count = crud_video_result.collection.count_documents(
-            {"taskId": str(task.id), "$or": [{"pending": False}, {"finalScore": {"$ne": None}}]}
-        )
-
-        dto_data = task.model_dump()
-        dto_data["sport_name"] = sport_name
-        dto_data["sport_mode"] = sport_mode
-        dto_data["submitted_count"] = sub_count
-        dto_data["graded_count"] = graded_count
-        return TaskRead.model_validate(dto_data)
+    def to_read_dtos(self, tasks: list[Task]) -> list[TaskRead]:
+        """Như to_read_dto cho cả danh sách: 1 truy vấn sport + 1 aggregate đếm bài nộp
+        (trước đây mỗi task tốn 3 truy vấn)."""
+        if not tasks:
+            return []
+        sport_ids = {to_object_id(t.sport_id) for t in tasks if to_object_id(t.sport_id)}
+        sports = {
+            str(doc["_id"]): doc
+            for doc in crud_sport.collection.find({"_id": {"$in": list(sport_ids)}}, {"name": 1, "mode": 1})
+        }
+        task_ids = [str(t.id) for t in tasks]
+        counts = {
+            row["_id"]: row
+            for row in crud_video_result.collection.aggregate([
+                {"$match": {"taskId": {"$in": task_ids}}},
+                {"$group": {
+                    "_id": "$taskId",
+                    "submitted": {"$sum": 1},
+                    # Cùng điều kiện với bản cũ: pending == False hoặc finalScore khác null
+                    "graded": {"$sum": {"$cond": [
+                        {"$or": [
+                            {"$eq": ["$pending", False]},
+                            {"$ne": [{"$ifNull": ["$finalScore", None]}, None]},
+                        ]},
+                        1, 0,
+                    ]}},
+                }},
+            ])
+        }
+        dtos = []
+        for task in tasks:
+            sport = sports.get(str(task.sport_id))
+            row = counts.get(str(task.id), {})
+            dto_data = task.model_dump()
+            dto_data["sport_name"] = sport.get("name") if sport else None
+            mode = sport.get("mode") if sport else None
+            dto_data["sport_mode"] = getattr(mode, "value", mode)
+            dto_data["submitted_count"] = row.get("submitted", 0)
+            dto_data["graded_count"] = row.get("graded", 0)
+            dtos.append(TaskRead.model_validate(dto_data))
+        return dtos
 
 
 task_service = TaskService()

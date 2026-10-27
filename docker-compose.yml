@@ -39,6 +39,9 @@ services:
     restart: unless-stopped
     # Lớn hơn AI_WORKER_SHUTDOWN_GRACE + 10s để kịp drain job đang chấm trước khi bị SIGKILL
     stop_grace_period: 45s
+    # Nhiều tiến trình API: outbox claim job bằng lease nguyên tử và result consumer dùng
+    # consumer group nên chạy song song an toàn (mỗi worker là 1 process riêng)
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "${BACKEND_WORKERS:-4}"]
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     env_file:
@@ -69,9 +72,12 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
-    pids_limit: 128
-    mem_limit: 768m
-    cpus: 1.50
+    # Mỗi worker uvicorn có threadpool ~40 luồng; pids_limit tính cả luồng
+    pids_limit: 1024
+    ulimits:
+      nofile: { soft: 65536, hard: 65536 }
+    mem_limit: ${BACKEND_MEM_LIMIT:-2g}
+    cpus: ${BACKEND_CPUS:-4}
     healthcheck:
       test:
         - CMD
@@ -111,6 +117,10 @@ services:
     environment:
       <<: *backend-environment
       APP_ROLE: worker
+      # Khớp sức chứa AI (số instance x slot, xem pickleball-ai): job dư nằm chờ trong hàng đợi AI
+      AI_MAX_CONCURRENCY: ${AI_MAX_CONCURRENCY:-6}
+      AI_POOL_SMALL_CONCURRENCY: ${AI_POOL_SMALL_CONCURRENCY:-4}
+      AI_POOL_LARGE_CONCURRENCY: ${AI_POOL_LARGE_CONCURRENCY:-2}
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
@@ -118,7 +128,9 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
-    pids_limit: 128
+    pids_limit: 512
+    ulimits:
+      nofile: { soft: 65536, hard: 65536 }
     mem_limit: 512m
     cpus: 1.00
     healthcheck:
@@ -162,8 +174,8 @@ services:
     security_opt:
       - no-new-privileges:true
     pids_limit: 256
-    mem_limit: 768m
-    cpus: 1.50
+    mem_limit: ${MONGODB_MEM_LIMIT:-2g}
+    cpus: ${MONGODB_CPUS:-4}
     healthcheck:
       test:
         - CMD-SHELL
@@ -290,7 +302,10 @@ services:
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic video-grading-jobs-small --partitions 3 --replication-factor 1 &&
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic video-grading-jobs-large --partitions 3 --replication-factor 1 &&
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic video-grading-results --partitions 3 --replication-factor 1 &&
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic video-grading-dlq --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic video-grading-dlq --partitions 1 --replication-factor 1 &&
+        for t in video-grading-jobs video-grading-jobs-small video-grading-jobs-large video-grading-results; do
+        /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafka:9093 --alter --entity-type topics --entity-name $$t
+        --add-config retention.ms=259200000,retention.bytes=268435456 || exit 1; done
     networks:
       - app
 

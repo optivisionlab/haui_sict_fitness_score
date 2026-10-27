@@ -28,6 +28,12 @@ class Settings:
     SECRET_KEY: str = os.getenv("SECRET_KEY", "changeme")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 10080))  # 7 days
+    # Argon2id (OWASP: m=19 MiB, t=2, p=1); mật khẩu băm bằng tham số cũ được băm lại khi đăng nhập
+    PASSWORD_HASH_TIME_COST: int = int(os.getenv("PASSWORD_HASH_TIME_COST", "2"))
+    PASSWORD_HASH_MEMORY_KIB: int = int(os.getenv("PASSWORD_HASH_MEMORY_KIB", "19456"))
+    PASSWORD_HASH_PARALLELISM: int = int(os.getenv("PASSWORD_HASH_PARALLELISM", "1"))
+    # Số lượt băm/kiểm tra mật khẩu đồng thời mỗi process (RAM đỉnh ~ số lượt x memory)
+    PASSWORD_HASH_CONCURRENCY: int = int(os.getenv("PASSWORD_HASH_CONCURRENCY", "4"))
 
     # Redis
     REDIS_HOST: str = os.getenv("REDIS_HOST", "127.0.0.1")
@@ -72,7 +78,8 @@ class Settings:
     AI_WORKER_SHUTDOWN_GRACE: float = float(os.getenv("AI_WORKER_SHUTDOWN_GRACE", "30"))
     AI_MAX_RETRIES: int = int(os.getenv("AI_MAX_RETRIES", "3"))
     # 2 làn theo thời lượng video: video dài không chặn video ngắn
-    AI_LANE_THRESHOLD_SEC: float = float(os.getenv("AI_LANE_THRESHOLD_SEC", "90"))
+    # Video dài hơn ngưỡng đi làn large; 20 s để video vài giây không phải chờ sau video ~1 phút
+    AI_LANE_THRESHOLD_SEC: float = float(os.getenv("AI_LANE_THRESHOLD_SEC", "20"))
     AI_POOL_SMALL_CONCURRENCY: int = int(os.getenv("AI_POOL_SMALL_CONCURRENCY", "2"))
     AI_POOL_LARGE_CONCURRENCY: int = int(os.getenv("AI_POOL_LARGE_CONCURRENCY", "1"))
     # Timeout gọi AI = min(BASE + PER_VIDEO_SEC x durationSec, MAX); thiếu durationSec thì dùng AI_API_TIMEOUT_SECONDS

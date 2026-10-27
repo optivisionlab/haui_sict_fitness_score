@@ -126,4 +126,4 @@ def get_course_tasks(
     tasks, _ = task_service.list_tasks(
         course_id=str(course.id), category=category, limit=100
     )
-    return [task_service.to_read_dto(t) for t in tasks]
+    return task_service.to_read_dtos(tasks)

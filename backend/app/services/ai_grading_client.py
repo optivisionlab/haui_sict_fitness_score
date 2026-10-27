@@ -1,13 +1,8 @@
-import asyncio
-from datetime import timedelta
 from typing import Any
 
 import httpx
 
 from app.core.config import settings
-
-# Thời hạn presigned GET URL gửi cho AI: đủ dài để AI xếp hàng + tải video
-AI_VIDEO_URL_TTL = timedelta(hours=2)
 
 # seed_data dùng code "PICKLE", sports/definitions dùng "PICKLEBALL"
 PICKLEBALL_CODES = {"PICKLE", "PICKLEBALL"}
@@ -58,91 +53,46 @@ class AIGradingClient:
         raise AIGradingError("unsupported_route", retryable=False)
 
     @staticmethod
-    def _build_detail(detail: Any) -> dict[str, str]:
-        """AI yêu cầu detail = {title, category, gradingMethod, timeLimit}, tất cả là chuỗi."""
-        if not isinstance(detail, dict):
-            detail = {"title": detail} if detail else {}
-        return {
-            key: "" if detail.get(key) is None else str(detail.get(key))
-            for key in ("title", "category", "gradingMethod", "timeLimit")
-        }
-
-    @staticmethod
     def build_request(job: dict[str, Any]) -> dict[str, Any]:
-        """Chuyển job (camelCase, lưu trong MongoDB/Kafka) sang request schema của AI API."""
-        job_id = job.get("jobId") or job.get("job_id")
-        result_id = job.get("resultId") or job.get("result_id")
-        task_id = job.get("taskId") or job.get("task_id")
-        course_id = job.get("courseId") or job.get("course_id")
-        sport_id = job.get("sportId") or job.get("sport_id")
-        sport_code = str(job.get("sportCode") or job.get("sport_code") or "").upper()
-        mode = str(job.get("mode") or "").upper()
+        """Request tối thiểu cho AI: AI chỉ cần job_id + bucket/object_key để tự tải video từ MinIO.
+
+        Không gửi task/course/user/detail và không ký presigned URL (AI dùng credential MinIO riêng).
+        """
+        result_id = job.get("resultId") or job.get("result_id") or job.get("jobId") or job.get("job_id")
+        job_id = job.get("jobId") or job.get("job_id") or result_id
         bucket = job.get("bucket") or job.get("minioBucket") or settings.MINIO_BUCKET_NAME
         object_key = job.get("objectKey") or job.get("object_key")
-        user_id = job.get("userId") or job.get("user_id")
-        attempt = int(job.get("attemptNo") or job.get("attempt") or 1)
-
-        if object_key and object_key.startswith(f"{bucket}/"):
+        if not job_id:
+            raise AIGradingError("invalid_job_missing_job_id", retryable=False)
+        if not object_key:
+            raise AIGradingError("invalid_job_missing_object_key", retryable=False)
+        if object_key.startswith(f"{bucket}/"):
             object_key = object_key[len(bucket) + 1:]
 
-        required = {
-            "job_id": job_id,
-            "result_id": result_id,
-            "task_id": task_id,
-            "course_id": course_id,
-            "sport_id": sport_id,
-            "user_id": user_id,
-            "object_key": object_key,
-        }
-        missing = [name for name, value in required.items() if not value]
-        if missing:
-            raise AIGradingError(f"invalid_job_missing_{missing[0]}", retryable=False)
-
-        # URL video trên MinIO (presigned GET) để AI có thể tải trực tiếp
-        from app.services.minio_service import minio_service
-        try:
-            video_url = minio_service.get_presigned_url(
-                object_key, expires=AI_VIDEO_URL_TTL, bucket_name=bucket
-            )
-        except Exception as exc:
-            raise AIGradingError("minio_presign_failed", retryable=True) from exc
-
-        return {
+        request = {
             "job_id": str(job_id),
             "result_id": str(result_id),
-            "task_id": str(task_id),
-            "course_id": str(course_id),
-            "sport_id": str(sport_id),
-            "sport_code": sport_code,
-            "mode": mode,
             "bucket": bucket,
             "object_key": object_key,
-            "video_url": video_url,
-            "minio_endpoint": settings.AI_MINIO_ENDPOINT,
-            "user_id": str(user_id),
-            "attempt": attempt,
-            "schema_version": int(job.get("schemaVersion") or job.get("schema_version") or 1),
-            "detail": AIGradingClient._build_detail(job.get("detail")),
+            "mode": str(job.get("mode") or "VIDEO").upper(),
+            "attempt": int(job.get("attemptNo") or job.get("attempt") or 1),
         }
+        if settings.AI_MINIO_ENDPOINT:
+            request["minio_endpoint"] = settings.AI_MINIO_ENDPOINT
+        return request
 
     async def grade(self, job: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
-        # build_request ký presigned URL qua MinIO SDK (đồng bộ, lần đầu có gọi mạng lấy region)
-        request_data = await asyncio.to_thread(self.build_request, job)
+        request_data = self.build_request(job)
         if self.mock_mode:
             return {
-                "jobId": request_data["job_id"],
                 "resultId": request_data["result_id"],
-                "sportCode": request_data["sport_code"],
-                "mode": request_data["mode"],
                 "status": "completed",
-                "score": 8.5,
                 "aiScore": 8.5,
-                "feedback": "Bài tập Pickleball đạt yêu cầu kỹ thuật cơ bản.",
                 "aiComment": "Bài tập Pickleball đạt yêu cầu kỹ thuật cơ bản.",
                 "metrics": {"accuracy": 0.85, "hitCount": 17, "missCount": 3},
             }
 
-        endpoint = self.resolve_endpoint(request_data["sport_code"], request_data["mode"])
+        endpoint = self.resolve_endpoint(job.get("sportCode") or job.get("sport_code"), request_data["mode"])
         if not endpoint:
             raise AIGradingError("ai_endpoint_not_configured", retryable=False)
 
@@ -169,15 +119,15 @@ class AIGradingClient:
                     retry_after = None
             raise AIGradingError(f"ai_http_{response.status_code}", retryable=retryable, retry_after=retry_after)
 
-        result = response.json()
-        result.setdefault("jobId", request_data["job_id"])
-        result.setdefault("resultId", request_data["result_id"])
-        result.setdefault("status", "completed")
-        if "aiScore" not in result and "score" in result:
-            result["aiScore"] = result["score"]
-        if "aiComment" not in result and "feedback" in result:
-            result["aiComment"] = result["feedback"]
-        return result
+        body = response.json()
+        # Kết quả gửi lên Kafka chỉ gồm trường backend dùng (không lặp score/aiScore, feedback/aiComment)
+        return {
+            "resultId": request_data["result_id"],
+            "status": body.get("status", "completed"),
+            "aiScore": body.get("aiScore", body.get("score")),
+            "aiComment": body.get("aiComment", body.get("feedback")),
+            "metrics": body.get("metrics") or {},
+        }
 
 
 ai_grading_client = AIGradingClient()

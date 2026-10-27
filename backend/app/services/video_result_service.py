@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, UploadFile, status
+from pymongo.errors import DuplicateKeyError
+from pymongo.results import InsertOneResult
 from app.crud.base import to_object_id
 from app.crud.course import crud_course
 from app.crud.enrollment import crud_enrollment
@@ -29,6 +31,7 @@ from app.schemas.video_result import (
     VideoUploadUrlResponse,
 )
 from app.services.enrollment_service import enrollment_service
+from app.services.grading_job import build_grading_job
 from app.services.minio_service import minio_service
 from app.services.notification_service import notification_service
 from app.services.sports.registry import sport_registry
@@ -44,8 +47,44 @@ LEGACY_UPLOAD_TOO_LARGE_MESSAGE = (
 
 logger = logging.getLogger(__name__)
 
+# Số lần thử lấy attemptNo mới khi nhiều bài nộp đồng thời
+ATTEMPT_INSERT_RETRIES = 5
+
 
 class VideoResultService:
+    @staticmethod
+    def _next_attempt_no(task_id: str, user_id: str) -> int:
+        latest = crud_video_result.collection.find_one(
+            {"taskId": str(task_id), "userId": str(user_id)},
+            {"attemptNo": 1},
+            sort=[("attemptNo", -1)],
+        )
+        return (latest["attemptNo"] if latest else 0) + 1
+
+    def _insert_with_free_attempt(self, data: dict, insert):
+        """Ghi bài nộp; trùng attemptNo (SV nộp nhiều bài cùng lúc) thì lấy số lần nộp kế tiếp.
+
+        attemptNo được tính trước khi ghi nên 2 request đồng thời có thể ra cùng số; index unique
+        (taskId, userId, attemptNo) chặn bản thứ hai, ta lấy số mới thay vì trả lỗi 500.
+        Trùng khóa khác (vd _id khi confirm lại) được ném lại cho caller xử lý.
+        """
+        for _ in range(ATTEMPT_INSERT_RETRIES):
+            try:
+                created = insert(data)
+                return created if not isinstance(created, InsertOneResult) else data
+            except DuplicateKeyError as exc:
+                if "attemptNo" not in ((exc.details or {}).get("keyPattern") or {}):
+                    raise
+                data["attemptNo"] = self._next_attempt_no(data["taskId"], data["userId"])
+                if isinstance(data.get("gradingJob"), dict):
+                    data["gradingJob"]["attemptNo"] = data["attemptNo"]
+                logger.info("attemptNo clash for task=%s user=%s, retrying with %s",
+                            data["taskId"], data["userId"], data["attemptNo"])
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Có nhiều bài nộp cùng lúc cho bài tập này, vui lòng thử lại",
+        )
+
     def _validate_submission_guards(
         self, task_id: str, user_id: str, sport_id: str
     ) -> tuple[Task, Course, int]:
@@ -319,25 +358,16 @@ class VideoResultService:
             raise HTTPException(status_code=400, detail="Thông tin task/course/sport không còn hợp lệ")
 
         now = datetime.now(timezone.utc)
-        job = {
-            "jobId": str(result_id),
-            "resultId": str(result_id),
-            "taskId": session["taskId"],
-            "courseId": session["courseId"],
-            "sportId": session["sportId"],
-            "sportCode": session["sportCode"],
-            "mode": session["sportMode"],
-            "userId": str(user_id),
-            "bucket": session["bucket"],
-            "objectKey": session["objectKey"],
-            "videoUrl": f"{session['bucket']}/{session['objectKey']}",
-            "minioBucket": session["bucket"],
-            "attemptNo": session["attemptNo"],
-            "durationSec": session.get("durationSec"),
-            "fileSize": object_stat.size,
-            "detail": session["taskDetail"],
-            "schemaVersion": 1,
-        }
+        job = build_grading_job(
+            result_id=result_id,
+            sport_code=session["sportCode"],
+            mode=session["sportMode"],
+            bucket=session["bucket"],
+            object_key=session["objectKey"],
+            attempt_no=session["attemptNo"],
+            duration_sec=session.get("durationSec"),
+            file_size=object_stat.size,
+        )
         data = {
             "_id": result_id,
             "taskId": session["taskId"],
@@ -364,16 +394,18 @@ class VideoResultService:
             "gradingJobNextAttemptAt": now,
         }
         try:
-            crud_video_result.collection.insert_one(data)
-        except Exception:
+            attempt_no = self._insert_with_free_attempt(data, crud_video_result.collection.insert_one)["attemptNo"]
+        except DuplicateKeyError:
+            # confirm gọi lại cho cùng phiên upload: bài nộp đã được ghi
             existing = crud_video_result.collection.find_one({"_id": result_id})
             if not existing:
                 raise
+            attempt_no = existing.get("attemptNo", session["attemptNo"])
         sessions.update_one({"_id": upload_oid}, {"$set": {"status": "confirmed", "confirmedAt": now}})
         notification_service.send_notification(
             user_id=str(user_id),
             title=f"Đã nộp bài: {task.title}",
-            message=f"Bài nộp lần thứ {session['attemptNo']} đã được xác nhận và đang chờ hệ thống AI xử lý.",
+            message=f"Bài nộp lần thứ {attempt_no} đã được xác nhận và đang chờ hệ thống AI xử lý.",
             notif_type=NotificationType.SUBMISSION_RECEIVED,
             link=f"/student/courses/{task.course_id}/grades",
         )
@@ -400,7 +432,8 @@ class VideoResultService:
             data["studentName"] = user.name
             data["studentCode"] = user.user_code
 
-        created = crud_video_result.create(data)
+        created = self._insert_with_free_attempt(data, crud_video_result.create)
+        next_attempt = created.attempt_no
 
         # Gửi job chấm điểm vào Kafka nếu có video_url
         if video_in.video_url:
@@ -505,30 +538,16 @@ class VideoResultService:
             # Denormalization (lưu dư thừa)
             "courseId": str(task.course_id),
             "taskTitle": task.title,
-            "gradingJob": {
-                "jobId": None,
-                "resultId": None,
-                "taskId": str(task_id),
-                "courseId": str(task.course_id),
-                "sportId": str(sport_id),
-                "sportCode": sport_code,
-                "mode": sport_mode,
-                "userId": str(user_id),
-                "bucket": settings.MINIO_BUCKET_NAME,
-                "objectKey": object_name,
-                "videoUrl": minio_path,
-                "minioBucket": settings.MINIO_BUCKET_NAME,
-                "attemptNo": next_attempt,
-                "durationSec": duration_sec,
-                "fileSize": file_size,
-                "detail": {
-                    "title": task.title,
-                    "category": task.category.value,
-                    "gradingMethod": task.grading_method.value,
-                    "timeLimit": task.time_limit,
-                },
-                "schemaVersion": 1,
-            },
+            "gradingJob": build_grading_job(
+                result_id=None,
+                sport_code=sport_code,
+                mode=sport_mode,
+                bucket=settings.MINIO_BUCKET_NAME,
+                object_key=object_name,
+                attempt_no=next_attempt,
+                duration_sec=duration_sec,
+                file_size=file_size,
+            ),
             "gradingJobStatus": "pending",
             "gradingJobAttempts": 0,
             "gradingJobNextAttemptAt": now,
@@ -537,11 +556,12 @@ class VideoResultService:
             data["studentName"] = user.name
             data["studentCode"] = user.user_code
 
-        created = crud_video_result.create(data)
+        created = self._insert_with_free_attempt(data, crud_video_result.create)
+        next_attempt = created.attempt_no
         result_oid = ObjectId(created.id)
         crud_video_result.collection.update_one(
             {"_id": result_oid},
-            {"$set": {"gradingJob.jobId": str(created.id), "gradingJob.resultId": str(created.id)}}
+            {"$set": {"gradingJob.jobId": str(created.id)}}
         )
 
         notification_service.send_notification(

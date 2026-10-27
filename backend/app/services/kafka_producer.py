@@ -21,7 +21,10 @@ class KafkaProducerService:
             self._loop = asyncio.get_running_loop()
             self._producer = AIOKafkaProducer(
                 bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-                value_serializer=lambda v: json.dumps(v, default=str).encode("utf-8"),
+                # JSON gọn: không khoảng trắng, giữ nguyên UTF-8 (tiếng Việt không thành \uXXXX)
+                value_serializer=lambda v: json.dumps(
+                    v, default=str, ensure_ascii=False, separators=(",", ":")
+                ).encode("utf-8"),
                 key_serializer=lambda k: k.encode("utf-8") if k else None,
             )
             await self._producer.start()

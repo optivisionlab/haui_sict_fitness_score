@@ -1,10 +1,15 @@
+import logging
 from typing import Optional
 from fastapi import HTTPException, status
 
+from app.crud.base import to_object_id
 from app.crud.user import crud_user
 from app.models.user import User, UserRole
 from app.schemas.user import Token, UserCreate, UserLogin, UserRead, UserUpdate
-from app.services.auth_service import create_access_token, hash_password, verify_password
+from app.services.auth_service import create_access_token, hash_password, password_needs_rehash, verify_password
+
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -45,6 +50,16 @@ class UserService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Tài khoản của bạn đã bị khóa",
             )
+
+        # Mật khẩu băm bằng tham số cũ (tốn RAM/CPU): băm lại bằng tham số hiện tại, chỉ 1 lần
+        if password_needs_rehash(user.password):
+            try:
+                crud_user.collection.update_one(
+                    {"_id": to_object_id(user.id)},
+                    {"$set": {"password": hash_password(login_data.password)}},
+                )
+            except Exception:
+                logger.warning("Could not rehash password for user %s", user.id, exc_info=True)
 
         access_token = create_access_token({
             "sub": str(user.id),

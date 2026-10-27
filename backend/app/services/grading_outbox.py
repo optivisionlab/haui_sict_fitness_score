@@ -7,6 +7,7 @@ from pymongo import ReturnDocument
 from app.core.database import get_async_db
 from app.services.grading_lanes import job_duration_sec, lane_topic, resolve_lane
 from app.services.kafka_producer import kafka_producer
+from app.services.grading_job import compact_job
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,8 @@ class GradingOutboxDispatcher:
             if not document:
                 break
 
-            job = document["gradingJob"]
+            # Job cũ (schema v1) có nhiều trường thừa: chỉ gửi phần worker/AI cần
+            job = compact_job(document["gradingJob"])
             duration = job_duration_sec(job, fallback=document.get("durationSec"))
             lane = resolve_lane(duration)
             if duration is not None and job.get("durationSec") is None:
@@ -192,7 +194,7 @@ class GradingOutboxDispatcher:
         from app.services.video_result_service import video_result_service
 
         collection = get_async_db().video_results
-        job = document["gradingJob"]
+        job = compact_job(document["gradingJob"])
         for field in ("durationSec", "fileSize"):
             if job.get(field) is None and document.get(field) is not None:
                 job = {**job, field: document[field]}

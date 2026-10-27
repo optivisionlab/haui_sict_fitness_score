@@ -40,9 +40,8 @@ def make_job(title: str = "ok") -> dict:
         "mode": "VIDEO",
         "userId": str(ObjectId()),
         "bucket": "videos",
-        "objectKey": f"submissions/test/{rid}.mp4",
+        "objectKey": f"submissions/fake={title}/{rid}.mp4",
         "attemptNo": 1,
-        "detail": {"title": title},
     }
 
 

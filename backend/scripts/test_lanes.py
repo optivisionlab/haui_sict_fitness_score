@@ -29,8 +29,9 @@ from pipeline_harness import FakeAIProcess, Pipeline
 def test_unit():
     print("\n[TEST 1] Chọn làn và timeout động")
     assert resolve_lane(None) == "small"
-    assert resolve_lane(90) == "small"
-    assert resolve_lane(91) == "large"
+    threshold = settings.AI_LANE_THRESHOLD_SEC
+    assert resolve_lane(threshold) == "small"
+    assert resolve_lane(threshold + 1) == "large"
     assert lane_topic("large") == settings.KAFKA_TOPIC_GRADING_JOBS_LARGE
     assert compute_ai_timeout({}) == settings.AI_API_TIMEOUT_SECONDS
     assert compute_ai_timeout({"durationSec": 30}) == 60 + 4 * 30
@@ -40,13 +41,16 @@ def test_unit():
     mb = 1024 * 1024
     assert compute_ai_timeout({"durationSec": 60, "fileSize": 52 * mb}) == 60 + 4 * 60 + 1 * 52
     assert compute_ai_timeout({"fileSize": 100 * mb}) == 60 + 100
-    print("  ✓ ≤90s/thiếu → small, >90s → large; timeout 30s→180s, 1000s→1800s (trần), thiếu → 600s")
+    print(f"  ✓ ≤{threshold:g}s/thiếu → small, >{threshold:g}s → large; timeout 30s→180s, 1000s→1800s (trần), thiếu → 600s")
     print("  ✓ Timeout cộng thêm theo dung lượng: 60s + 52MB → 352s; chỉ biết 100MB → 160s")
 
 
 def test_long_videos_do_not_block_short(fake_ai: FakeAIProcess):
     print("\n[TEST 2] 5 video dài vào cùng lúc, sau đó 2 video ngắn")
-    pipe = Pipeline(fake_ai, AI_POOL_SMALL_CONCURRENCY="2", AI_POOL_LARGE_CONCURRENCY="1", AI_MAX_CONCURRENCY="3")
+    pipe = Pipeline(
+        fake_ai, AI_POOL_SMALL_CONCURRENCY="2", AI_POOL_LARGE_CONCURRENCY="1", AI_MAX_CONCURRENCY="3",
+        AI_LANE_THRESHOLD_SEC="90",
+    )
     try:
         pipe.create_topics()
         pipe.start_app()

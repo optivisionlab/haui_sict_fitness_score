@@ -221,7 +221,8 @@ class Pipeline:
         result_id = ObjectId()
         now = datetime.now(timezone.utc)
         task_id, course_id, sport_id, user_id = (str(ObjectId()) for _ in range(4))
-        object_key = object_key or f"submissions/{task_id}/{result_id}.mp4"
+        # Job gửi AI không còn `detail`: fake AI đọc hành vi từ đoạn fake=<title> trong object_key
+        object_key = object_key or f"submissions/fake={title}/{result_id}.mp4"
         job = {
             "jobId": str(result_id),
             "resultId": str(result_id),
