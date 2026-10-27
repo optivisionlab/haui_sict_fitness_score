@@ -190,7 +190,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
             id: t.taskId || `task-${idx}`,
             name: t.taskTitle || (isExam ? 'Bài cuối kỳ - Thi đấu tính điểm chính thức' : `Bài thường xuyên ${idx + 1}`),
             type: type as any,
-            gradingMethod: isExam ? 'Chấm 1 lần duy nhất' : 'Lần cao nhất',
+            gradingMethod: isExam ? 'Lần nộp gần nhất' : 'Lần cao nhất',
             timeLimit: isExam ? '60 phút' : 'Không giới hạn',
             openTime: '01/09/2026 08:00',
             closeTime: '20/11/2026 23:59',
@@ -384,27 +384,21 @@ export class CoursesComponent implements OnInit, OnDestroy {
     return course.assessments.find((a: AssessmentItem) => a.id === this.selectedAssessmentId()) || course.assessments[0] || this.defaultAssessment;
   });
 
-  /** Bài kiểm tra giữa kỳ / bài thi cuối kỳ: chỉ được nộp 1 lần. */
+  /** Bài kiểm tra giữa kỳ / bài thi cuối kỳ. */
   isExam(assessment: AssessmentItem): boolean {
     return assessment.type === 'midterm' || assessment.type === 'final';
   }
 
-  // Bài thi đã có lần nộp hợp lệ (lần chấm thất bại vẫn cho nộp lại)
-  examSubmitted = computed<boolean>(() => {
-    const assessment = this.currentAssessment();
-    if (!this.isExam(assessment)) return false;
-    return assessment.status === 'graded' || assessment.attempts.some((a: AssessmentAttempt) => !a.failed);
-  });
-
-  // Highest score for current assessment
+  // Điểm hiển thị: bài thi lấy lần chấm gần nhất (giống backend), bài tập lấy lần cao nhất
   highestScore = computed<number | null>(() => {
     const assessment = this.currentAssessment();
     if (!assessment || !assessment.attempts || assessment.attempts.length === 0) return null;
-    const scores = assessment.attempts
-      .filter((a: AssessmentAttempt) => a.score !== undefined && !a.pending)
-      .map((a: AssessmentAttempt) => a.score as number);
-    if (scores.length === 0) return null;
-    return Math.max(...scores);
+    const graded = assessment.attempts.filter((a: AssessmentAttempt) => a.score !== undefined && !a.pending);
+    if (graded.length === 0) return null;
+    if (this.isExam(assessment)) {
+      return graded.reduce((latest, a) => (a.attemptNo > latest.attemptNo ? a : latest)).score as number;
+    }
+    return Math.max(...graded.map((a: AssessmentAttempt) => a.score as number));
   });
 
   // Filtered courses in list view
@@ -456,10 +450,6 @@ export class CoursesComponent implements OnInit, OnDestroy {
 
   // Submit Video Modal handlers
   openSubmitModal(): void {
-    if (this.examSubmitted()) {
-      this.showToast('Bài kiểm tra/bài thi chỉ được nộp 1 lần. Bạn đã nộp bài này.');
-      return;
-    }
     this.selectedFile.set(null);
     this.selectedFileName.set('');
     this.hasVideoSelected.set(false);
@@ -509,7 +499,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
 
   submitVideo(): void {
     const file = this.selectedFile();
-    if (!file || this.examSubmitted()) return;
+    if (!file) return;
 
     const courseId = this.selectedCourseId();
     const assessmentId = this.selectedAssessmentId();

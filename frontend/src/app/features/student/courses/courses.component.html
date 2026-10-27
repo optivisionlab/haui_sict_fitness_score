@@ -194,15 +194,15 @@
           <div>Hạn nộp bài: <strong>{{ a.closeTime }}</strong></div>
         </div>
 
-        <!-- Bài tập: nộp nhiều lần | Bài kiểm tra/thi: nút riêng, chỉ nộp 1 lần -->
+        <!-- Bài tập và bài kiểm tra/thi đều được nộp không giới hạn số lần -->
         <div class="assessment-action-row">
           @if (isExam(a)) {
-            <button type="button" class="btn-primary btn-exam" [disabled]="examSubmitted()" (click)="openSubmitModal()">
+            <button type="button" class="btn-primary btn-exam" (click)="openSubmitModal()">
               <svg lucideUploadCloud [size]="18"></svg>
-              <span>{{ examSubmitted() ? 'Đã nộp bài thi' : 'Nộp video bài thi' }}</span>
+              <span>Nộp video bài thi</span>
             </button>
             <span class="submit-rule-hint exam">
-              Bài kiểm tra/bài thi chỉ được nộp <strong>1 lần duy nhất</strong> và chấm điểm 1 lần.
+              Bài kiểm tra/bài thi được nộp nhiều lần, hệ thống lấy điểm lần nộp gần nhất.
             </span>
           } @else {
             <button type="button" class="btn-primary" (click)="openSubmitModal()">
@@ -305,12 +305,6 @@
         }
       </div>
 
-      @if (isExam(currentAssessment())) {
-        <div class="exam-warning-box">
-          <svg lucideAlertCircle [size]="18"></svg>
-          <span>Bài kiểm tra/bài thi chỉ được nộp <strong>1 lần duy nhất</strong>. Sau khi nộp sẽ không thể nộp lại, hãy kiểm tra kỹ video trước khi xác nhận.</span>
-        </div>
-      }
 
       <!-- Dropzone -->
       <div

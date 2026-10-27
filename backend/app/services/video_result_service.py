@@ -173,33 +173,8 @@ class VideoResultService:
             "status": "uploading",
             "expiresAt": {"$gt": datetime.now(timezone.utc)},
         })
-        # GUARD 4: Bài kiểm tra/bài thi chỉ được nộp 1 lần (lần chấm thất bại được nộp lại)
-        if task_category == TaskCategory.EXAM:
-            valid_exam_submissions = crud_video_result.collection.count_documents({
-                "taskId": str(task_id),
-                "userId": str(user_id),
-                "status": {"$ne": "failed"},
-            })
-            if valid_exam_submissions > 0 or active_uploads > 0:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Bài kiểm tra/bài thi chỉ được nộp 1 lần. Bạn đã nộp bài này.",
-                )
-
-        # GUARD 5: Giới hạn số lần nộp theo task.maxAttempts. Lần chấm thất bại (lỗi phía AI/hạ tầng)
-        # không tính; phiên upload còn hạn thì tính để không mở được nhiều phiên vượt giới hạn.
-        max_attempts = getattr(task, "max_attempts", None)
-        if max_attempts:
-            used_attempts = crud_video_result.collection.count_documents({
-                "taskId": str(task_id),
-                "userId": str(user_id),
-                "status": {"$ne": "failed"},
-            }) + active_uploads
-            if used_attempts >= max_attempts:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Bạn đã hết lượt nộp bài ({used_attempts}/{max_attempts} lần)",
-                )
+        # Không giới hạn số lần nộp: mọi bài tập, bài kiểm tra và bài thi đều được nộp lại
+        # (task.maxAttempts không còn được áp dụng).
 
         # Kiểm tra sport
         sport = crud_sport.get(sport_id)
