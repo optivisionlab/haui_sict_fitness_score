@@ -6,6 +6,7 @@ import { ApiResponse } from '../../../core/models/auth.model';
 import { 
   TeacherCourseItem, 
   TeacherCourseDetail,
+  TeacherSemesterSummary,
   GradebookResponse,
   GradebookTaskItem,
   GradebookStudentItem,
@@ -36,9 +37,7 @@ export class TeacherClassService {
   // Active classes only (Học phần hiện tại)
   currentActiveClasses = computed(() => this.classes().filter(c => c.status === 'in_progress'));
 
-  constructor() {
-    this.loadTeacherClasses().subscribe();
-  }
+  constructor() {}
 
   private deduceSportInfo(name: string = '', code: string = ''): { sport_name: string; sport_code: string } {
     const nl = (name || '').toLowerCase();
@@ -207,11 +206,15 @@ export class TeacherClassService {
   }
 
   /**
-   * Lấy danh sách lớp học phần của giảng viên
+   * Lấy danh sách lớp học phần của giảng viên (hỗ trợ lọc status, semester)
    */
-  loadTeacherClasses(): Observable<TeacherCourseItem[]> {
+  loadTeacherClasses(status: string = 'all', semester?: string): Observable<TeacherCourseItem[]> {
     this.isLoadingState.set(true);
-    return this.http.get<ApiResponse<any[]>>(`${environment.apiUrl}/teacher/courses`).pipe(
+    let params: any = {};
+    if (status && status !== 'all') params.status = status;
+    if (semester && semester !== 'all') params.semester = semester;
+
+    return this.http.get<ApiResponse<any[]>>(`${environment.apiUrl}/teacher/courses`, { params }).pipe(
       map((res) => (res?.data || []).map(item => this.normalizeCourseItem(item))),
       tap((items) => {
         this.classesState.set(items);
@@ -222,6 +225,35 @@ export class TeacherClassService {
         this.classesState.set([]);
         return of([]);
       })
+    );
+  }
+
+  /**
+   * Lấy các lớp đang diễn ra (chỉ kéo status=in_progress về client)
+   */
+  loadActiveClasses(): Observable<TeacherCourseItem[]> {
+    return this.loadTeacherClasses('in_progress');
+  }
+
+  /**
+   * Lấy danh sách tóm tắt các kỳ học (cực nhẹ, không kéo toàn bộ lớp học)
+   */
+  loadTeacherSemesters(): Observable<TeacherSemesterSummary[]> {
+    return this.http.get<ApiResponse<TeacherSemesterSummary[]>>(`${environment.apiUrl}/teacher/semesters`).pipe(
+      map((res) => res?.data || []),
+      catchError(() => of([]))
+    );
+  }
+
+  /**
+   * Kéo danh sách lớp theo 1 kỳ học cụ thể khi người dùng click vào kỳ đó
+   */
+  loadCoursesBySemester(semesterCode: string): Observable<TeacherCourseItem[]> {
+    return this.http.get<ApiResponse<any[]>>(`${environment.apiUrl}/teacher/courses`, {
+      params: { semester: semesterCode }
+    }).pipe(
+      map((res) => (res?.data || []).map(item => this.normalizeCourseItem(item))),
+      catchError(() => of([]))
     );
   }
 

@@ -1,4 +1,4 @@
-import { Component, signal, computed, inject } from '@angular/core';
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import {
@@ -31,15 +31,21 @@ import { TeacherCourseItem, ClassStatus } from '../models/teacher.model';
   templateUrl: './teacher-classes.component.html',
   styleUrl: './teacher-classes.component.scss'
 })
-export class TeacherClassesComponent {
+export class TeacherClassesComponent implements OnInit {
   private router = inject(Router);
   private classService = inject(TeacherClassService);
+
+  isLoading = this.classService.isLoading;
 
   // Filter signals
   searchKeyword = signal<string>('');
 
-  // Raw data from service (only active in_progress classes for Học phần hiện tại)
-  classes = computed(() => this.classService.classes().filter(c => c.status === 'in_progress'));
+  // Raw data from service (only active in_progress classes loaded on-demand from backend)
+  classes = this.classService.classes;
+
+  ngOnInit(): void {
+    this.classService.loadActiveClasses().subscribe();
+  }
 
   // Stats computed
   stats = computed(() => {

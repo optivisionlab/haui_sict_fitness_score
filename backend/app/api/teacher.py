@@ -15,6 +15,7 @@ from app.schemas.teacher import (
     SubmissionLockResponse,
     TeacherCourseDetail,
     TeacherCourseItem,
+    TeacherSemesterSummary,
     UnlockGradesRequest,
     UnlockGradesResponse,
 )
@@ -24,6 +25,15 @@ from app.services.enrollment_service import enrollment_service
 from app.services.task_service import task_service
 
 router = APIRouter(prefix="/teacher", tags=["Teacher Portal"])
+
+
+@router.get("/semesters", response_model=list[TeacherSemesterSummary])
+def get_teacher_semesters(
+    current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.TEACHER)),
+):
+    """Lấy danh sách tóm tắt các kỳ học của giáo viên (cực nhẹ, chỉ trả về thống kê kỳ, không tải chi tiết lớp)."""
+    teacher_id = str(current_user.id)
+    return course_service.get_teacher_semesters_summary(teacher_id)
 
 
 @router.get("/courses", response_model=list[TeacherCourseItem])

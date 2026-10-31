@@ -15,19 +15,7 @@ import {
 } from '@lucide/angular';
 import { SearchInputComponent } from '@shared/components';
 import { TeacherClassService } from '../services/teacher-class.service';
-import { TeacherCourseItem, ClassStatus } from '../models/teacher.model';
-
-export interface SemesterViewItem {
-  code: string;
-  name: string;
-  academic_year: string;
-  term: number;
-  totalSports: number;
-  totalClasses: number;
-  totalStudents: number;
-  activeClasses: number;
-  is_current: boolean;
-}
+import { TeacherCourseItem, TeacherSemesterSummary, ClassStatus } from '../models/teacher.model';
 
 export interface SportViewItem {
   name: string;
@@ -72,87 +60,64 @@ export class TeacherCoursesComponent implements OnInit {
   // Search filter
   searchKeyword = signal<string>('');
 
-  // Raw data from service
-  classes = this.classService.classes;
+  // Loading states
+  isLoadingSemesters = signal<boolean>(false);
+  isLoadingClasses = signal<boolean>(false);
+
+  // Data states (Lazy loaded on demand)
+  semesters = signal<TeacherSemesterSummary[]>([]);
+  semesterClasses = signal<TeacherCourseItem[]>([]);
 
   ngOnInit(): void {
-    // If needed, can reload or sync
+    this.loadSemesters();
   }
 
-  // 1. Grouped Semesters
-  semestersList = computed<SemesterViewItem[]>(() => {
-    const list = this.classes();
-    const map = new Map<string, {
-      name: string;
-      academic_year: string;
-      term: number;
-      sports: Set<string>;
-      classes: TeacherCourseItem[];
-    }>();
-
-    for (const c of list) {
-      const semCode = c.semester || '2026-2027.1';
-      const semName = c.semester_name || 'Học kỳ 1 (2026 - 2027)';
-      const year = c.academic_year || '2026-2027';
-      const term = c.term || 1;
-
-      if (!map.has(semCode)) {
-        map.set(semCode, {
-          name: semName,
-          academic_year: year,
-          term,
-          sports: new Set<string>(),
-          classes: []
-        });
+  /**
+   * Tải danh sách tóm tắt các kỳ học (chỉ tải metadata và số liệu đếm, không kéo lớp)
+   */
+  loadSemesters(): void {
+    this.isLoadingSemesters.set(true);
+    this.classService.loadTeacherSemesters().subscribe({
+      next: (list) => {
+        this.semesters.set(list);
+        this.isLoadingSemesters.set(false);
+      },
+      error: () => {
+        this.isLoadingSemesters.set(false);
       }
+    });
+  }
 
-      const item = map.get(semCode)!;
-      item.classes.push(c);
-      if (c.sport_name) {
-        item.sports.add(c.sport_name);
+  /**
+   * Kéo danh sách lớp học phần khi người dùng click vào kỳ cụ thể
+   */
+  loadClassesForSemester(semesterCode: string): void {
+    this.isLoadingClasses.set(true);
+    this.semesterClasses.set([]);
+    this.classService.loadCoursesBySemester(semesterCode).subscribe({
+      next: (classes) => {
+        this.semesterClasses.set(classes);
+        this.isLoadingClasses.set(false);
+      },
+      error: () => {
+        this.isLoadingClasses.set(false);
       }
-    }
-
-    const result: SemesterViewItem[] = [];
-    map.forEach((val, code) => {
-      const totalStudents = val.classes.reduce((sum, c) => sum + (c.student_total || 0), 0);
-      const activeClasses = val.classes.filter(c => c.status === 'in_progress').length;
-      result.push({
-        code,
-        name: val.name,
-        academic_year: val.academic_year,
-        term: val.term,
-        totalSports: Math.max(val.sports.size, 1),
-        totalClasses: val.classes.length,
-        totalStudents,
-        activeClasses,
-        is_current: activeClasses > 0
-      });
     });
+  }
 
-    // Sort: current semester first, then newest academic year
-    return result.sort((a, b) => {
-      if (a.is_current && !b.is_current) return -1;
-      if (!a.is_current && b.is_current) return 1;
-      return b.code.localeCompare(a.code);
-    });
-  });
-
-  // Filtered Semesters by search
+  // 1. Filtered Semesters by search
   filteredSemesters = computed(() => {
     const kw = this.searchKeyword().toLowerCase().trim();
-    if (!kw) return this.semestersList();
-    return this.semestersList().filter(s =>
+    const list = this.semesters();
+    if (!kw) return list;
+    return list.filter(s =>
       s.name.toLowerCase().includes(kw) || s.code.toLowerCase().includes(kw)
     );
   });
 
-  // 2. Grouped Sports for selected semester
+  // 2. Grouped Sports for selected semester (computed from lazily loaded semesterClasses)
   sportsList = computed<SportViewItem[]>(() => {
-    const sem = this.selectedSemesterCode();
-    if (!sem) return [];
-
-    const list = this.classes().filter(c => (c.semester || '2026-2027.1') === sem);
+    const list = this.semesterClasses();
     const map = new Map<string, { code: string; classes: TeacherCourseItem[] }>();
 
     for (const c of list) {
@@ -192,15 +157,10 @@ export class TeacherCoursesComponent implements OnInit {
 
   // 3. Classes in selected semester and sport
   classesInSport = computed<TeacherCourseItem[]>(() => {
-    const sem = this.selectedSemesterCode();
     const sport = this.selectedSportName();
-    if (!sem || !sport) return [];
+    if (!sport) return [];
 
-    return this.classes().filter(c => {
-      const matchSem = (c.semester || '2026-2027.1') === sem;
-      const matchSport = (c.sport_name || 'Giáo dục Thể chất') === sport;
-      return matchSem && matchSport;
-    });
+    return this.semesterClasses().filter(c => (c.sport_name || 'Giáo dục Thể chất') === sport);
   });
 
   // Filtered Classes by search
@@ -215,11 +175,12 @@ export class TeacherCoursesComponent implements OnInit {
   });
 
   // Navigation actions
-  selectSemester(sem: SemesterViewItem): void {
+  selectSemester(sem: TeacherSemesterSummary): void {
     this.selectedSemesterCode.set(sem.code);
     this.selectedSemesterName.set(sem.name);
     this.searchKeyword.set('');
     this.currentLevel.set('sport');
+    this.loadClassesForSemester(sem.code);
   }
 
   selectSport(sport: SportViewItem): void {

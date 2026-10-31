@@ -70,64 +70,71 @@
       </div>
     </div>
 
-    <!-- Classes Grid -->
-    <div class="classes-grid">
-      @for (classItem of filteredClasses(); track classItem.id) {
-        <div class="class-card" (click)="goToClassDetail(classItem)">
-          <!-- Top Row: Icon & Status -->
-          <div class="class-header">
-            <div class="class-thumb">
-                <svg lucideActivity [size]="28"></svg>
-            </div>
-
-            <div class="class-meta-badges">
-              @if (classItem.sport_name) {
-                <span class="badge badge-info">{{ classItem.sport_name }}</span>
-              }
-              <span class="badge" [ngClass]="getStatusBadgeClass(classItem.status)">
-                <svg lucideClock [size]="14"></svg>
-                {{ getStatusText(classItem.status) }}
-              </span>
-            </div>
-          </div>
-
-          <!-- Class Info -->
-          <div class="class-content">
-            <div class="class-code-tag">{{ classItem.code || 'Chưa có mã' }}</div>
-            <h3 class="class-title">{{ classItem.name }}</h3>
-
-            <div class="info-list">
-              <div class="info-item">
-                <svg lucideCalendar class="info-icon" [size]="15"></svg>
-                <span>Bắt đầu: {{ classItem.start_date ? (classItem.start_date | date:'dd/MM/yyyy') : '—' }}</span>
+    @if (isLoading()) {
+      <div class="empty-state" style="padding: 3rem 1rem;">
+        <div class="spinner-sm" style="width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem;"></div>
+        <p style="color: var(--color-text-secondary); font-size: 0.95rem;">Đang tải danh sách học phần hiện tại...</p>
+      </div>
+    } @else {
+      <!-- Classes Grid -->
+      <div class="classes-grid">
+        @for (classItem of filteredClasses(); track classItem.id) {
+          <div class="class-card" (click)="goToClassDetail(classItem)">
+            <!-- Top Row: Icon & Status -->
+            <div class="class-header">
+              <div class="class-thumb">
+                  <svg lucideActivity [size]="28"></svg>
               </div>
-              <div class="info-item">
-                <svg lucideUsers class="info-icon" [size]="15"></svg>
-                <span>Sĩ số: <strong>{{ classItem.student_total }}</strong> sinh viên</span>
+
+              <div class="class-meta-badges">
+                @if (classItem.sport_name) {
+                  <span class="badge badge-info">{{ classItem.sport_name }}</span>
+                }
+                <span class="badge" [ngClass]="getStatusBadgeClass(classItem.status)">
+                  <svg lucideClock [size]="14"></svg>
+                  {{ getStatusText(classItem.status) }}
+                </span>
               </div>
             </div>
-          </div>
 
-          <!-- Card Footer Action -->
-          <div class="class-footer">
-            <button
-              type="button"
-              class="btn btn-primary btn-block"
-              (click)="goToClassDetail(classItem); $event.stopPropagation()">
-              <span>Thông tin lớp học</span>
-              <svg lucideArrowRight [size]="16"></svg>
-            </button>
+            <!-- Class Info -->
+            <div class="class-content">
+              <div class="class-code-tag">{{ classItem.code || 'Chưa có mã' }}</div>
+              <h3 class="class-title">{{ classItem.name }}</h3>
+
+              <div class="info-list">
+                <div class="info-item">
+                  <svg lucideCalendar class="info-icon" [size]="15"></svg>
+                  <span>Bắt đầu: {{ classItem.start_date ? (classItem.start_date | date:'dd/MM/yyyy') : '—' }}</span>
+                </div>
+                <div class="info-item">
+                  <svg lucideUsers class="info-icon" [size]="15"></svg>
+                  <span>Sĩ số: <strong>{{ classItem.student_total }}</strong> sinh viên</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card Footer Action -->
+            <div class="class-footer">
+              <button
+                type="button"
+                class="btn btn-primary btn-block"
+                (click)="goToClassDetail(classItem); $event.stopPropagation()">
+                <span>Thông tin lớp học</span>
+                <svg lucideArrowRight [size]="16"></svg>
+              </button>
+            </div>
           </div>
-        </div>
-      } @empty {
-        <div class="empty-state">
-          <div class="empty-icon">
-            <svg lucideBookOpen [size]="48"></svg>
+        } @empty {
+          <div class="empty-state">
+            <div class="empty-icon">
+              <svg lucideBookOpen [size]="48"></svg>
+            </div>
+            <h3>Không tìm thấy học phần hiện tại phù hợp</h3>
+            <p>Thử thay đổi từ khóa tìm kiếm hoặc kiểm tra danh mục trong phần Học phần.</p>
           </div>
-          <h3>Không tìm thấy học phần hiện tại phù hợp</h3>
-          <p>Thử thay đổi từ khóa tìm kiếm hoặc kiểm tra danh mục trong phần Học phần.</p>
-        </div>
-      }
-    </div>
+        }
+      </div>
+    }
   </div>
 </div>

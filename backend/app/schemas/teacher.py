@@ -11,6 +11,18 @@ from app.schemas.course import GradingFormulaSchema
 from app.schemas.enrollment import StudentGradesSchema
 
 
+class TeacherSemesterSummary(BaseSchema):
+    code: str
+    name: str
+    academic_year: str
+    term: int
+    total_sports: int = 0
+    total_classes: int = 0
+    total_students: int = 0
+    active_classes: int = 0
+    is_current: bool = False
+
+
 class TeacherCourseItem(BaseSchema):
     id: PyObjectId
     code: Optional[str] = None

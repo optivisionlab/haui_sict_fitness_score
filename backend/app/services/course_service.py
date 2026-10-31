@@ -24,6 +24,7 @@ from app.schemas.teacher import (
     SubmissionLockResponse,
     TeacherCourseDetail,
     TeacherCourseItem,
+    TeacherSemesterSummary,
     UnlockGradesResponse,
 )
 from app.services.grading_service import grading_service
@@ -207,6 +208,105 @@ class CourseService:
 
     # ─── Teacher Portal Features ──────────────────────────────────────────────
 
+    @staticmethod
+    def deduce_sport_from_name(name: str = "", code: str = "") -> tuple[str, str]:
+        """Suy luận môn thể thao từ tên hoặc mã lớp học."""
+        nl = (name or "").lower()
+        cl = (code or "").lower()
+        if "pickleball" in nl or "pb" in cl:
+            return "Pickleball", "PICKLEBALL"
+        if "điền kinh" in nl or "chạy" in nl or "run" in cl or "cb" in cl:
+            return "Điền kinh", "RUNNING"
+        if "bóng đá" in nl or "đá bóng" in nl or "foot" in cl or "fb" in cl:
+            return "Bóng đá", "FOOTBALL"
+        if "cầu lông" in nl or "badminton" in nl:
+            return "Cầu lông", "BADMINTON"
+        if "bóng rổ" in nl or "basket" in cl:
+            return "Bóng rổ", "BASKETBALL"
+        if "bóng chuyền" in nl or "volley" in cl:
+            return "Bóng chuyền", "VOLLEYBALL"
+        if "bơi" in nl or "swim" in cl:
+            return "Bơi lội", "SWIMMING"
+        return "Giáo dục Thể chất", "GENERAL"
+
+    def get_teacher_semesters_summary(self, teacher_id: str) -> list[TeacherSemesterSummary]:
+        """Lấy danh sách tóm tắt các kỳ học của giáo viên (cực nhẹ, chỉ tải thống kê kỳ, không tải chi tiết bài tập/sinh viên)."""
+        courses = list(
+            crud_course.collection.find(
+                {"teacherId": str(teacher_id)},
+                {
+                    "semester": 1,
+                    "key": 1,
+                    "semesterName": 1,
+                    "academicYear": 1,
+                    "term": 1,
+                    "studentTotal": 1,
+                    "student_total": 1,
+                    "status": 1,
+                    "sportName": 1,
+                    "sport_name": 1,
+                    "name": 1,
+                    "code": 1,
+                },
+            )
+        )
+        sem_map: dict[str, dict] = {}
+
+        for d in courses:
+            sem_code = d.get("semester") or d.get("key") or "2026-2027.1"
+            sem_name = d.get("semesterName")
+            acad_year = d.get("academicYear")
+            term_val = d.get("term")
+
+            if not sem_name or not acad_year or not term_val:
+                s_name, s_year, s_term = self._parse_semester_info(sem_code)
+                sem_name = sem_name or s_name or f"Học kỳ ({sem_code})"
+                acad_year = acad_year or s_year or sem_code
+                term_val = term_val or s_term or 1
+
+            if sem_code not in sem_map:
+                sem_map[sem_code] = {
+                    "code": sem_code,
+                    "name": sem_name,
+                    "academic_year": acad_year,
+                    "term": term_val,
+                    "sports": set(),
+                    "total_classes": 0,
+                    "total_students": 0,
+                    "active_classes": 0,
+                }
+
+            entry = sem_map[sem_code]
+            entry["total_classes"] += 1
+            entry["total_students"] += (d.get("studentTotal") or d.get("student_total") or 0)
+            if d.get("status") == CourseStatus.IN_PROGRESS.value or d.get("status") == "in_progress":
+                entry["active_classes"] += 1
+
+            sport_title = d.get("sportName") or d.get("sport_name")
+            if not sport_title:
+                s_name, _ = self.deduce_sport_from_name(d.get("name", ""), d.get("code", ""))
+                sport_title = s_name
+            if sport_title:
+                entry["sports"].add(sport_title)
+
+        result: list[TeacherSemesterSummary] = []
+        for code, info in sem_map.items():
+            result.append(
+                TeacherSemesterSummary(
+                    code=code,
+                    name=info["name"],
+                    academic_year=info["academic_year"],
+                    term=info["term"],
+                    total_sports=max(len(info["sports"]), 1),
+                    total_classes=info["total_classes"],
+                    total_students=info["total_students"],
+                    active_classes=info["active_classes"],
+                    is_current=info["active_classes"] > 0,
+                )
+            )
+
+        return sorted(result, key=lambda s: (not s.is_current, s.code), reverse=False)
+
     def get_teacher_courses(
         self,
         teacher_id: str,
@@ -215,25 +315,41 @@ class CourseService:
         semester_filter: Optional[str] = None,
         sport_id_filter: Optional[str] = None,
     ) -> list[TeacherCourseItem]:
-        """Lấy danh sách các lớp học phần do giáo viên phụ trách."""
+        """Lấy danh sách các lớp học phần do giáo viên phụ trách (hỗ trợ lọc theo kỳ cụ thể)."""
         query: dict = {"teacherId": str(teacher_id)}
         if status_filter and status_filter != "all":
             query["status"] = status_filter
-        if semester_filter and semester_filter != "all":
-            query["semester"] = semester_filter
         if sport_id_filter and sport_id_filter != "all":
             query["sportId"] = str(sport_id_filter)
+
+        conditions = []
+        if semester_filter and semester_filter != "all":
+            conditions.append({"$or": [{"semester": semester_filter}, {"key": semester_filter}]})
         if search:
-            query["$or"] = [
-                {"name": {"$regex": search.strip(), "$options": "i"}},
-                {"code": {"$regex": search.strip(), "$options": "i"}},
-                {"sportName": {"$regex": search.strip(), "$options": "i"}},
-            ]
+            conditions.append({
+                "$or": [
+                    {"name": {"$regex": search.strip(), "$options": "i"}},
+                    {"code": {"$regex": search.strip(), "$options": "i"}},
+                    {"sportName": {"$regex": search.strip(), "$options": "i"}},
+                ]
+            })
+
+        if len(conditions) == 1:
+            query.update(conditions[0])
+        elif len(conditions) > 1:
+            query["$and"] = conditions
 
         docs = crud_course.collection.find(query).sort("createdAt", -1)
         result = []
         for d in docs:
             course_obj = Course.model_validate(d)
+            sport_name = course_obj.sport_name
+            sport_code = course_obj.sport_code
+            if not sport_name:
+                s_name, s_code = self.deduce_sport_from_name(course_obj.name, course_obj.code)
+                sport_name = s_name
+                sport_code = s_code
+
             result.append(
                 TeacherCourseItem(
                     id=course_obj.id,
@@ -241,9 +357,9 @@ class CourseService:
                     name=course_obj.name,
                     student_total=course_obj.student_total,
                     sport_id=course_obj.sport_id,
-                    sport_name=course_obj.sport_name,
-                    sport_code=course_obj.sport_code,
-                    semester=course_obj.semester,
+                    sport_name=sport_name,
+                    sport_code=sport_code,
+                    semester=course_obj.semester or course_obj.key,
                     semester_name=course_obj.semester_name,
                     academic_year=course_obj.academic_year,
                     term=course_obj.term,

@@ -7,6 +7,18 @@ export interface GradingFormula {
   practice_tasks_count?: number;
 }
 
+export interface TeacherSemesterSummary {
+  code: string;
+  name: string;
+  academic_year: string;
+  term: number;
+  total_sports: number;
+  total_classes: number;
+  total_students: number;
+  active_classes: number;
+  is_current: boolean;
+}
+
 export interface TeacherCourseItem {
   id: string;
   code?: string;
