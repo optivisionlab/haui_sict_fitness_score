@@ -73,10 +73,11 @@ def seed():
     # BƯỚC 2: DỌN DẸP MONGODB
     # ──────────────────────────────────────────────────────────────────────────
     print("\n[BƯỚC 2/9] Dọn sạch dữ liệu cũ trong MongoDB...")
-    collections_to_clean = [
+    # Xóa mọi collection đang có (gồm cả video_upload_sessions...), không chỉ các collection được seed.
+    collections_to_clean = sorted(set(db.list_collection_names()) | {
         "users", "sports", "cameras", "courses", "tasks",
         "enrollments", "video_results", "live_results", "notifications"
-    ]
+    })
     for col in collections_to_clean:
         res = db[col].delete_many({})
         print(f"  - Xóa collection '{col:14}': {res.deleted_count} bản ghi.")
@@ -340,6 +341,14 @@ def seed():
             "updatedAt": now,
         },
     ]
+    # Sinh viên được nộp không giới hạn ở mọi bài tập/bài thi của mọi môn:
+    # bỏ giới hạn lượt nộp, mở khóa và kéo dài thời gian nộp.
+    for task in tasks_data:
+        task["maxAttempts"] = None
+        task["isLocked"] = False
+        task["openTime"] = now - timedelta(days=30)
+        task["closeTime"] = now + timedelta(days=365)
+
     db.tasks.insert_many(tasks_data)
 
     courses_data = [

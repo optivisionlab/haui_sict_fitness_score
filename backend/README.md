@@ -169,9 +169,11 @@ Khi khởi động:
 | `KAFKA_TOPIC_GRADING_JOBS_LARGE` | `video-grading-jobs-large` | Topic làn large |
 | `AI_TIMEOUT_BASE_SEC` | `60` | Phần cố định của timeout gọi AI |
 | `AI_TIMEOUT_PER_VIDEO_SEC` | `4` | Số giây timeout cộng thêm cho mỗi giây video |
-| `AI_TIMEOUT_MAX_SEC` | `1800` | Trần timeout; job không có cả `durationSec` lẫn `fileSize` dùng `AI_API_TIMEOUT_SECONDS` |
+| `AI_TIMEOUT_MAX_SEC` | `7200` | Trần timeout (đủ cho video tới 7GB); job không có cả `durationSec` lẫn `fileSize` dùng `AI_API_TIMEOUT_SECONDS` |
 | `AI_TIMEOUT_PER_MB_SEC` | `1` | Số giây timeout cộng thêm cho mỗi MB video (AI phải tải video từ MinIO trước khi chấm) |
 | `AI_BUSY_MAX_WAIT_SEC` | `1800` | AI trả `429`/`503` kèm `Retry-After` (đang bận): chờ và gửi lại tối đa chừng này giây, không tính vào `AI_MAX_RETRIES` |
+| `VIDEO_UPLOAD_MAX_BYTES` | `7516192768` (7GB) | Giới hạn video upload qua `upload-url` (presigned PUT thẳng lên MinIO), kiểm tra ở cả `upload-url` và `confirm-upload` |
+| `UPLOAD_URL_TTL_SEC` | `14400` (4h) | Hạn presigned PUT và phiên upload; quá hạn thì `confirm-upload` trả `410` |
 | `LEGACY_UPLOAD_MAX_BYTES` | `52428800` (50MB) | Giới hạn của `POST /video-results/upload` (luồng cũ đi qua backend). Vượt thì `413`, chặn theo `Content-Length` trước khi đọc body. Video lớn dùng `upload-url` |
 | `UPLOAD_CLEANUP_ENABLED` | `true` | Bật job xóa video đã upload nhưng không confirm |
 | `UPLOAD_CLEANUP_INTERVAL_SEC` | `3600` | Chu kỳ chạy job dọn dẹp |

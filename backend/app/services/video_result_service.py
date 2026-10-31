@@ -38,8 +38,8 @@ from app.services.sports.registry import sport_registry
 
 # AI service (pickleball_track) chỉ đọc được MP4/MOV
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov"}
-MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500 MB
-UPLOAD_URL_TTL_SECONDS = 600
+MAX_VIDEO_SIZE = settings.VIDEO_UPLOAD_MAX_BYTES
+UPLOAD_URL_TTL_SECONDS = settings.UPLOAD_URL_TTL_SEC
 LEGACY_UPLOAD_TOO_LARGE_MESSAGE = (
     f"Video quá lớn cho POST /video-results/upload (tối đa {settings.LEGACY_UPLOAD_MAX_BYTES // (1024 * 1024)}MB). "
     "Hãy dùng upload-url + confirm-upload để tải video lớn."
@@ -234,7 +234,7 @@ class VideoResultService:
         if extension not in ALLOWED_VIDEO_EXTENSIONS:
             raise HTTPException(status_code=400, detail="Định dạng video không được hỗ trợ")
         if upload_in.file_size > MAX_VIDEO_SIZE:
-            raise HTTPException(status_code=400, detail="Dung lượng video vượt quá giới hạn 500MB")
+            raise HTTPException(status_code=400, detail=f"Dung lượng video vượt quá giới hạn {MAX_VIDEO_SIZE / (1024 ** 3):g}GB")
         if not upload_in.content_type.lower().startswith("video/") and upload_in.content_type.lower() != "application/octet-stream":
             raise HTTPException(status_code=400, detail="Content-Type không phải định dạng video")
 

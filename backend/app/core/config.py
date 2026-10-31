@@ -56,6 +56,11 @@ class Settings:
     )
     MINIO_BUCKET_NAME: str = os.getenv("MINIO_BUCKET_NAME", "videos")
     MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "False").lower() == "true"
+    # Giới hạn video upload qua upload-url (presigned PUT thẳng lên MinIO), mặc định 7GB
+    VIDEO_UPLOAD_MAX_BYTES: int = int(os.getenv("VIDEO_UPLOAD_MAX_BYTES", str(7 * 1024 * 1024 * 1024)))
+    # Hạn của presigned PUT và của phiên upload (confirm-upload bị từ chối khi quá hạn).
+    # 4h đủ cho video 7GB ở ~0,5MB/s (~4Mbps); MinIO chỉ kiểm tra hạn lúc bắt đầu PUT
+    UPLOAD_URL_TTL_SEC: int = int(os.getenv("UPLOAD_URL_TTL_SEC", str(4 * 3600)))
     # POST /video-results/upload (luồng cũ) đi qua backend: Starlette ghi body vào /tmp (tmpfs 64MB trong container,
     # nằm trên RAM) nên giới hạn nhỏ hơn hẳn; video lớn dùng upload-url (presigned PUT thẳng lên MinIO)
     LEGACY_UPLOAD_MAX_BYTES: int = int(os.getenv("LEGACY_UPLOAD_MAX_BYTES", str(50 * 1024 * 1024)))
@@ -87,7 +92,7 @@ class Settings:
     # Timeout gọi AI = min(BASE + PER_VIDEO_SEC x durationSec, MAX); thiếu durationSec thì dùng AI_API_TIMEOUT_SECONDS
     AI_TIMEOUT_BASE_SEC: float = float(os.getenv("AI_TIMEOUT_BASE_SEC", "60"))
     AI_TIMEOUT_PER_VIDEO_SEC: float = float(os.getenv("AI_TIMEOUT_PER_VIDEO_SEC", "4"))
-    AI_TIMEOUT_MAX_SEC: float = float(os.getenv("AI_TIMEOUT_MAX_SEC", "1800"))
+    AI_TIMEOUT_MAX_SEC: float = float(os.getenv("AI_TIMEOUT_MAX_SEC", "7200"))
     AI_TIMEOUT_PER_MB_SEC: float = float(os.getenv("AI_TIMEOUT_PER_MB_SEC", "1"))
     # AI trả 429/503 kèm Retry-After (đang bận): chờ và gửi lại tối đa chừng này giây, không tính vào AI_MAX_RETRIES
     AI_BUSY_MAX_WAIT_SEC: float = float(os.getenv("AI_BUSY_MAX_WAIT_SEC", "1800"))

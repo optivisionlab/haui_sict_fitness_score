@@ -2,7 +2,7 @@
 Kiểm thử T10 — giới hạn nộp bài và dọn object bỏ dở.
 
 1. upload-url chặn duration_sec > task.timeLimit.
-2. task.maxAttempts: lần chấm failed không tính, phiên upload còn hạn thì tính.
+2. Không giới hạn số lần nộp: task.maxAttempts không chặn upload-url.
 3. Job dọn dẹp chỉ xóa object submissions/{taskId}/{resultId}.ext đủ cũ, task thuộc DB này,
    không có video_results và không có phiên upload đang mở (chạy trên bucket test riêng).
 
@@ -43,7 +43,7 @@ def expect_400(fn, contains: str):
 
 
 def test_limits(db, run_id: str, ids: dict):
-    print("\n[TEST 1-2] timeLimit và maxAttempts ở upload-url")
+    print("\n[TEST 1-2] timeLimit và không giới hạn số lần nộp ở upload-url")
     now = datetime.now(timezone.utc)
     db.sports.insert_one({"_id": ids["sport"], "code": f"TEST-{run_id}", "name": "Test", "mode": "video", "createdAt": now})
     db.courses.insert_one({"_id": ids["course"], "name": "C", "teacherId": str(ObjectId()), "createdAt": now})
@@ -70,9 +70,10 @@ def test_limits(db, run_id: str, ids: dict):
     ])
     resp = video_result_service.create_upload_url(user_id, request(60))
     session = db.video_upload_sessions.find_one({"resultId": ObjectId(resp.result_id)})
-    print(f"  ✓ 1 completed + 1 failed, maxAttempts=2 → vẫn được nộp (lần failed không tính), attemptNo={session['attemptNo']}")
-    detail = expect_400(lambda: video_result_service.create_upload_url(user_id, request(30)), "hết lượt nộp bài")
-    print(f"  ✓ Thêm 1 phiên upload đang mở → chặn: {detail}")
+    print(f"  ✓ 1 completed + 1 failed → vẫn được nộp, attemptNo={session['attemptNo']}")
+    resp_extra = video_result_service.create_upload_url(user_id, request(30))
+    assert resp_extra.upload_id
+    print("  ✓ Vượt maxAttempts=2 vẫn được nộp (không giới hạn số lần nộp)")
     db.video_upload_sessions.delete_many({"userId": user_id})
     resp2 = video_result_service.create_upload_url(user_id, request(None))
     assert resp2.upload_id
