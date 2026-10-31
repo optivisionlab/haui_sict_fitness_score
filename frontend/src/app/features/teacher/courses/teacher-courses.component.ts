@@ -10,10 +10,8 @@ import {
   LucideArrowRight,
   LucideArrowLeft,
   LucideBookOpen,
-  LucideGraduationCap,
   LucideTrophy,
-  LucideChevronRight,
-  LucideLayers
+  LucideChevronRight
 } from '@lucide/angular';
 import { SearchInputComponent } from '@shared/components';
 import { TeacherClassService } from '../services/teacher-class.service';
@@ -52,10 +50,8 @@ export interface SportViewItem {
     LucideArrowRight,
     LucideArrowLeft,
     LucideBookOpen,
-    LucideGraduationCap,
     LucideTrophy,
     LucideChevronRight,
-    LucideLayers,
     SearchInputComponent
   ],
   templateUrl: './teacher-courses.component.html',
