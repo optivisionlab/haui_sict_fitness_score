@@ -258,6 +258,12 @@
   }
 }
 
+.badge-info {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
 // Badge Warning (custom for pending finalize)
 .badge-warning {
   background: #fef3c7;

@@ -74,6 +74,7 @@ def init_db_indexes():
     database.enrollments.create_index([("courseId", 1), ("studentCode", 1)])
 
     database.courses.create_index([("teacherId", 1), ("status", 1)])
+    database.courses.create_index([("teacherId", 1), ("semester", 1), ("sportId", 1)])
     database.tasks.create_index([("courseId", 1), ("category", 1)])
     database.sports.create_index("code", unique=True)
 

@@ -57,6 +57,14 @@ class CourseBase(BaseSchema):
     code: Optional[str] = None
     desc: Optional[str] = None
 
+    sport_id: Optional[str] = None
+    sport_name: Optional[str] = None
+    sport_code: Optional[str] = None
+    semester: Optional[str] = None
+    semester_name: Optional[str] = None
+    academic_year: Optional[str] = None
+    term: Optional[int] = None
+
     status: CourseStatus = CourseStatus.IN_PROGRESS
     allow_practice_submission: bool = True
     allow_exam_submission: bool = True
@@ -79,6 +87,14 @@ class CourseUpdate(BaseSchema):
     desc: Optional[str] = None
     student_total: Optional[int] = None
 
+    sport_id: Optional[str] = None
+    sport_name: Optional[str] = None
+    sport_code: Optional[str] = None
+    semester: Optional[str] = None
+    semester_name: Optional[str] = None
+    academic_year: Optional[str] = None
+    term: Optional[int] = None
+
     status: Optional[CourseStatus] = None
     is_grade_locked: Optional[bool] = None
     allow_practice_submission: Optional[bool] = None
@@ -100,6 +116,14 @@ class CourseRead(BaseSchema):
     code: Optional[str] = None
     desc: Optional[str] = None
     student_total: int = 0
+
+    sport_id: Optional[str] = None
+    sport_name: Optional[str] = None
+    sport_code: Optional[str] = None
+    semester: Optional[str] = None
+    semester_name: Optional[str] = None
+    academic_year: Optional[str] = None
+    term: Optional[int] = None
 
     status: CourseStatus = CourseStatus.IN_PROGRESS
     is_grade_locked: bool = False

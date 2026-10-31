@@ -37,31 +37,24 @@ export class TeacherClassesComponent {
 
   // Filter signals
   searchKeyword = signal<string>('');
-  selectedTab = signal<'all' | 'in_progress' | 'completed'>('all');
 
-  // Raw data from service
-  classes = this.classService.classes;
+  // Raw data from service (only active in_progress classes for Học phần hiện tại)
+  classes = computed(() => this.classService.classes().filter(c => c.status === 'in_progress'));
 
   // Stats computed
   stats = computed(() => {
     const list = this.classes();
     return {
-      total: list.length,
-      active: list.filter(c => c.status === 'in_progress').length,
-      finalized: list.filter(c => c.status === 'completed').length,
-      totalStudents: list.reduce((sum, c) => sum + (c.student_total || 0), 0)
+      active: list.length,
+      totalStudents: list.reduce((sum, c) => sum + (c.student_total || 0), 0),
+      openSubmissions: list.filter(c => c.allow_practice_submission || c.allow_exam_submission).length,
+      gradeLocked: list.filter(c => c.is_grade_locked).length
     };
   });
 
-  // Filtered classes
+  // Filtered active classes
   filteredClasses = computed(() => {
     let result = this.classes();
-
-    // Filter by tab
-    const tab = this.selectedTab();
-    if (tab !== 'all') {
-      result = result.filter(c => c.status === tab);
-    }
 
     // Filter by keyword
     const keyword = this.searchKeyword().toLowerCase().trim();
@@ -69,16 +62,13 @@ export class TeacherClassesComponent {
       result = result.filter(
         c =>
           c.name.toLowerCase().includes(keyword) ||
-          (c.code && c.code.toLowerCase().includes(keyword))
+          (c.code && c.code.toLowerCase().includes(keyword)) ||
+          (c.sport_name && c.sport_name.toLowerCase().includes(keyword))
       );
     }
 
     return result;
   });
-
-  setTab(tab: 'all' | 'in_progress' | 'completed'): void {
-    this.selectedTab.set(tab);
-  }
 
   goToClassDetail(classItem: TeacherCourseItem): void {
     this.router.navigate(['/teacher/classes', classItem.id]);

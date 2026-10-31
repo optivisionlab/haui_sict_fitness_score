@@ -153,7 +153,11 @@ export class TeacherClassDetailComponent implements OnInit {
   }
 
   goBack(): void {
-    this.router.navigate(['/teacher/classes']);
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      this.router.navigate(['/teacher/classes']);
+    }
   }
 
   setTab(tab: 'students' | 'assessments' | 'stats'): void {

@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 
 from app.crud.course import crud_course
 from app.crud.enrollment import crud_enrollment
+from app.crud.sport import crud_sport
 from app.crud.task import crud_task
 from app.crud.user import crud_user
 from app.models.course import Course, CourseStatus
@@ -30,6 +31,26 @@ from app.services.notification_service import notification_service
 
 
 class CourseService:
+    @staticmethod
+    def _parse_semester_info(semester_str: Optional[str]) -> tuple[Optional[str], Optional[str], Optional[int]]:
+        """Phân tích chuỗi học kỳ (VD: '2026-2027.1') thành (semester_name, academic_year, term)."""
+        if not semester_str:
+            return None, None, None
+        s = str(semester_str).strip()
+        term = None
+        year = s
+        if "." in s:
+            parts = s.split(".", 1)
+            year = parts[0]
+            try:
+                term = int(parts[1])
+            except ValueError:
+                pass
+        term_labels = {1: "Học kỳ 1", 2: "Học kỳ 2", 3: "Học kỳ hè"}
+        term_text = term_labels.get(term, f"Học kỳ {term}" if term else "Học kỳ")
+        semester_name = f"{term_text} ({year.replace('-', ' - ')})"
+        return semester_name, year, term
+
     def create_course(self, course_in: CourseCreate) -> Course:
         """Tạo mới khóa học, tự động đồng bộ tên giảng viên nếu chưa truyền."""
         course_data = course_in.model_dump(by_alias=True, exclude_unset=True)
@@ -42,6 +63,23 @@ class CourseService:
                 detail=f"Không tìm thấy giáo viên với ID {course_in.teacher_id}",
             )
         course_data["teacherName"] = teacher.name
+
+        # Tự động điền thông tin môn thể thao nếu có
+        if course_in.sport_id:
+            sport = crud_sport.get(course_in.sport_id)
+            if sport:
+                course_data["sportName"] = sport.name
+                course_data["sportCode"] = sport.code.upper()
+
+        # Tự động chuẩn hóa học kỳ nếu có
+        if course_in.semester:
+            s_name, s_year, s_term = self._parse_semester_info(course_in.semester)
+            if s_name and "semesterName" not in course_data:
+                course_data["semesterName"] = s_name
+            if s_year and "academicYear" not in course_data:
+                course_data["academicYear"] = s_year
+            if s_term and "term" not in course_data:
+                course_data["term"] = s_term
 
         # Kiểm tra key/slug unique nếu có
         if course_in.key:
@@ -77,6 +115,21 @@ class CourseService:
                     detail=f"Không tìm thấy giáo viên với ID {update_data['teacherId']}",
                 )
             update_data["teacherName"] = teacher.name
+
+        if "sportId" in update_data and update_data["sportId"]:
+            sport = crud_sport.get(update_data["sportId"])
+            if sport:
+                update_data["sportName"] = sport.name
+                update_data["sportCode"] = sport.code.upper()
+
+        if "semester" in update_data and update_data["semester"]:
+            s_name, s_year, s_term = self._parse_semester_info(update_data["semester"])
+            if s_name and "semesterName" not in update_data:
+                update_data["semesterName"] = s_name
+            if s_year and "academicYear" not in update_data:
+                update_data["academicYear"] = s_year
+            if s_term and "term" not in update_data:
+                update_data["term"] = s_term
 
         updated = crud_course.update(course_id, update_data)
         if not updated:
@@ -159,15 +212,22 @@ class CourseService:
         teacher_id: str,
         status_filter: Optional[str] = "all",
         search: Optional[str] = None,
+        semester_filter: Optional[str] = None,
+        sport_id_filter: Optional[str] = None,
     ) -> list[TeacherCourseItem]:
         """Lấy danh sách các lớp học phần do giáo viên phụ trách."""
         query: dict = {"teacherId": str(teacher_id)}
         if status_filter and status_filter != "all":
             query["status"] = status_filter
+        if semester_filter and semester_filter != "all":
+            query["semester"] = semester_filter
+        if sport_id_filter and sport_id_filter != "all":
+            query["sportId"] = str(sport_id_filter)
         if search:
             query["$or"] = [
                 {"name": {"$regex": search.strip(), "$options": "i"}},
                 {"code": {"$regex": search.strip(), "$options": "i"}},
+                {"sportName": {"$regex": search.strip(), "$options": "i"}},
             ]
 
         docs = crud_course.collection.find(query).sort("createdAt", -1)
@@ -180,6 +240,13 @@ class CourseService:
                     code=course_obj.code,
                     name=course_obj.name,
                     student_total=course_obj.student_total,
+                    sport_id=course_obj.sport_id,
+                    sport_name=course_obj.sport_name,
+                    sport_code=course_obj.sport_code,
+                    semester=course_obj.semester,
+                    semester_name=course_obj.semester_name,
+                    academic_year=course_obj.academic_year,
+                    term=course_obj.term,
                     status=course_obj.status,
                     is_grade_locked=course_obj.is_grade_locked,
                     allow_practice_submission=course_obj.allow_practice_submission,
@@ -204,6 +271,13 @@ class CourseService:
             teacher_id=course.teacher_id,
             teacher_name=course.teacher_name,
             student_total=course.student_total,
+            sport_id=course.sport_id,
+            sport_name=course.sport_name,
+            sport_code=course.sport_code,
+            semester=course.semester,
+            semester_name=course.semester_name,
+            academic_year=course.academic_year,
+            term=course.term,
             status=course.status,
             is_grade_locked=course.is_grade_locked,
             grade_locked_at=course.grade_locked_at,

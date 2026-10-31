@@ -16,6 +16,15 @@ class TeacherCourseItem(BaseSchema):
     code: Optional[str] = None
     name: str
     student_total: int = 0
+
+    sport_id: Optional[str] = None
+    sport_name: Optional[str] = None
+    sport_code: Optional[str] = None
+    semester: Optional[str] = None
+    semester_name: Optional[str] = None
+    academic_year: Optional[str] = None
+    term: Optional[int] = None
+
     status: CourseStatus = CourseStatus.IN_PROGRESS
     is_grade_locked: bool = False
     allow_practice_submission: bool = True

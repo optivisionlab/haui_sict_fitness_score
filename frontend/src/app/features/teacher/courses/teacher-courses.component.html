@@ -1,0 +1,261 @@
+<div class="teacher-courses-page">
+  <!-- Dynamic Breadcrumb -->
+  <div class="breadcrumb">
+    <span>Cổng thông tin Giảng viên</span>
+    <span class="separator">/</span>
+    <span [class.breadcrumb-link]="currentLevel() !== 'semester'" (click)="goToSemesterLevel()">
+      Học phần
+    </span>
+
+    @if (currentLevel() === 'sport' || currentLevel() === 'class') {
+      <span class="separator">/</span>
+      <span
+        [class.breadcrumb-link]="currentLevel() === 'class'"
+        (click)="goToSportLevel()">
+        {{ selectedSemesterName() }}
+      </span>
+    }
+
+    @if (currentLevel() === 'class') {
+      <span class="separator">/</span>
+      <span class="current">{{ selectedSportName() }}</span>
+    }
+  </div>
+
+  <!-- Page Header Row -->
+  <div class="page-header-row">
+    <div class="header-content-wrap">
+      @if (currentLevel() === 'sport') {
+        <button type="button" class="btn btn-back" (click)="goToSemesterLevel()">
+          <svg lucideArrowLeft [size]="18"></svg>
+          <span>Quay lại Học kỳ</span>
+        </button>
+      } @else if (currentLevel() === 'class') {
+        <button type="button" class="btn btn-back" (click)="goToSportLevel()">
+          <svg lucideArrowLeft [size]="18"></svg>
+          <span>Quay lại Môn học</span>
+        </button>
+      }
+
+      <div class="header-titles">
+        @if (currentLevel() === 'semester') {
+          <h1 class="page-title">Quản lý Học phần theo Kỳ</h1>
+          <p class="page-subtitle">Chọn kỳ học để xem các môn thể chất và lớp học phần bạn phụ trách.</p>
+        } @else if (currentLevel() === 'sport') {
+          <h1 class="page-title">Môn học thể chất · {{ selectedSemesterName() }}</h1>
+          <p class="page-subtitle">Danh sách các môn học thể dục bạn giảng dạy trong học kỳ này.</p>
+        } @else {
+          <h1 class="page-title">Lớp học phần {{ selectedSportName() }}</h1>
+          <p class="page-subtitle">{{ selectedSemesterName() }} · Danh sách lớp học phần và sĩ số sinh viên.</p>
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== CẤP 1: DANH SÁCH HỌC KỲ ==================== -->
+  @if (currentLevel() === 'semester') {
+    <div class="card">
+      <div class="filters-row">
+        <div class="filter-search">
+          <app-search-input
+            label="Tìm kiếm học kỳ"
+            placeholder="Nhập tên kỳ học (Học kỳ 1, 2026-2027...)..."
+            [(value)]="searchKeyword">
+          </app-search-input>
+        </div>
+      </div>
+
+      <div class="selection-grid">
+        @for (sem of filteredSemesters(); track sem.code) {
+          <div class="level-card semester-card" (click)="selectSemester(sem)">
+            <div class="card-top">
+              <div class="card-icon blue">
+                <svg lucideCalendar [size]="24"></svg>
+              </div>
+              <div class="badge-wrapper">
+                @if (sem.is_current) {
+                  <span class="badge badge-active">
+                    <svg lucideClock [size]="13"></svg>
+                    Kỳ hiện tại
+                  </span>
+                } @else {
+                  <span class="badge badge-muted">Kỳ đã qua</span>
+                }
+              </div>
+            </div>
+
+            <div class="card-body">
+              <div class="code-tag">{{ sem.code }}</div>
+              <h3 class="card-title">{{ sem.name }}</h3>
+
+              <div class="stats-row">
+                <div class="stat-item">
+                  <span class="stat-number">{{ sem.totalSports }}</span>
+                  <span class="stat-desc">Môn học</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                  <span class="stat-number">{{ sem.totalClasses }}</span>
+                  <span class="stat-desc">Lớp học phần</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                  <span class="stat-number">{{ sem.totalStudents }}</span>
+                  <span class="stat-desc">Sinh viên</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-action">
+              <span>Xem danh sách môn học</span>
+              <svg lucideChevronRight [size]="18"></svg>
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-state">
+            <div class="empty-icon">
+              <svg lucideCalendar [size]="48"></svg>
+            </div>
+            <h3>Không tìm thấy học kỳ phù hợp</h3>
+            <p>Vui lòng thử lại với từ khóa tìm kiếm khác.</p>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ==================== CẤP 2: DANH SÁCH MÔN HỌC TRONG KỲ ==================== -->
+  @if (currentLevel() === 'sport') {
+    <div class="card">
+      <div class="filters-row">
+        <div class="filter-search">
+          <app-search-input
+            label="Tìm kiếm môn học"
+            placeholder="Nhập tên môn học (Pickleball, Điền kinh, Bóng đá...)..."
+            [(value)]="searchKeyword">
+          </app-search-input>
+        </div>
+      </div>
+
+      <div class="selection-grid">
+        @for (sport of filteredSports(); track sport.name) {
+          <div class="level-card sport-card" (click)="selectSport(sport)">
+            <div class="card-top">
+              <div class="card-icon purple">
+                <svg lucideTrophy [size]="24"></svg>
+              </div>
+              <div class="badge-wrapper">
+                <span class="badge badge-info">{{ sport.totalClasses }} lớp mở</span>
+              </div>
+            </div>
+
+            <div class="card-body">
+              <div class="code-tag">{{ sport.code }}</div>
+              <h3 class="card-title">{{ sport.name }}</h3>
+
+              <div class="stats-row">
+                <div class="stat-item">
+                  <span class="stat-number">{{ sport.totalClasses }}</span>
+                  <span class="stat-desc">Lớp phụ trách</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                  <span class="stat-number">{{ sport.totalStudents }}</span>
+                  <span class="stat-desc">Tổng sinh viên</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-action">
+              <span>Xem lớp học phần môn này</span>
+              <svg lucideChevronRight [size]="18"></svg>
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-state">
+            <div class="empty-icon">
+              <svg lucideTrophy [size]="48"></svg>
+            </div>
+            <h3>Không tìm thấy môn học nào phù hợp</h3>
+            <p>Thử tìm kiếm với tên môn thể thao khác.</p>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ==================== CẤP 3: DANH SÁCH LỚP HỌC PHẦN ==================== -->
+  @if (currentLevel() === 'class') {
+    <div class="card">
+      <div class="filters-row">
+        <div class="filter-search">
+          <app-search-input
+            label="Tìm kiếm lớp học phần"
+            placeholder="Nhập tên lớp, mã lớp (GDTC-PB01...)..."
+            [(value)]="searchKeyword">
+          </app-search-input>
+        </div>
+      </div>
+
+      <div class="classes-grid">
+        @for (classItem of filteredClasses(); track classItem.id) {
+          <div class="class-card" (click)="goToClassDetail(classItem)">
+            <!-- Header: Icon & Status -->
+            <div class="class-header">
+              <div class="class-thumb">
+                <svg lucideActivity [size]="28"></svg>
+              </div>
+
+              <div class="class-meta-badges">
+                <span class="badge" [ngClass]="getStatusBadgeClass(classItem.status)">
+                  @if (classItem.status === 'completed') {
+                    <svg lucideCheckCircle2 [size]="14"></svg>
+                  } @else {
+                    <svg lucideClock [size]="14"></svg>
+                  }
+                  {{ getStatusText(classItem.status) }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Content -->
+            <div class="class-content">
+              <div class="class-code-tag">{{ classItem.code || 'Chưa có mã' }}</div>
+              <h3 class="class-title">{{ classItem.name }}</h3>
+
+              <div class="info-list">
+                <div class="info-item">
+                  <svg lucideCalendar class="info-icon" [size]="15"></svg>
+                  <span>Bắt đầu: {{ classItem.start_date ? (classItem.start_date | date:'dd/MM/yyyy') : '—' }}</span>
+                </div>
+                <div class="info-item">
+                  <svg lucideUsers class="info-icon" [size]="15"></svg>
+                  <span>Sĩ số: <strong>{{ classItem.student_total }}</strong> sinh viên</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer Action -->
+            <div class="class-footer">
+              <button
+                type="button"
+                class="btn btn-primary btn-block"
+                (click)="goToClassDetail(classItem); $event.stopPropagation()">
+                <span>Thông tin lớp học</span>
+                <svg lucideArrowRight [size]="16"></svg>
+              </button>
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-state">
+            <div class="empty-icon">
+              <svg lucideBookOpen [size]="48"></svg>
+            </div>
+            <h3>Không tìm thấy lớp học phần phù hợp</h3>
+            <p>Vui lòng thử lại với từ khóa tìm kiếm khác.</p>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>

@@ -49,6 +49,17 @@ class Course(BaseDocument):
     code: Optional[str] = None
     desc: Optional[str] = None
 
+    # Bộ môn thể chất
+    sport_id: Optional[str] = None
+    sport_name: Optional[str] = None
+    sport_code: Optional[str] = None
+
+    # Học kỳ & năm học
+    semester: Optional[str] = None          # VD: "2026-2027.1"
+    semester_name: Optional[str] = None     # VD: "Học kỳ 1 (2026 - 2027)"
+    academic_year: Optional[str] = None     # VD: "2026-2027"
+    term: Optional[int] = None              # VD: 1, 2, 3
+
     status: CourseStatus = CourseStatus.IN_PROGRESS
     is_grade_locked: bool = False
     grade_locked_at: Optional[datetime] = None

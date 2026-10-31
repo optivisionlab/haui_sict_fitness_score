@@ -12,6 +12,13 @@ export interface TeacherCourseItem {
   code?: string;
   name: string;
   student_total: number;
+  sport_id?: string;
+  sport_name?: string;
+  sport_code?: string;
+  semester?: string;
+  semester_name?: string;
+  academic_year?: string;
+  term?: number;
   status: ClassStatus;
   is_grade_locked: boolean;
   allow_practice_submission: boolean;

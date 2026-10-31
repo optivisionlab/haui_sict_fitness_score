@@ -30,12 +30,18 @@ router = APIRouter(prefix="/teacher", tags=["Teacher Portal"])
 def get_teacher_courses(
     status: Optional[str] = Query(default="all", description="in_progress | completed | all"),
     search: Optional[str] = Query(default=None, description="Tìm theo tên hoặc mã lớp"),
+    semester: Optional[str] = Query(default=None, description="Lọc theo mã học kỳ (VD: 2026-2027.1)"),
+    sport_id: Optional[str] = Query(default=None, description="Lọc theo ID môn học"),
     current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.TEACHER)),
 ):
     """Lấy danh sách các lớp học phần do giáo viên đang đăng nhập phụ trách."""
     teacher_id = str(current_user.id)
     return course_service.get_teacher_courses(
-        teacher_id=teacher_id, status_filter=status, search=search
+        teacher_id=teacher_id,
+        status_filter=status,
+        search=search,
+        semester_filter=semester,
+        sport_id_filter=sport_id,
     )
 
 

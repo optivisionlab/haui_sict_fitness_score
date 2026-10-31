@@ -3,14 +3,14 @@
   <div class="breadcrumb">
     <span>Cổng thông tin Giảng viên</span>
     <span class="separator">/</span>
-    <span class="current">Lớp học phần</span>
+    <span class="current">Học phần hiện tại</span>
   </div>
 
   <!-- Page Header -->
   <div class="page-header-row">
     <div>
-      <h1 class="page-title">Quản lý Lớp học phần</h1>
-      <p class="page-subtitle">Theo dõi tiến độ giảng dạy, kiểm soát nộp bài, luyện tập và thực hiện chốt điểm học phần.</p>
+      <h1 class="page-title">Học phần hiện tại</h1>
+      <p class="page-subtitle">Theo dõi tiến độ giảng dạy, kiểm soát nộp bài, luyện tập và thực hiện chốt điểm các lớp đang diễn ra.</p>
     </div>
   </div>
 
@@ -21,28 +21,8 @@
         <svg lucideBookOpen [size]="24"></svg>
       </div>
       <div class="stat-content">
-        <div class="stat-value">{{ stats().total }}</div>
-        <div class="stat-label">Tổng số lớp giảng dạy</div>
-      </div>
-    </div>
-
-    <div class="stat-card">
-      <div class="stat-icon indigo">
-        <svg lucideClock [size]="24"></svg>
-      </div>
-      <div class="stat-content">
         <div class="stat-value">{{ stats().active }}</div>
-        <div class="stat-label">Lớp đang diễn ra</div>
-      </div>
-    </div>
-
-    <div class="stat-card">
-      <div class="stat-icon green">
-        <svg lucideCheckCircle2 [size]="24"></svg>
-      </div>
-      <div class="stat-content">
-        <div class="stat-value">{{ stats().finalized }}</div>
-        <div class="stat-label">Lớp đã kết thúc</div>
+        <div class="stat-label">Lớp đang giảng dạy</div>
       </div>
     </div>
 
@@ -55,41 +35,36 @@
         <div class="stat-label">Tổng sinh viên phụ trách</div>
       </div>
     </div>
+
+    <div class="stat-card">
+      <div class="stat-icon indigo">
+        <svg lucideClock [size]="24"></svg>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ stats().openSubmissions }}</div>
+        <div class="stat-label">Lớp đang mở nộp bài</div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon green">
+        <svg lucideCheckCircle2 [size]="24"></svg>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ stats().gradeLocked }}</div>
+        <div class="stat-label">Lớp đã chốt điểm</div>
+      </div>
+    </div>
   </div>
 
   <!-- Main Card -->
   <div class="card">
-    <!-- Tab Bar -->
-    <div class="tab-bar">
-      <button
-        type="button"
-        class="tab-btn"
-        [class.active]="selectedTab() === 'all'"
-        (click)="setTab('all')">
-        Tất cả lớp học ({{ stats().total }})
-      </button>
-      <button
-        type="button"
-        class="tab-btn"
-        [class.active]="selectedTab() === 'in_progress'"
-        (click)="setTab('in_progress')">
-        Đang diễn ra ({{ stats().active }})
-      </button>
-      <button
-        type="button"
-        class="tab-btn"
-        [class.active]="selectedTab() === 'completed'"
-        (click)="setTab('completed')">
-        Đã kết thúc ({{ stats().finalized }})
-      </button>
-    </div>
-
     <!-- Filters Row -->
     <div class="filters-row">
       <div class="filter-search">
         <app-search-input
           label="Tìm kiếm lớp học phần"
-          placeholder="Nhập tên môn học, mã lớp (FIT-PB01...)..."
+          placeholder="Nhập tên môn học, mã lớp (GDTC-PB01, Pickleball...)..."
           [(value)]="searchKeyword">
         </app-search-input>
       </div>
@@ -106,12 +81,11 @@
             </div>
 
             <div class="class-meta-badges">
+              @if (classItem.sport_name) {
+                <span class="badge badge-info">{{ classItem.sport_name }}</span>
+              }
               <span class="badge" [ngClass]="getStatusBadgeClass(classItem.status)">
-                @if (classItem.status === 'completed') {
-                  <svg lucideCheckCircle2 [size]="14"></svg>
-                } @else {
-                  <svg lucideClock [size]="14"></svg>
-                }
+                <svg lucideClock [size]="14"></svg>
                 {{ getStatusText(classItem.status) }}
               </span>
             </div>
@@ -150,8 +124,8 @@
           <div class="empty-icon">
             <svg lucideBookOpen [size]="48"></svg>
           </div>
-          <h3>Không tìm thấy lớp học phần phù hợp</h3>
-          <p>Thử thay đổi từ khóa tìm kiếm hoặc chuyển tab bộ lọc khác.</p>
+          <h3>Không tìm thấy học phần hiện tại phù hợp</h3>
+          <p>Thử thay đổi từ khóa tìm kiếm hoặc kiểm tra danh mục trong phần Học phần.</p>
         </div>
       }
     </div>

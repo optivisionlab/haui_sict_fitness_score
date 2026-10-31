@@ -45,6 +45,11 @@ export interface Course {
   teacher_name?: string;
   sport_id?: string;
   sport_name?: string;
+  sport_code?: string;
+  semester?: string;
+  semester_name?: string;
+  academic_year?: string;
+  term?: number;
   student_total?: number;
   status?: string;
   start_date?: string;
@@ -61,6 +66,11 @@ export interface CourseCreateRequest {
   teacher_name?: string;
   sport_id?: string;
   sport_name?: string;
+  sport_code?: string;
+  semester?: string;
+  semester_name?: string;
+  academic_year?: string;
+  term?: number;
   key?: string;
   status?: string;
 }
