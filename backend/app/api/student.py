@@ -10,6 +10,7 @@ from app.models.task import TaskCategory
 from app.models.user import User
 from app.schemas.student import StudentGradeViewResponse, StudentTaskGradeItem
 from app.services.auth_service import get_current_user, verify_student_in_course
+from app.services.task_service import task_service
 
 router = APIRouter(prefix="/student", tags=["Student Flow"])
 
@@ -71,6 +72,7 @@ def get_student_course_grades(
                 score=score,
                 submitted_at=submitted_at,
                 status=sub_status,
+                instruction_video_url=task_service.resolve_video_url(getattr(t, "instruction_video_url", None)),
             )
         )
 

@@ -14,7 +14,8 @@ import {
   LucideCheckCircle2,
   LucideClock,
   LucideAlertCircle,
-  LucideArrowLeft
+  LucideArrowLeft,
+  LucideVideo
 } from '@lucide/angular';
 import { SearchInputComponent } from '@shared/components';
 import { environment } from '../../../../environments/environment';
@@ -49,7 +50,8 @@ const STATUS_POLL_TIMEOUT_MS = 15 * 60 * 1000;
     LucideCheckCircle2,
     LucideClock,
     LucideAlertCircle,
-    LucideArrowLeft
+    LucideArrowLeft,
+    LucideVideo
   ],
   templateUrl: './courses.component.html',
   styleUrl: './courses.component.scss'
@@ -403,6 +405,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
             timeLimit: isExam ? '60 phút' : 'Không giới hạn',
             openTime: '01/09/2026 08:00',
             closeTime: '20/11/2026 23:59',
+            instructionVideoUrl: t.instruction_video_url || t.instructionVideoUrl || undefined,
             status: hasScore ? 'graded' : (t.status === 'pending' ? 'pending' : 'not_submitted'),
             score: hasScore ? t.score : undefined,
             aiScore: hasScore ? t.score : undefined,

@@ -54,6 +54,7 @@ export interface GradebookTaskItem {
   id: string;
   title: string;
   category: 'practice' | 'exam';
+  instruction_video_url?: string;
 }
 
 export interface StudentGrades {

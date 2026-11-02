@@ -67,6 +67,7 @@ class GradebookTaskItem(BaseSchema):
     id: str
     title: str
     category: TaskCategory
+    instruction_video_url: Optional[str] = None
 
 
 class GradebookStudentItem(BaseSchema):

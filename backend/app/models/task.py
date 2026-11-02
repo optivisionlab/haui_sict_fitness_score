@@ -33,4 +33,5 @@ class Task(BaseDocument):
     close_time: Optional[datetime] = None
 
     camera_id: Optional[str] = None  # Khi mode = "camera"
+    instruction_video_url: Optional[str] = None  # Đường dẫn MinIO hoặc URL video hướng dẫn soạn bài
 

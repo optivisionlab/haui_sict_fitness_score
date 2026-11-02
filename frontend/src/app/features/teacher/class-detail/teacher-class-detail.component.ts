@@ -1,6 +1,7 @@
 import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpEventType } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   LucideArrowLeft,
@@ -14,7 +15,11 @@ import {
   LucideX,
   LucideEdit3,
   LucideActivity,
-  LucideShieldAlert
+  LucideShieldAlert,
+  LucideVideo,
+  LucideUploadCloud,
+  LucideTrash2,
+  LucideEye
 } from '@lucide/angular';
 import {
   SearchInputComponent,
@@ -44,6 +49,10 @@ import { GradebookStudentItem, GradebookTaskItem } from '../models/teacher.model
     LucideEdit3,
     LucideActivity,
     LucideShieldAlert,
+    LucideVideo,
+    LucideUploadCloud,
+    LucideTrash2,
+    LucideEye,
     SearchInputComponent,
     SelectComponent
   ],
@@ -77,6 +86,15 @@ export class TeacherClassDetailComponent implements OnInit {
   // Modals
   isFinalizeModalOpen = signal<boolean>(false);
   hasFinalizeConfirmedCheck = signal<boolean>(false);
+
+  // Instruction Video Modals & State
+  isInstructionUploadModalOpen = signal<boolean>(false);
+  isInstructionPreviewModalOpen = signal<boolean>(false);
+  selectedInstructionTask = signal<GradebookTaskItem | null>(null);
+  selectedInstructionFile = signal<File | null>(null);
+  instructionUploadProgress = signal<number>(0);
+  isInstructionUploading = signal<boolean>(false);
+  instructionUploadError = signal<string | null>(null);
 
   // Submission Detail Modal
   isSubmissionModalOpen = signal<boolean>(false);
@@ -359,6 +377,108 @@ export class TeacherClassDetailComponent implements OnInit {
 
   exportExcel(): void {
     this.toastService.info('Đang tạo và tải về bảng điểm Excel của lớp học phần...');
+  }
+
+  // --- INSTRUCTION VIDEO MANAGEMENT ---
+
+  openInstructionUpload(task: GradebookTaskItem): void {
+    this.selectedInstructionTask.set(task);
+    this.selectedInstructionFile.set(null);
+    this.instructionUploadProgress.set(0);
+    this.instructionUploadError.set(null);
+    this.isInstructionUploading.set(false);
+    this.isInstructionUploadModalOpen.set(true);
+  }
+
+  closeInstructionUpload(): void {
+    if (this.isInstructionUploading()) return;
+    this.isInstructionUploadModalOpen.set(false);
+    this.selectedInstructionFile.set(null);
+    this.instructionUploadProgress.set(0);
+    this.instructionUploadError.set(null);
+  }
+
+  onInstructionFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    const validExtensions = ['.mp4', '.webm', '.mov', '.mkv'];
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+
+    if (!validExtensions.includes(ext)) {
+      this.instructionUploadError.set(`Định dạng file không được hỗ trợ (${ext}). Vui lòng chọn file MP4 hoặc WebM.`);
+      this.selectedInstructionFile.set(null);
+      return;
+    }
+
+    if (file.size > 100 * 1024 * 1024) {
+      this.instructionUploadError.set('Dung lượng video không được vượt quá 100MB.');
+      this.selectedInstructionFile.set(null);
+      return;
+    }
+
+    this.instructionUploadError.set(null);
+    this.selectedInstructionFile.set(file);
+  }
+
+  uploadInstructionVideo(): void {
+    const task = this.selectedInstructionTask();
+    const file = this.selectedInstructionFile();
+    if (!task || !file) {
+      this.toastService.warning('Vui lòng chọn file video trước khi tải lên.');
+      return;
+    }
+
+    this.isInstructionUploading.set(true);
+    this.instructionUploadProgress.set(0);
+    this.instructionUploadError.set(null);
+
+    this.classService.uploadInstructionVideo(task.id, file).subscribe({
+      next: (event) => {
+        if (event.type === HttpEventType.UploadProgress && event.total) {
+          const percent = Math.round((100 * event.loaded) / event.total);
+          this.instructionUploadProgress.set(percent);
+        } else if (event.type === HttpEventType.Response) {
+          this.isInstructionUploading.set(false);
+          this.toastService.success(`Đã tải lên video hướng dẫn cho bài "${task.title}" thành công!`);
+          this.closeInstructionUpload();
+          this.classService.loadGradebook(this.classId()).subscribe();
+        }
+      },
+      error: (err) => {
+        this.isInstructionUploading.set(false);
+        const errMsg = err.error?.detail || 'Lỗi khi tải video lên server. Vui lòng thử lại.';
+        this.instructionUploadError.set(errMsg);
+        this.toastService.error(errMsg);
+      }
+    });
+  }
+
+  openInstructionPreview(task: GradebookTaskItem): void {
+    this.selectedInstructionTask.set(task);
+    this.isInstructionPreviewModalOpen.set(true);
+  }
+
+  closeInstructionPreview(): void {
+    this.isInstructionPreviewModalOpen.set(false);
+  }
+
+  confirmDeleteInstructionVideo(task: GradebookTaskItem): void {
+    if (!confirm(`Bạn có chắc chắn muốn xóa video hướng dẫn của bài kiểm tra "${task.title}"?`)) {
+      return;
+    }
+
+    this.classService.deleteInstructionVideo(task.id).subscribe({
+      next: () => {
+        this.toastService.success(`Đã xóa video hướng dẫn của bài "${task.title}".`);
+        this.closeInstructionPreview();
+        this.classService.loadGradebook(this.classId()).subscribe();
+      },
+      error: (err) => {
+        this.toastService.error(err.error?.detail || 'Lỗi khi xóa video hướng dẫn');
+      }
+    });
   }
 }
 

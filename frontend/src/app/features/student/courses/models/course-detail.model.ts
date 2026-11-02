@@ -27,6 +27,7 @@ export interface AssessmentItem {
   status: 'graded' | 'pending' | 'not_submitted' | 'locked';
   score?: number;
   aiScore?: number;
+  instructionVideoUrl?: string;
   attempts: AssessmentAttempt[];
 }
 

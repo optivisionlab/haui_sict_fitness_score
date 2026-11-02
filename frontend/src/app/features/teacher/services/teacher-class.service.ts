@@ -1,5 +1,5 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpEvent, HttpRequest } from '@angular/common/http';
 import { Observable, tap, map, catchError, of } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ApiResponse } from '../../../core/models/auth.model';
@@ -92,7 +92,8 @@ export class TeacherClassService {
     const task_list: GradebookTaskItem[] = rawTasks.map((t: any) => ({
       id: t.id || t._id,
       title: t.title,
-      category: t.category
+      category: t.category,
+      instruction_video_url: t.instruction_video_url || t.instructionVideoUrl || undefined
     }));
 
     const rawFormula = data.formula || data.grading_formula || data.gradingFormula || {};
@@ -263,5 +264,26 @@ export class TeacherClassService {
    */
   reopenClassGrades(courseId: string, reason: string = 'Giáo viên yêu cầu điều chỉnh điểm'): Observable<any> {
     return this.http.post(`${environment.apiUrl}/teacher/courses/${courseId}/unlock-grades`, { reason });
+  }
+
+  /**
+   * Tải lên video hướng dẫn soạn bài/thực hiện cho bài kiểm tra (kèm tracking progress)
+   */
+  uploadInstructionVideo(taskId: string, file: File): Observable<HttpEvent<any>> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const req = new HttpRequest('POST', `${environment.apiUrl}/tasks/${taskId}/instruction-video`, formData, {
+      reportProgress: true
+    });
+
+    return this.http.request(req);
+  }
+
+  /**
+   * Xóa video hướng dẫn soạn bài của bài kiểm tra
+   */
+  deleteInstructionVideo(taskId: string): Observable<any> {
+    return this.http.delete(`${environment.apiUrl}/tasks/${taskId}/instruction-video`);
   }
 }

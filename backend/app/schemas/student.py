@@ -14,6 +14,7 @@ class StudentTaskGradeItem(BaseSchema):
     score: Optional[float] = None
     submitted_at: Optional[datetime] = None
     status: str = "not_submitted"  # "not_submitted" | "pending" | "graded"
+    instruction_video_url: Optional[str] = None
 
 
 class StudentGradeViewResponse(BaseSchema):

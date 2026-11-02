@@ -18,6 +18,7 @@ class TaskBase(BaseSchema):
     open_time: Optional[datetime] = None
     close_time: Optional[datetime] = None
     camera_id: Optional[str] = None
+    instruction_video_url: Optional[str] = None
 
 
 class TaskCreate(TaskBase):
@@ -36,6 +37,7 @@ class TaskUpdate(BaseSchema):
     open_time: Optional[datetime] = None
     close_time: Optional[datetime] = None
     camera_id: Optional[str] = None
+    instruction_video_url: Optional[str] = None
 
 
 class TaskLockUpdate(BaseSchema):
@@ -57,6 +59,7 @@ class TaskRead(BaseSchema):
     open_time: Optional[datetime] = None
     close_time: Optional[datetime] = None
     camera_id: Optional[str] = None
+    instruction_video_url: Optional[str] = None
     submitted_count: Optional[int] = None
     graded_count: Optional[int] = None
     created_at: Optional[datetime] = None

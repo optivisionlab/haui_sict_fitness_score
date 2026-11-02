@@ -288,6 +288,45 @@
                       }
                     </div>
                   </div>
+
+                  <!-- Khu vực Hướng dẫn soạn bài bằng Video -->
+                  <div class="assessment-instruction-section">
+                    <div class="instruction-left">
+                      @if (item.instruction_video_url) {
+                        <span class="instruction-state-tag has-video">
+                          <svg lucideVideo [size]="15"></svg>
+                          <span>Đã có video hướng dẫn</span>
+                        </span>
+                      } @else {
+                        <span class="instruction-state-tag no-video">
+                          <svg lucideVideo [size]="15"></svg>
+                          <span>Chưa có video hướng dẫn</span>
+                        </span>
+                      }
+                    </div>
+
+                    <div class="instruction-actions">
+                      @if (item.instruction_video_url) {
+                        <button type="button" class="btn-action-inst preview" (click)="openInstructionPreview(item)">
+                          <svg lucideEye [size]="15"></svg>
+                          <span>Xem trước</span>
+                        </button>
+                        <button type="button" class="btn-action-inst change" (click)="openInstructionUpload(item)">
+                          <svg lucideUploadCloud [size]="15"></svg>
+                          <span>Thay video</span>
+                        </button>
+                        <button type="button" class="btn-action-inst delete" (click)="confirmDeleteInstructionVideo(item)">
+                          <svg lucideTrash2 [size]="15"></svg>
+                          <span>Xóa</span>
+                        </button>
+                      } @else {
+                        <button type="button" class="btn-action-inst upload-primary" (click)="openInstructionUpload(item)">
+                          <svg lucideUploadCloud [size]="15"></svg>
+                          <span>Hướng dẫn soạn bài (Tải video)</span>
+                        </button>
+                      }
+                    </div>
+                  </div>
                 </div>
               }
             </div>
@@ -505,6 +544,136 @@
               (click)="saveTeacherGrading()">
               <svg lucideCheck [size]="16"></svg>
               <span>Lưu điểm đánh giá</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    <!-- ==================== MODAL: UPLOAD VIDEO HƯỚNG DẪN ==================== -->
+    @if (isInstructionUploadModalOpen()) {
+      <div class="modal-backdrop" (click)="closeInstructionUpload()">
+        <div class="modal-card modal-instruction-upload" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <div class="modal-header-icon success-icon">
+              <svg lucideVideo [size]="24"></svg>
+            </div>
+            <div>
+              <h3>Hướng dẫn soạn bài (Video)</h3>
+              <p>{{ selectedInstructionTask()?.title }}</p>
+            </div>
+            <button type="button" class="modal-close-btn" [disabled]="isInstructionUploading()" (click)="closeInstructionUpload()">
+              <svg lucideX [size]="20"></svg>
+            </button>
+          </div>
+
+          <div class="modal-body">
+            <div class="upload-dropzone" [class.has-file]="!!selectedInstructionFile()">
+              <input
+                type="file"
+                id="instruction-file-input"
+                accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
+                (change)="onInstructionFileSelected($event)"
+                [disabled]="isInstructionUploading()"
+              />
+              <label for="instruction-file-input" class="dropzone-label">
+                <div class="dropzone-icon">
+                  <svg lucideUploadCloud [size]="36"></svg>
+                </div>
+                @if (selectedInstructionFile(); as file) {
+                  <div class="file-picked-info">
+                    <span class="file-name">{{ file.name }}</span>
+                    <span class="file-size">{{ (file.size / (1024 * 1024)).toFixed(2) }} MB</span>
+                    <span class="change-hint">Nhấn để chọn file khác</span>
+                  </div>
+                } @else {
+                  <div class="file-prompt">
+                    <span class="prompt-main">Kéo thả file video vào đây hoặc <strong>duyệt file</strong></span>
+                    <span class="prompt-sub">Hỗ trợ định dạng MP4, WebM (Dung lượng tối đa 100MB)</span>
+                  </div>
+                }
+              </label>
+            </div>
+
+            @if (instructionUploadError()) {
+              <div class="upload-error-alert">
+                <svg lucideShieldAlert [size]="16"></svg>
+                <span>{{ instructionUploadError() }}</span>
+              </div>
+            }
+
+            @if (isInstructionUploading()) {
+              <div class="upload-progress-box">
+                <div class="progress-info-row">
+                  <span>Đang tải video lên MinIO...</span>
+                  <span class="progress-percent">{{ instructionUploadProgress() }}%</span>
+                </div>
+                <div class="progress-bar-track">
+                  <div class="progress-bar-fill" [style.width.%]="instructionUploadProgress()"></div>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn-cancel" [disabled]="isInstructionUploading()" (click)="closeInstructionUpload()">
+              Hủy
+            </button>
+            <button
+              type="button"
+              class="btn-confirm-upload"
+              [disabled]="!selectedInstructionFile() || isInstructionUploading()"
+              (click)="uploadInstructionVideo()"
+            >
+              @if (isInstructionUploading()) {
+                <span class="spinner-small"></span>
+                <span>Đang xử lý...</span>
+              } @else {
+                <svg lucideUploadCloud [size]="16"></svg>
+                <span>Bắt đầu tải lên</span>
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ==================== MODAL: PREVIEW VIDEO HƯỚNG DẪN ==================== -->
+    @if (isInstructionPreviewModalOpen()) {
+      <div class="modal-backdrop" (click)="closeInstructionPreview()">
+        <div class="modal-card modal-instruction-preview" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <div class="modal-header-icon success-icon">
+              <svg lucideVideo [size]="24"></svg>
+            </div>
+            <div>
+              <h3>Xem trước Video Hướng dẫn soạn bài</h3>
+              <p>{{ selectedInstructionTask()?.title }}</p>
+            </div>
+            <button type="button" class="modal-close-btn" (click)="closeInstructionPreview()">
+              <svg lucideX [size]="20"></svg>
+            </button>
+          </div>
+
+          <div class="modal-body preview-modal-body">
+            @if (selectedInstructionTask()?.instruction_video_url; as url) {
+              <div class="video-player-container">
+                <video [src]="url" controls autoplay playsinline class="teacher-instruction-player"></video>
+              </div>
+            } @else {
+              <div class="no-video-alert">Không tìm thấy video hướng dẫn.</div>
+            }
+          </div>
+
+          <div class="modal-footer preview-footer">
+            <button
+              type="button"
+              class="btn-delete-instruction"
+              (click)="selectedInstructionTask() && confirmDeleteInstructionVideo(selectedInstructionTask()!)"
+            >
+              <svg lucideTrash2 [size]="16"></svg>
+              <span>Xóa video này</span>
+            </button>
+            <button type="button" class="btn-cancel" (click)="closeInstructionPreview()">
+              Đóng
             </button>
           </div>
         </div>

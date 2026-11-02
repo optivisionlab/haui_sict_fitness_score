@@ -1,6 +1,6 @@
 import math
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 
 from app.models.user import User, UserRole
 from app.schemas.common import MessageResponse, PaginatedResponse
@@ -98,3 +98,24 @@ def delete_task(
     """Xóa bài tập (Admin hoặc Giáo viên)."""
     task_service.delete_task(task_id)
     return MessageResponse(message=f"Đã xóa bài tập {task_id} thành công")
+
+
+@router.post("/{task_id}/instruction-video", response_model=TaskRead)
+def upload_instruction_video(
+    task_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.TEACHER)),
+):
+    """Giáo viên hoặc Admin tải lên video hướng dẫn soạn bài/thực hiện cho bài kiểm tra."""
+    task = task_service.upload_instruction_video(task_id=task_id, file=file)
+    return task_service.to_read_dto(task)
+
+
+@router.delete("/{task_id}/instruction-video", response_model=TaskRead)
+def delete_instruction_video(
+    task_id: str,
+    current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.TEACHER)),
+):
+    """Giáo viên hoặc Admin xóa video hướng dẫn soạn bài của bài kiểm tra."""
+    task = task_service.delete_instruction_video(task_id=task_id)
+    return task_service.to_read_dto(task)

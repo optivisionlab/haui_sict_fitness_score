@@ -525,12 +525,14 @@ class CourseService:
         course = self.get_by_id(course_id)
 
         # Lấy danh sách tasks thuộc khóa học
+        from app.services.task_service import task_service
         tasks_in_course, _ = crud_task.get_by_course(course_id, limit=100)
         task_list = [
             GradebookTaskItem(
                 id=str(t.id),
                 title=t.title,
                 category=getattr(t, "category", TaskCategory.PRACTICE),
+                instruction_video_url=task_service.resolve_video_url(getattr(t, "instruction_video_url", None)),
             )
             for t in tasks_in_course
         ]

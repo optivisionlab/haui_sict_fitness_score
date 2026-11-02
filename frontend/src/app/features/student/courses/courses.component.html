@@ -270,6 +270,21 @@
           </div>
         }
 
+        @if (a.instructionVideoUrl) {
+          <div class="instruction-video-box">
+            <div class="instruction-video-header">
+              <div class="instruction-badge">
+                <svg lucideVideo [size]="16"></svg>
+                <span>Hướng dẫn soạn bài (Video từ Giáo viên)</span>
+              </div>
+              <span class="instruction-hint">Sinh viên xem kỹ video hướng dẫn để thực hiện đúng quy chuẩn động tác trước khi nộp bài.</span>
+            </div>
+            <div class="instruction-player-wrapper">
+              <video [src]="a.instructionVideoUrl" controls preload="metadata" playsinline class="instruction-video-player"></video>
+            </div>
+          </div>
+        }
+
         <!-- Bài tập và bài kiểm tra/thi đều được nộp không giới hạn số lần -->
         <div class="assessment-action-row">
           @if (isExam(a)) {
