@@ -3,11 +3,11 @@
   <div class="breadcrumb">
     <span>Cổng thông tin Giảng viên</span>
     <span class="separator">/</span>
-    <span [class.breadcrumb-link]="currentLevel() !== 'semester'" (click)="goToSemesterLevel()">
+    <span [class.breadcrumb-link]="viewMode() === 'tree' && currentLevel() !== 'semester'" (click)="goToSemesterLevel()">
       Học phần
     </span>
 
-    @if (currentLevel() === 'sport' || currentLevel() === 'class') {
+    @if (viewMode() === 'tree' && (currentLevel() === 'sport' || currentLevel() === 'class')) {
       <span class="separator">/</span>
       <span
         [class.breadcrumb-link]="currentLevel() === 'class'"
@@ -16,7 +16,7 @@
       </span>
     }
 
-    @if (currentLevel() === 'class') {
+    @if (viewMode() === 'tree' && currentLevel() === 'class') {
       <span class="separator">/</span>
       <span class="current">{{ selectedSportName() }}</span>
     }
@@ -25,12 +25,12 @@
   <!-- Page Header Row -->
   <div class="page-header-row">
     <div class="header-content-wrap">
-      @if (currentLevel() === 'sport') {
+      @if (viewMode() === 'tree' && currentLevel() === 'sport') {
         <button type="button" class="btn btn-back" (click)="goToSemesterLevel()">
           <svg lucideArrowLeft [size]="18"></svg>
           <span>Quay lại Học kỳ</span>
         </button>
-      } @else if (currentLevel() === 'class') {
+      } @else if (viewMode() === 'tree' && currentLevel() === 'class') {
         <button type="button" class="btn btn-back" (click)="goToSportLevel()">
           <svg lucideArrowLeft [size]="18"></svg>
           <span>Quay lại Môn học</span>
@@ -38,9 +38,12 @@
       }
 
       <div class="header-titles">
-        @if (currentLevel() === 'semester') {
-          <h1 class="page-title">Quản lý Học phần theo Kỳ</h1>
-          <p class="page-subtitle">Chọn kỳ học để xem các môn thể chất và lớp học phần bạn phụ trách.</p>
+        @if (viewMode() === 'flat') {
+          <h1 class="page-title">Quản lý Học phần theo Kỳ & Môn</h1>
+          <p class="page-subtitle">Xem toàn bộ các lớp học phần phụ trách, tìm kiếm và lọc linh hoạt theo kỳ đào tạo và bộ môn thể chất.</p>
+        } @else if (currentLevel() === 'semester') {
+          <h1 class="page-title">Quản lý Học phần theo Cây Học kỳ</h1>
+          <p class="page-subtitle">Chọn kỳ học chuẩn để xem các môn thể chất và lớp học phần bạn phụ trách.</p>
         } @else if (currentLevel() === 'sport') {
           <h1 class="page-title">Môn học thể chất · {{ selectedSemesterName() }}</h1>
           <p class="page-subtitle">Danh sách các môn học thể dục bạn giảng dạy trong học kỳ này.</p>
@@ -50,27 +53,210 @@
         }
       </div>
     </div>
+
+    <!-- View Mode Switcher -->
+    <div class="view-mode-switcher">
+      <button
+        type="button"
+        class="mode-btn"
+        [class.active]="viewMode() === 'flat'"
+        (click)="setViewMode('flat')"
+        title="Lọc nhanh tất cả các lớp học phần">
+        <svg lucideLayoutGrid [size]="16"></svg>
+        <span>Lọc danh sách</span>
+      </button>
+
+      <button
+        type="button"
+        class="mode-btn"
+        [class.active]="viewMode() === 'tree'"
+        (click)="setViewMode('tree')"
+        title="Xem theo cấu trúc phân cấp: Kỳ -> Môn -> Lớp">
+        <svg lucideLayers [size]="16"></svg>
+        <span>Xem theo kỳ</span>
+      </button>
+    </div>
   </div>
 
-  <!-- ==================== CẤP 1: DANH SÁCH HỌC KỲ ==================== -->
-  @if (currentLevel() === 'semester') {
-    <div class="card">
-      <div class="filters-row">
-        <div class="filter-search">
+  <!-- ==================== CHẾ ĐỘ 1: XEM DANH SÁCH LỚP CÓ BỘ LỌC TOÀN DIỆN (FLAT VIEW) ==================== -->
+  @if (viewMode() === 'flat') {
+    <div class="card filter-card">
+      <!-- Toolbar Filters -->
+      <div class="toolbar-wrapper">
+        <div class="toolbar-search">
           <app-search-input
-            label="Tìm kiếm học kỳ"
-            placeholder="Nhập tên kỳ học (Học kỳ 1, 2026-2027...)..."
+            label="Tìm kiếm lớp học"
+            placeholder="Tìm theo tên lớp, mã lớp (GDTC-PB01...)..."
             [(value)]="searchKeyword">
           </app-search-input>
         </div>
+
+        <div class="toolbar-selects">
+          <div class="select-item">
+            <app-select
+              label="Học kỳ"
+              [options]="semesterOptions()"
+              [(value)]="selectedSemesterFilter">
+            </app-select>
+          </div>
+
+          <div class="select-item">
+            <app-select
+              label="Bộ môn"
+              [options]="sportOptions()"
+              [(value)]="selectedSportFilter">
+            </app-select>
+          </div>
+
+          <div class="select-item">
+            <app-select
+              label="Trạng thái"
+              [options]="statusOptions"
+              [(value)]="selectedStatusFilter">
+            </app-select>
+          </div>
+
+          @if (activeFiltersCount() > 0) {
+            <button
+              type="button"
+              class="btn-reset-filters"
+              (click)="resetFilters()"
+              title="Đặt lại toàn bộ bộ lọc">
+              <svg lucideRotateCcw [size]="16"></svg>
+              <span>Đặt lại</span>
+            </button>
+          }
+        </div>
       </div>
 
-      @if (isLoadingSemesters()) {
+      <!-- Result Counter & Meta -->
+      <div class="results-meta-bar">
+        <div class="count-text">
+          Tìm thấy <strong>{{ filteredFlatClasses().length }}</strong> lớp học phần
+          @if (allClasses().length > 0 && filteredFlatClasses().length !== allClasses().length) {
+            <span class="sub-count">(trên tổng số {{ allClasses().length }} lớp)</span>
+          }
+        </div>
+
+        @if (activeFiltersCount() > 0) {
+          <div class="active-chips">
+            @if (selectedSemesterFilter() !== 'all') {
+              <span class="filter-chip">
+                <span>Kỳ: {{ selectedSemesterFilter() }}</span>
+                <button type="button" class="chip-remove" (click)="selectedSemesterFilter.set('all')">×</button>
+              </span>
+            }
+            @if (selectedSportFilter() !== 'all') {
+              <span class="filter-chip">
+                <span>Môn: {{ selectedSportFilter() }}</span>
+                <button type="button" class="chip-remove" (click)="selectedSportFilter.set('all')">×</button>
+              </span>
+            }
+            @if (selectedStatusFilter() !== 'all') {
+              <span class="filter-chip">
+                <span>Trạng thái: {{ getStatusText(selectedStatusFilter() === 'in_progress' ? 'in_progress' : 'completed') }}</span>
+                <button type="button" class="chip-remove" (click)="selectedStatusFilter.set('all')">×</button>
+              </span>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Classes Content Grid -->
+      @if (isLoading()) {
         <div class="empty-state" style="padding: 3.5rem 1rem;">
           <div class="spinner-sm" style="width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem;"></div>
-          <p style="color: var(--color-text-secondary); font-size: 0.95rem;">Đang tải danh sách học kỳ...</p>
+          <p style="color: var(--color-text-secondary); font-size: 0.95rem;">Đang tải danh sách học phần...</p>
         </div>
       } @else {
+        <div class="classes-grid">
+          @for (classItem of filteredFlatClasses(); track classItem.id) {
+            <div class="class-card" (click)="goToClassDetail(classItem)">
+              <!-- Header: Sport Icon & Status -->
+              <div class="class-header">
+                <div class="class-thumb">
+                  <svg lucideActivity [size]="26"></svg>
+                </div>
+
+                <div class="class-meta-badges">
+                  <span class="badge badge-sport-tag">
+                    <svg lucideTrophy [size]="12"></svg>
+                    {{ classItem.sport_name || 'Thể chất' }}
+                  </span>
+
+                  <span class="badge" [ngClass]="getStatusBadgeClass(classItem.status)">
+                    @if (classItem.status === 'completed') {
+                      <svg lucideCheckCircle2 [size]="13"></svg>
+                    } @else {
+                      <svg lucideClock [size]="13"></svg>
+                    }
+                    {{ getStatusText(classItem.status) }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Content -->
+              <div class="class-content">
+                <div class="class-code-tag">{{ classItem.code || 'Chưa có mã' }}</div>
+                <h3 class="class-title">{{ classItem.name }}</h3>
+
+                <div class="info-list">
+                  <div class="info-item semester-info">
+                    <svg lucideCalendar class="info-icon" [size]="15"></svg>
+                    <span><strong>{{ classItem.semester_name || classItem.semester }}</strong></span>
+                  </div>
+                  <div class="info-item">
+                    <svg lucideUsers class="info-icon" [size]="15"></svg>
+                    <span>Sĩ số: <strong>{{ classItem.student_total }}</strong> sinh viên</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Footer Action -->
+              <div class="class-footer">
+                <button
+                  type="button"
+                  class="btn btn-primary btn-block"
+                  (click)="goToClassDetail(classItem); $event.stopPropagation()">
+                  <span>Vào lớp học phần</span>
+                  <svg lucideArrowRight [size]="16"></svg>
+                </button>
+              </div>
+            </div>
+          } @empty {
+            <div class="empty-state">
+              <div class="empty-icon">
+                <svg lucideBookOpen [size]="48"></svg>
+              </div>
+              <h3>Không tìm thấy lớp học phần phù hợp</h3>
+              <p>Thử thay đổi bộ lọc học kỳ, môn học hoặc từ khóa tìm kiếm.</p>
+              @if (activeFiltersCount() > 0) {
+                <button type="button" class="btn btn-secondary" style="margin-top: 1rem;" (click)="resetFilters()">
+                  Đặt lại toàn bộ bộ lọc
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ==================== CHẾ ĐỘ 2: XEM PHÂN CẤP CÂY HỌC KỲ (TREE VIEW) ==================== -->
+  @if (viewMode() === 'tree') {
+    <!-- CẤP 1: DANH SÁCH HỌC KỲ CHUẨN -->
+    @if (currentLevel() === 'semester') {
+      <div class="card">
+        <div class="filters-row">
+          <div class="filter-search">
+            <app-search-input
+              label="Tìm kiếm học kỳ"
+              placeholder="Nhập tên kỳ học (Học kỳ 1, 2026-2027...)..."
+              [(value)]="searchKeyword">
+            </app-search-input>
+          </div>
+        </div>
+
         <div class="selection-grid">
           @for (sem of filteredSemesters(); track sem.code) {
             <div class="level-card semester-card" (click)="selectSemester(sem)">
@@ -127,100 +313,92 @@
             </div>
           }
         </div>
-      }
-    </div>
-  }
-
-  <!-- ==================== CẤP 2: DANH SÁCH MÔN HỌC TRONG KỲ ==================== -->
-  @if (currentLevel() === 'sport') {
-    <div class="card">
-      <div class="filters-row">
-        <div class="filter-search">
-          <app-search-input
-            label="Tìm kiếm môn học"
-            placeholder="Nhập tên môn học (Pickleball, Điền kinh, Bóng đá...)..."
-            [(value)]="searchKeyword">
-          </app-search-input>
-        </div>
       </div>
+    }
 
-      @if (isLoadingClasses()) {
-        <div class="empty-state" style="padding: 3.5rem 1rem;">
-          <div class="spinner-sm" style="width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem;"></div>
-          <p style="color: var(--color-text-secondary); font-size: 0.95rem;">Đang tải danh sách lớp học cho {{ selectedSemesterName() }}...</p>
+    <!-- CẤP 2: DANH SÁCH MÔN HỌC TRONG KỲ -->
+    @if (currentLevel() === 'sport') {
+      <div class="card">
+        <div class="filters-row">
+          <div class="filter-search">
+            <app-search-input
+              label="Tìm kiếm môn học"
+              placeholder="Nhập tên môn học (Pickleball, Điền kinh, Bóng đá...)..."
+              [(value)]="searchKeyword">
+            </app-search-input>
+          </div>
         </div>
-      } @else {
-        <div class="selection-grid">
-          @for (sport of filteredSports(); track sport.name) {
-            <div class="level-card sport-card" (click)="selectSport(sport)">
-              <div class="card-top">
-                <div class="card-icon purple">
-                  <svg lucideTrophy [size]="24"></svg>
-                </div>
-                <div class="badge-wrapper">
-                  <span class="badge badge-info">{{ sport.totalClasses }} lớp mở</span>
-                </div>
-              </div>
 
-              <div class="card-body">
-                <div class="code-tag">{{ sport.code }}</div>
-                <h3 class="card-title">{{ sport.name }}</h3>
-
-                <div class="stats-row">
-                  <div class="stat-item">
-                    <span class="stat-number">{{ sport.totalClasses }}</span>
-                    <span class="stat-desc">Lớp phụ trách</span>
+        @if (isLoadingTreeClasses()) {
+          <div class="empty-state" style="padding: 3.5rem 1rem;">
+            <div class="spinner-sm" style="width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem;"></div>
+            <p style="color: var(--color-text-secondary); font-size: 0.95rem;">Đang tải danh sách lớp học cho {{ selectedSemesterName() }}...</p>
+          </div>
+        } @else {
+          <div class="selection-grid">
+            @for (sport of filteredSports(); track sport.name) {
+              <div class="level-card sport-card" (click)="selectSport(sport)">
+                <div class="card-top">
+                  <div class="card-icon purple">
+                    <svg lucideTrophy [size]="24"></svg>
                   </div>
-                  <div class="stat-divider"></div>
-                  <div class="stat-item">
-                    <span class="stat-number">{{ sport.totalStudents }}</span>
-                    <span class="stat-desc">Tổng sinh viên</span>
+                  <div class="badge-wrapper">
+                    <span class="badge badge-info">{{ sport.totalClasses }} lớp mở</span>
                   </div>
                 </div>
-              </div>
 
-              <div class="card-action">
-                <span>Xem lớp học phần môn này</span>
-                <svg lucideChevronRight [size]="18"></svg>
-              </div>
-            </div>
-          } @empty {
-            <div class="empty-state">
-              <div class="empty-icon">
-                <svg lucideTrophy [size]="48"></svg>
-              </div>
-              <h3>Không tìm thấy môn học nào phù hợp</h3>
-              <p>Thử tìm kiếm với tên môn thể thao khác.</p>
-            </div>
-          }
-        </div>
-      }
-    </div>
-  }
+                <div class="card-body">
+                  <div class="code-tag">{{ sport.code }}</div>
+                  <h3 class="card-title">{{ sport.name }}</h3>
 
-  <!-- ==================== CẤP 3: DANH SÁCH LỚP HỌC PHẦN ==================== -->
-  @if (currentLevel() === 'class') {
-    <div class="card">
-      <div class="filters-row">
-        <div class="filter-search">
-          <app-search-input
-            label="Tìm kiếm lớp học phần"
-            placeholder="Nhập tên lớp, mã lớp (GDTC-PB01...)..."
-            [(value)]="searchKeyword">
-          </app-search-input>
-        </div>
+                  <div class="stats-row">
+                    <div class="stat-item">
+                      <span class="stat-number">{{ sport.totalClasses }}</span>
+                      <span class="stat-desc">Lớp phụ trách</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                      <span class="stat-number">{{ sport.totalStudents }}</span>
+                      <span class="stat-desc">Tổng sinh viên</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card-action">
+                  <span>Xem lớp học phần môn này</span>
+                  <svg lucideChevronRight [size]="18"></svg>
+                </div>
+              </div>
+            } @empty {
+              <div class="empty-state">
+                <div class="empty-icon">
+                  <svg lucideTrophy [size]="48"></svg>
+                </div>
+                <h3>Không tìm thấy môn học nào phù hợp</h3>
+                <p>Thử tìm kiếm với tên môn thể thao khác.</p>
+              </div>
+            }
+          </div>
+        }
       </div>
+    }
 
-      @if (isLoadingClasses()) {
-        <div class="empty-state" style="padding: 3.5rem 1rem;">
-          <div class="spinner-sm" style="width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem;"></div>
-          <p style="color: var(--color-text-secondary); font-size: 0.95rem;">Đang tải danh sách lớp học phần...</p>
+    <!-- CẤP 3: DANH SÁCH LỚP HỌC PHẦN TRONG MÔN -->
+    @if (currentLevel() === 'class') {
+      <div class="card">
+        <div class="filters-row">
+          <div class="filter-search">
+            <app-search-input
+              label="Tìm kiếm lớp học phần"
+              placeholder="Nhập tên lớp, mã lớp (GDTC-PB01...)..."
+              [(value)]="searchKeyword">
+            </app-search-input>
+          </div>
         </div>
-      } @else {
+
         <div class="classes-grid">
-          @for (classItem of filteredClasses(); track classItem.id) {
+          @for (classItem of filteredTreeClasses(); track classItem.id) {
             <div class="class-card" (click)="goToClassDetail(classItem)">
-              <!-- Header: Icon & Status -->
               <div class="class-header">
                 <div class="class-thumb">
                   <svg lucideActivity [size]="28"></svg>
@@ -238,7 +416,6 @@
                 </div>
               </div>
 
-              <!-- Content -->
               <div class="class-content">
                 <div class="class-code-tag">{{ classItem.code || 'Chưa có mã' }}</div>
                 <h3 class="class-title">{{ classItem.name }}</h3>
@@ -255,7 +432,6 @@
                 </div>
               </div>
 
-              <!-- Footer Action -->
               <div class="class-footer">
                 <button
                   type="button"
@@ -276,7 +452,7 @@
             </div>
           }
         </div>
-      }
-    </div>
+      </div>
+    }
   }
 </div>

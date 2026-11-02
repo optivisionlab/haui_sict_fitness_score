@@ -14,6 +14,7 @@ import {
   GradingFormula,
   ClassStatus
 } from '../models/teacher.model';
+import { deduceSportMetadata, parseSemesterCode } from '../../../core/constants/academic.constant';
 
 @Injectable({
   providedIn: 'root'
@@ -39,76 +40,9 @@ export class TeacherClassService {
 
   constructor() {}
 
-  private deduceSportInfo(name: string = '', code: string = ''): { sport_name: string; sport_code: string } {
-    const nl = (name || '').toLowerCase();
-    const cl = (code || '').toLowerCase();
-    if (nl.includes('pickleball') || cl.includes('pb')) {
-      return { sport_name: 'Pickleball', sport_code: 'PICKLEBALL' };
-    }
-    if (nl.includes('điền kinh') || nl.includes('chạy') || cl.includes('run') || cl.includes('cb')) {
-      return { sport_name: 'Điền kinh', sport_code: 'RUNNING' };
-    }
-    if (nl.includes('bóng đá') || nl.includes('đá bóng') || cl.includes('fb') || cl.includes('foot')) {
-      return { sport_name: 'Bóng đá', sport_code: 'FOOTBALL' };
-    }
-    if (nl.includes('cầu lông') || cl.includes('badminton')) {
-      return { sport_name: 'Cầu lông', sport_code: 'BADMINTON' };
-    }
-    if (nl.includes('bóng rổ') || cl.includes('basket')) {
-      return { sport_name: 'Bóng rổ', sport_code: 'BASKETBALL' };
-    }
-    if (nl.includes('bóng chuyền') || cl.includes('volley')) {
-      return { sport_name: 'Bóng chuyền', sport_code: 'VOLLEYBALL' };
-    }
-    if (nl.includes('bơi') || cl.includes('swim')) {
-      return { sport_name: 'Bơi lội', sport_code: 'SWIMMING' };
-    }
-    return { sport_name: 'Giáo dục Thể chất', sport_code: 'GENERAL' };
-  }
-
-  private deduceSemesterInfo(key?: string, startDate?: string): { semester: string; semester_name: string; academic_year: string; term: number } {
-    if (key && key.includes('.')) {
-      const [year, termStr] = key.split('.');
-      const term = parseInt(termStr, 10) || 1;
-      const termLabels: Record<number, string> = { 1: 'Học kỳ 1', 2: 'Học kỳ 2', 3: 'Học kỳ hè' };
-      return {
-        semester: key,
-        semester_name: `${termLabels[term] || 'Học kỳ'} (${year.replace('-', ' - ')})`,
-        academic_year: year,
-        term
-      };
-    }
-    let year = '2026-2027';
-    let term = 1;
-    if (startDate) {
-      const d = new Date(startDate);
-      if (!isNaN(d.getTime())) {
-        const m = d.getMonth() + 1;
-        const y = d.getFullYear();
-        if (m >= 8) {
-          year = `${y}-${y + 1}`;
-          term = 1;
-        } else if (m <= 5) {
-          year = `${y - 1}-${y}`;
-          term = 2;
-        } else {
-          year = `${y - 1}-${y}`;
-          term = 3;
-        }
-      }
-    }
-    const termLabels: Record<number, string> = { 1: 'Học kỳ 1', 2: 'Học kỳ 2', 3: 'Học kỳ hè' };
-    return {
-      semester: `${year}.${term}`,
-      semester_name: `${termLabels[term] || 'Học kỳ'} (${year.replace('-', ' - ')})`,
-      academic_year: year,
-      term
-    };
-  }
-
   private normalizeCourseItem(item: any): TeacherCourseItem {
-    const deducedSport = this.deduceSportInfo(item.name, item.code);
-    const deducedSem = this.deduceSemesterInfo(item.semester || item.key, item.start_date ?? item.startDate);
+    const deducedSport = deduceSportMetadata(item.name, item.code);
+    const deducedSem = parseSemesterCode(item.semester);
 
     return {
       id: item.id || item._id,
@@ -116,11 +50,11 @@ export class TeacherClassService {
       name: item.name,
       student_total: item.student_total ?? item.studentTotal ?? 0,
       sport_id: item.sport_id ?? item.sportId,
-      sport_name: item.sport_name ?? item.sportName ?? deducedSport.sport_name,
-      sport_code: item.sport_code ?? item.sportCode ?? deducedSport.sport_code,
-      semester: item.semester ?? deducedSem.semester,
-      semester_name: item.semester_name ?? item.semesterName ?? deducedSem.semester_name,
-      academic_year: item.academic_year ?? item.academicYear ?? deducedSem.academic_year,
+      sport_name: item.sport_name ?? item.sportName ?? deducedSport.name,
+      sport_code: item.sport_code ?? item.sportCode ?? deducedSport.code,
+      semester: item.semester ?? deducedSem.code,
+      semester_name: item.semester_name ?? item.semesterName ?? deducedSem.name,
+      academic_year: item.academic_year ?? item.academicYear ?? deducedSem.academicYear,
       term: item.term ?? deducedSem.term,
       status: item.status,
       is_grade_locked: item.is_grade_locked ?? item.isGradeLocked ?? false,
@@ -206,13 +140,20 @@ export class TeacherClassService {
   }
 
   /**
-   * Lấy danh sách lớp học phần của giảng viên (hỗ trợ lọc status, semester)
+   * Lấy danh sách lớp học phần của giảng viên (hỗ trợ lọc status, semester, sport_code, search)
    */
-  loadTeacherClasses(status: string = 'all', semester?: string): Observable<TeacherCourseItem[]> {
+  loadTeacherClasses(
+    status: string = 'all',
+    semester?: string,
+    sportCode?: string,
+    search?: string
+  ): Observable<TeacherCourseItem[]> {
     this.isLoadingState.set(true);
     let params: any = {};
     if (status && status !== 'all') params.status = status;
     if (semester && semester !== 'all') params.semester = semester;
+    if (sportCode && sportCode !== 'all') params.sport_code = sportCode;
+    if (search && search.trim()) params.search = search.trim();
 
     return this.http.get<ApiResponse<any[]>>(`${environment.apiUrl}/teacher/courses`, { params }).pipe(
       map((res) => (res?.data || []).map(item => this.normalizeCourseItem(item))),
@@ -225,6 +166,16 @@ export class TeacherClassService {
         this.classesState.set([]);
         return of([]);
       })
+    );
+  }
+
+  /**
+   * Lấy các tùy chọn học kỳ và môn học thực tế của giảng viên cho bộ lọc
+   */
+  loadFilterOptions(): Observable<{ semesters: { code: string; name: string }[]; sports: { code: string; name: string }[] }> {
+    return this.http.get<ApiResponse<any>>(`${environment.apiUrl}/teacher/filters`).pipe(
+      map((res) => res?.data || { semesters: [], sports: [] }),
+      catchError(() => of({ semesters: [], sports: [] }))
     );
   }
 

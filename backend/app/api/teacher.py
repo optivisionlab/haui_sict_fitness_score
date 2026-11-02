@@ -36,12 +36,22 @@ def get_teacher_semesters(
     return course_service.get_teacher_semesters_summary(teacher_id)
 
 
+@router.get("/filters")
+def get_teacher_filter_options(
+    current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.TEACHER)),
+):
+    """Lấy danh sách các kỳ học và môn học thực tế mà giáo viên phụ trách để hiển thị lên bộ lọc."""
+    teacher_id = str(current_user.id)
+    return course_service.get_teacher_filter_options(teacher_id)
+
+
 @router.get("/courses", response_model=list[TeacherCourseItem])
 def get_teacher_courses(
     status: Optional[str] = Query(default="all", description="in_progress | completed | all"),
     search: Optional[str] = Query(default=None, description="Tìm theo tên hoặc mã lớp"),
     semester: Optional[str] = Query(default=None, description="Lọc theo mã học kỳ (VD: 2026-2027.1)"),
     sport_id: Optional[str] = Query(default=None, description="Lọc theo ID môn học"),
+    sport_code: Optional[str] = Query(default=None, description="Lọc theo mã môn học (VD: PICKLEBALL, RUNNING)"),
     current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.TEACHER)),
 ):
     """Lấy danh sách các lớp học phần do giáo viên đang đăng nhập phụ trách."""
@@ -52,6 +62,7 @@ def get_teacher_courses(
         search=search,
         semester_filter=semester,
         sport_id_filter=sport_id,
+        sport_code_filter=sport_code,
     )
 
 

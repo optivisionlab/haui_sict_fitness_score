@@ -3,6 +3,14 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 
+from app.core.enums import (
+    PHYSICAL_SUBJECTS_MAP,
+    PhysicalSubjectCode,
+    SemesterTerm,
+    deduce_sport_metadata,
+    format_semester_info,
+    parse_semester_code,
+)
 from app.crud.course import crud_course
 from app.crud.enrollment import crud_enrollment
 from app.crud.sport import crud_sport
@@ -35,22 +43,16 @@ class CourseService:
     @staticmethod
     def _parse_semester_info(semester_str: Optional[str]) -> tuple[Optional[str], Optional[str], Optional[int]]:
         """Phân tích chuỗi học kỳ (VD: '2026-2027.1') thành (semester_name, academic_year, term)."""
-        if not semester_str:
-            return None, None, None
-        s = str(semester_str).strip()
-        term = None
-        year = s
-        if "." in s:
-            parts = s.split(".", 1)
-            year = parts[0]
-            try:
-                term = int(parts[1])
-            except ValueError:
-                pass
-        term_labels = {1: "Học kỳ 1", 2: "Học kỳ 2", 3: "Học kỳ hè"}
-        term_text = term_labels.get(term, f"Học kỳ {term}" if term else "Học kỳ")
-        semester_name = f"{term_text} ({year.replace('-', ' - ')})"
-        return semester_name, year, term
+        info = parse_semester_code(semester_str)
+        if info:
+            return info.name, info.academic_year, info.term
+        if semester_str:
+            s = str(semester_str).strip()
+            if "-" in s and len(s) >= 9:
+                default_info = format_semester_info(s, 1)
+                return default_info.name, default_info.academic_year, default_info.term
+            return f"Học kỳ ({s})", s, 1
+        return None, None, None
 
     def create_course(self, course_in: CourseCreate) -> Course:
         """Tạo mới khóa học, tự động đồng bộ tên giảng viên nếu chưa truyền."""
@@ -65,22 +67,43 @@ class CourseService:
             )
         course_data["teacherName"] = teacher.name
 
-        # Tự động điền thông tin môn thể thao nếu có
+        # Tự động điền thông tin môn thể thao nếu có hoặc suy luận chuẩn
         if course_in.sport_id:
             sport = crud_sport.get(course_in.sport_id)
             if sport:
                 course_data["sportName"] = sport.name
                 course_data["sportCode"] = sport.code.upper()
+        elif course_in.sport_code:
+            code_upper = str(course_in.sport_code).upper()
+            try:
+                subject_enum = PhysicalSubjectCode(code_upper)
+                meta = PHYSICAL_SUBJECTS_MAP.get(subject_enum)
+                if meta:
+                    course_data["sportName"] = meta.name
+                    course_data["sportCode"] = meta.code.value
+            except ValueError:
+                pass
+        
+        if "sportName" not in course_data or not course_data.get("sportCode"):
+            meta = deduce_sport_metadata(course_in.name, course_in.code or "")
+            course_data["sportName"] = course_data.get("sportName") or meta.name
+            course_data["sportCode"] = course_data.get("sportCode") or meta.code.value
 
-        # Tự động chuẩn hóa học kỳ nếu có
+        # Tự động chuẩn hóa học kỳ nếu có hoặc gán kỳ mặc định
         if course_in.semester:
             s_name, s_year, s_term = self._parse_semester_info(course_in.semester)
-            if s_name and "semesterName" not in course_data:
+            if s_name:
                 course_data["semesterName"] = s_name
-            if s_year and "academicYear" not in course_data:
+            if s_year:
                 course_data["academicYear"] = s_year
-            if s_term and "term" not in course_data:
+            if s_term:
                 course_data["term"] = s_term
+        else:
+            default_info = format_semester_info("2026-2027", 1)
+            course_data["semester"] = default_info.code
+            course_data["semesterName"] = default_info.name
+            course_data["academicYear"] = default_info.academic_year
+            course_data["term"] = default_info.term
 
         # Kiểm tra key/slug unique nếu có
         if course_in.key:
@@ -253,16 +276,31 @@ class CourseService:
         sem_map: dict[str, dict] = {}
 
         for d in courses:
-            sem_code = d.get("semester") or d.get("key") or "2026-2027.1"
-            sem_name = d.get("semesterName")
-            acad_year = d.get("academicYear")
-            term_val = d.get("term")
+            raw_sem = d.get("semester")
+            sem_info = parse_semester_code(raw_sem)
+            if not sem_info:
+                # Nếu không có hoặc dữ liệu cũ bị gán nhầm key
+                start_dt = d.get("startDate") or d.get("start_date")
+                year = "2026-2027"
+                term = 1
+                if start_dt and hasattr(start_dt, "month"):
+                    m = start_dt.month
+                    y = start_dt.year
+                    if m >= 8:
+                        year = f"{y}-{y+1}"
+                        term = 1
+                    elif m <= 5:
+                        year = f"{y-1}-{y}"
+                        term = 2
+                    else:
+                        year = f"{y-1}-{y}"
+                        term = 3
+                sem_info = format_semester_info(year, term)
 
-            if not sem_name or not acad_year or not term_val:
-                s_name, s_year, s_term = self._parse_semester_info(sem_code)
-                sem_name = sem_name or s_name or f"Học kỳ ({sem_code})"
-                acad_year = acad_year or s_year or sem_code
-                term_val = term_val or s_term or 1
+            sem_code = sem_info.code
+            sem_name = sem_info.name
+            acad_year = sem_info.academic_year
+            term_val = sem_info.term
 
             if sem_code not in sem_map:
                 sem_map[sem_code] = {
@@ -284,8 +322,8 @@ class CourseService:
 
             sport_title = d.get("sportName") or d.get("sport_name")
             if not sport_title:
-                s_name, _ = self.deduce_sport_from_name(d.get("name", ""), d.get("code", ""))
-                sport_title = s_name
+                meta = deduce_sport_metadata(d.get("name", ""), d.get("code", ""))
+                sport_title = meta.name
             if sport_title:
                 entry["sports"].add(sport_title)
 
@@ -307,6 +345,42 @@ class CourseService:
 
         return sorted(result, key=lambda s: (not s.is_current, s.code), reverse=False)
 
+    def get_teacher_filter_options(self, teacher_id: str) -> dict:
+        """Lấy danh sách các kỳ học và môn học thực tế mà giáo viên phụ trách để hiển thị bộ lọc."""
+        courses = list(
+            crud_course.collection.find(
+                {"teacherId": str(teacher_id)},
+                {"semester": 1, "semesterName": 1, "sportCode": 1, "sportName": 1, "name": 1, "code": 1}
+            )
+        )
+        sem_map: dict[str, str] = {}
+        sport_map: dict[str, str] = {}
+
+        for c in courses:
+            raw_sem = c.get("semester")
+            sem_info = parse_semester_code(raw_sem)
+            if sem_info:
+                sem_map[sem_info.code] = sem_info.name
+            elif raw_sem:
+                sem_map[raw_sem] = c.get("semesterName") or f"Học kỳ ({raw_sem})"
+
+            s_code = c.get("sportCode")
+            s_name = c.get("sportName")
+            if not s_code or not s_name:
+                meta = deduce_sport_metadata(c.get("name", ""), c.get("code", ""))
+                s_code = meta.code.value
+                s_name = meta.name
+            sport_map[s_code] = s_name
+
+        # Mặc định thêm các môn phổ biến nếu danh sách trống
+        if not sport_map:
+            for s_code_enum, meta in PHYSICAL_SUBJECTS_MAP.items():
+                sport_map[s_code_enum.value] = meta.name
+
+        semesters = [{"code": k, "name": v} for k, v in sem_map.items()]
+        sports = [{"code": k, "name": v} for k, v in sport_map.items()]
+        return {"semesters": sorted(semesters, key=lambda x: x["code"], reverse=True), "sports": sorted(sports, key=lambda x: x["name"])}
+
     def get_teacher_courses(
         self,
         teacher_id: str,
@@ -314,17 +388,20 @@ class CourseService:
         search: Optional[str] = None,
         semester_filter: Optional[str] = None,
         sport_id_filter: Optional[str] = None,
+        sport_code_filter: Optional[str] = None,
     ) -> list[TeacherCourseItem]:
-        """Lấy danh sách các lớp học phần do giáo viên phụ trách (hỗ trợ lọc theo kỳ cụ thể)."""
+        """Lấy danh sách các lớp học phần do giáo viên phụ trách (hỗ trợ lọc theo kỳ, môn, trạng thái)."""
         query: dict = {"teacherId": str(teacher_id)}
         if status_filter and status_filter != "all":
             query["status"] = status_filter
         if sport_id_filter and sport_id_filter != "all":
             query["sportId"] = str(sport_id_filter)
+        if sport_code_filter and sport_code_filter != "all":
+            query["sportCode"] = str(sport_code_filter).upper()
 
         conditions = []
         if semester_filter and semester_filter != "all":
-            conditions.append({"$or": [{"semester": semester_filter}, {"key": semester_filter}]})
+            conditions.append({"semester": semester_filter})
         if search:
             conditions.append({
                 "$or": [
@@ -345,6 +422,10 @@ class CourseService:
             course_obj = Course.model_validate(d)
             sport_name = course_obj.sport_name
             sport_code = course_obj.sport_code
+            if not sport_name or not sport_code:
+                meta = deduce_sport_metadata(course_obj.name, course_obj.code or "")
+                sport_name = sport_name or meta.name
+                sport_code = sport_code or meta.code.value
             if not sport_name:
                 s_name, s_code = self.deduce_sport_from_name(course_obj.name, course_obj.code)
                 sport_name = s_name

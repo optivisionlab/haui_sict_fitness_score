@@ -49,12 +49,12 @@ class Course(BaseDocument):
     code: Optional[str] = None
     desc: Optional[str] = None
 
-    # Bộ môn thể chất
+    # Bộ môn thể chất (Master Enum)
     sport_id: Optional[str] = None
     sport_name: Optional[str] = None
-    sport_code: Optional[str] = None
+    sport_code: Optional[str] = None        # VD: PhysicalSubjectCode.PICKLEBALL ("PICKLEBALL")
 
-    # Học kỳ & năm học
+    # Học kỳ & năm học (Quy chuẩn: YYYY-YYYY.T)
     semester: Optional[str] = None          # VD: "2026-2027.1"
     semester_name: Optional[str] = None     # VD: "Học kỳ 1 (2026 - 2027)"
     academic_year: Optional[str] = None     # VD: "2026-2027"
