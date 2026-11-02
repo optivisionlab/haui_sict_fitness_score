@@ -181,6 +181,12 @@
                   <div class="assessment-main">
                     <div class="assessment-name-row">
                       <span class="assessment-name">{{ item.name }}</span>
+                      @if (item.instructionVideoUrl) {
+                        <span class="mode-tag video-instruction-tag">
+                          <svg lucideVideo [size]="12"></svg>
+                          <span>Có video hướng dẫn</span>
+                        </span>
+                      }
                       @if (item.mode === 'practice') {
                         <span class="mode-tag practice">Luyện tập (Nộp nhiều lần)</span>
                       } @else {

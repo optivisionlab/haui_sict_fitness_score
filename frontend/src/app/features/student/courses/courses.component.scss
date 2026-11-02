@@ -451,13 +451,52 @@ $primary-blue-light: #eff6ff;
   .assessment-main {
     flex: 1;
     min-width: 0;
+
+    .assessment-name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+
+    .mode-tag {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+
+      &.practice {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+      }
+
+      &.exam {
+        background: #fff7ed;
+        color: #c2410c;
+        border: 1px solid #fed7aa;
+      }
+
+      &.video-instruction-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: #f0fdf4;
+        color: #166534;
+        border: 1px solid #bbf7d0;
+
+        svg {
+          color: #15803d;
+        }
+      }
+    }
   }
 
   .assessment-name {
     font-size: 0.95rem;
     font-weight: 600;
     color: #0f172a;
-    margin-bottom: 2px;
     transition: color 0.15s ease;
   }
 
