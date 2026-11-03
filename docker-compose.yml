@@ -64,7 +64,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9093
       AI_API_URL: ${AI_SERVICE_URL:-http://100.95.228.82:8888/api/v1/process}
       AI_PICKLEBALL_VIDEO_URL: ${AI_SERVICE_URL:-http://100.95.228.82:8888/api/v1/process}
-      AI_MINIO_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-100.95.228.82:9000}
+      # AI đọc MinIO qua mạng nội bộ, tách khỏi endpoint public mà trình duyệt dùng
+      AI_MINIO_ENDPOINT: ${AI_MINIO_ENDPOINT:-100.95.228.82:9000}
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
@@ -311,6 +312,29 @@ services:
         for t in video-grading-jobs video-grading-jobs-small video-grading-jobs-large video-grading-results; do
         /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafka:9093 --alter --entity-type topics --entity-name $$t
         --add-config retention.ms=259200000,retention.bytes=268435456 || exit 1; done
+    networks:
+      - app
+
+  # Cloudflare Tunnel: public hostname cấu hình trên dashboard Cloudflare Zero Trust
+  #   app   -> http://frontend:8080  (web + /api)
+  #   minio -> http://minio:9000     (presigned URL upload/xem video)
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Set TUNNEL_TOKEN in .env}
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 256m
+    cpus: 1
+    depends_on:
+      frontend:
+        condition: service_healthy
     networks:
       - app
 

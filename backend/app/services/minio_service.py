@@ -24,7 +24,9 @@ class MinioService:
                 endpoint=settings.MINIO_PUBLIC_ENDPOINT,
                 access_key=settings.MINIO_ACCESS_KEY,
                 secret_key=settings.MINIO_SECRET_KEY,
-                secure=settings.MINIO_SECURE,
+                secure=settings.MINIO_PUBLIC_SECURE,
+                # Đặt sẵn region để ký URL không phải gọi mạng ra endpoint public
+                region=settings.MINIO_REGION,
             )
             if settings.MINIO_PUBLIC_ENDPOINT
             else self.client

@@ -56,6 +56,11 @@ class Settings:
     )
     MINIO_BUCKET_NAME: str = os.getenv("MINIO_BUCKET_NAME", "videos")
     MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "False").lower() == "true"
+    # HTTPS cho presigned URL trình duyệt dùng (bật khi MinIO public qua Cloudflare Tunnel)
+    MINIO_PUBLIC_SECURE: bool = os.getenv(
+        "MINIO_PUBLIC_SECURE", os.getenv("MINIO_SECURE", "False")
+    ).lower() == "true"
+    MINIO_REGION: str = os.getenv("MINIO_REGION", "us-east-1")
     # Giới hạn video upload qua upload-url (presigned PUT thẳng lên MinIO), mặc định 7GB
     VIDEO_UPLOAD_MAX_BYTES: int = int(os.getenv("VIDEO_UPLOAD_MAX_BYTES", str(7 * 1024 * 1024 * 1024)))
     # Hạn của presigned PUT và của phiên upload (confirm-upload bị từ chối khi quá hạn).
