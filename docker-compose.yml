@@ -62,10 +62,10 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
       MINIO_SECURE: "False"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9093
-      AI_API_URL: ${AI_SERVICE_URL:-http://100.95.228.82:8888/api/v1/process}
-      AI_PICKLEBALL_VIDEO_URL: ${AI_SERVICE_URL:-http://100.95.228.82:8888/api/v1/process}
+      AI_API_URL: ${AI_SERVICE_URL:-http://host.docker.internal:8888/api/v1/process}
+      AI_PICKLEBALL_VIDEO_URL: ${AI_SERVICE_URL:-http://host.docker.internal:8888/api/v1/process}
       # AI đọc MinIO qua mạng nội bộ, tách khỏi endpoint public mà trình duyệt dùng
-      AI_MINIO_ENDPOINT: ${AI_MINIO_ENDPOINT:-100.95.228.82:9000}
+      AI_MINIO_ENDPOINT: ${AI_MINIO_ENDPOINT:?Set AI_MINIO_ENDPOINT in .env}
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
@@ -317,7 +317,7 @@ services:
 
   # Cloudflare Tunnel: public hostname cấu hình trên dashboard Cloudflare Zero Trust
   #   app   -> http://frontend:8080  (web + /api)
-  #   minio -> http://minio:9000     (presigned URL upload/xem video)
+  #   minio -> http://minio:9000     (presigned URL upload/xem video; KHÔNG phải cổng 80)
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
