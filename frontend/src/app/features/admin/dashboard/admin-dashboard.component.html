@@ -1,0 +1,176 @@
+<div class="admin-dashboard-page">
+  <!-- Header Page -->
+  <div class="dashboard-header">
+    <div>
+      <h1 class="page-title">Hệ Thống Quản Trị Đào Tạo</h1>
+      <p class="page-subtitle">Tổng quan tình hình người dùng, môn học thể chất và các lớp học phần</p>
+    </div>
+    <div class="header-actions">
+      <a routerLink="/admin/sports" class="btn btn-secondary">
+        <svg lucideTrophy [size]="18"></svg>
+        <span>Thêm môn học</span>
+      </a>
+      <a routerLink="/admin/classes" class="btn btn-primary">
+        <svg lucidePlus [size]="18"></svg>
+        <span>Mở lớp học phần</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <!-- Card 1: Tổng người dùng -->
+    <div class="kpi-card">
+      <div class="kpi-icon blue">
+        <svg lucideUsers [size]="24"></svg>
+      </div>
+      <div class="kpi-info">
+        <span class="kpi-label">Tổng người dùng</span>
+        <h3 class="kpi-value">{{ stats().totalUsers }}</h3>
+        <span class="kpi-sub">SV, Giảng viên & Admin</span>
+      </div>
+    </div>
+
+    <!-- Card 2: Giảng viên -->
+    <div class="kpi-card">
+      <div class="kpi-icon green">
+        <svg lucideUserCheck [size]="24"></svg>
+      </div>
+      <div class="kpi-info">
+        <span class="kpi-label">Giảng viên phụ trách</span>
+        <h3 class="kpi-value">{{ stats().totalTeachers }}</h3>
+        <span class="kpi-sub">Khoa Giáo dục Thể chất</span>
+      </div>
+    </div>
+
+    <!-- Card 3: Sinh viên -->
+    <div class="kpi-card">
+      <div class="kpi-icon purple">
+        <svg lucideGraduationCap [size]="24"></svg>
+      </div>
+      <div class="kpi-info">
+        <span class="kpi-label">Sinh viên ghi danh</span>
+        <h3 class="kpi-value">{{ stats().totalStudents }}</h3>
+        <span class="kpi-sub">Đang tham gia rèn luyện</span>
+      </div>
+    </div>
+
+    <!-- Card 4: Môn học & Lớp học phần -->
+    <div class="kpi-card">
+      <div class="kpi-icon orange">
+        <svg lucideTrophy [size]="24"></svg>
+      </div>
+      <div class="kpi-info">
+        <span class="kpi-label">Môn thể chất / Lớp</span>
+        <h3 class="kpi-value">{{ stats().totalSports }} / {{ stats().totalCourses }}</h3>
+        <span class="kpi-sub">Đang hoạt động trong kỳ</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content Section (Grid 2 cột) -->
+  <div class="dashboard-content-grid">
+    <!-- Left Column: Lớp học phần hiện tại -->
+    <div class="content-card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <svg lucideBookOpen [size]="20" class="text-primary"></svg>
+          <h2>Lớp học phần đang mở</h2>
+        </div>
+        <a routerLink="/admin/classes" class="card-link">
+          <span>Xem tất cả</span>
+          <svg lucideArrowRight [size]="16"></svg>
+        </a>
+      </div>
+
+      <div class="card-body">
+        @if (isLoading()) {
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <span>Đang tải danh sách lớp...</span>
+          </div>
+        } @else if (recentCourses().length === 0) {
+          <div class="empty-state">
+            <svg lucideBookOpen [size]="40"></svg>
+            <p>Chưa có lớp học phần nào được tạo.</p>
+            <a routerLink="/admin/classes" class="btn btn-sm btn-outline">Tạo lớp ngay</a>
+          </div>
+        } @else {
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Mã lớp</th>
+                  <th>Tên lớp học phần</th>
+                  <th>Giảng viên</th>
+                  <th>Sĩ số</th>
+                  <th>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (c of recentCourses(); track c.id) {
+                  <tr>
+                    <td><span class="code-badge">{{ c.code || c.key || 'LHP' }}</span></td>
+                    <td class="font-medium text-dark">{{ c.name }}</td>
+                    <td>{{ c.teacher_name || 'Chưa phân công' }}</td>
+                    <td>
+                      <span class="student-count-pill">
+                        {{ c.student_total || 0 }} SV
+                      </span>
+                    </td>
+                    <td>
+                      <span class="status-badge active">Đang diễn ra</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Right Column: Danh mục Môn Thể thao -->
+    <div class="content-card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <svg lucideTrophy [size]="20" class="text-orange"></svg>
+          <h2>Môn học thể chất</h2>
+        </div>
+        <a routerLink="/admin/sports" class="card-link">
+          <span>Quản lý môn</span>
+          <svg lucideArrowRight [size]="16"></svg>
+        </a>
+      </div>
+
+      <div class="card-body">
+        @if (recentSports().length === 0) {
+          <div class="empty-state">
+            <svg lucideTrophy [size]="40"></svg>
+            <p>Chưa có môn học nào được khai báo.</p>
+            <a routerLink="/admin/sports" class="btn btn-sm btn-outline">Thêm môn mới</a>
+          </div>
+        } @else {
+          <div class="sports-mini-list">
+            @for (sport of recentSports(); track sport.id) {
+              <div class="sport-item-row">
+                <div class="sport-icon-box">
+                  <svg lucideTrophy [size]="20"></svg>
+                </div>
+                <div class="sport-info">
+                  <h4 class="sport-name">{{ sport.name }}</h4>
+                  <span class="sport-code">Mã: {{ sport.code }}</span>
+                </div>
+                <div class="sport-badge">
+                  <span class="mode-pill" [class.video]="sport.mode === 'video'">
+                    {{ sport.mode === 'video' ? 'Video AI' : 'Thực hành' }}
+                  </span>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>

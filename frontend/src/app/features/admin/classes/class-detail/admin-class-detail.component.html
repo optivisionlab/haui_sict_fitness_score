@@ -1,0 +1,244 @@
+<div class="admin-class-detail-page">
+  <!-- Back Button & Breadcrumbs -->
+  <div class="breadcrumb-row">
+    <a routerLink="/admin/classes" class="back-link">
+      <svg lucideArrowLeft [size]="18"></svg>
+      <span>Quay lại danh sách lớp học phần</span>
+    </a>
+  </div>
+
+  <!-- Class Banner / Header Info -->
+  <div class="class-header-card">
+    <div class="class-header-main">
+      <div class="class-icon-avatar">
+        <svg lucideBookOpen [size]="32"></svg>
+      </div>
+      <div class="class-title-info">
+        <div class="class-badges-row">
+          <span class="code-badge">{{ course()?.code || course()?.key || 'LHP' }}</span>
+          <span class="sport-badge">
+            <svg lucideTrophy [size]="14"></svg>
+            <span>{{ course()?.sport_name || 'Thể chất' }}</span>
+          </span>
+          <span class="status-badge">Đang giảng dạy</span>
+        </div>
+        <h1 class="class-name">{{ course()?.name }}</h1>
+        <div class="class-meta">
+          <div class="meta-item">
+            <svg lucideUserCheck [size]="16" class="text-green"></svg>
+            <span>Giảng viên: <strong>{{ course()?.teacher_name || 'Chưa phân công' }}</strong></span>
+          </div>
+          <div class="meta-item">
+            <svg lucideUsers [size]="16" class="text-blue"></svg>
+            <span>Sĩ số lớp: <strong>{{ enrollments().length }} sinh viên</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="class-header-actions">
+      <button type="button" class="btn btn-primary" (click)="openEnrollModal()">
+        <svg lucideUserPlus [size]="18"></svg>
+        <span>Ghi danh sinh viên</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Student List Table -->
+  <div class="students-section">
+    <div class="section-toolbar">
+      <div class="section-title-wrap">
+        <h2>Danh sách sinh viên trong lớp</h2>
+        <span class="student-count">({{ enrollments().length }})</span>
+      </div>
+
+      <div class="search-box">
+        <svg lucideSearch [size]="18" class="search-icon"></svg>
+        <input
+          type="text"
+          placeholder="Tìm theo tên hoặc mã sinh viên..."
+          [ngModel]="searchTerm()"
+          (ngModelChange)="searchTerm.set($event)"
+        />
+        @if (searchTerm()) {
+          <button type="button" class="clear-btn" (click)="searchTerm.set('')">
+            <svg lucideX [size]="16"></svg>
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="table-card">
+      @if (isLoading()) {
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <span>Đang tải danh sách sinh viên...</span>
+        </div>
+      } @else if (filteredEnrollments.length === 0) {
+        <div class="empty-state">
+          <svg lucideUsers [size]="44"></svg>
+          <h3>Chưa có sinh viên nào trong lớp</h3>
+          <p>Bấm nút "Ghi danh sinh viên" để thêm sinh viên vào lớp học phần này.</p>
+          <button type="button" class="btn btn-sm btn-primary" (click)="openEnrollModal()">
+            <svg lucideUserPlus [size]="16"></svg>
+            <span>Ghi danh ngay</span>
+          </button>
+        </div>
+      } @else {
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>STT</th>
+                <th>Sinh viên</th>
+                <th>Mã sinh viên</th>
+                <th>Trạng thái</th>
+                <th class="text-center">Điểm chuyên cần</th>
+                <th class="text-center">Điểm giữa kỳ</th>
+                <th class="text-center">Điểm cuối kỳ</th>
+                <th class="text-center">Tổng kết</th>
+                <th class="text-right">Gỡ lớp</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (en of filteredEnrollments; track en.id; let idx = $index) {
+                <tr>
+                  <td class="stt-cell">{{ idx + 1 }}</td>
+                  <td>
+                    <div class="student-cell">
+                      <div class="student-avatar">
+                        <svg lucideGraduationCap [size]="18"></svg>
+                      </div>
+                      <span class="student-name">{{ en.user_name || 'Sinh viên' }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="code-pill">{{ en.student_code || '---' }}</span>
+                  </td>
+                  <td>
+                    <span class="status-pill active">Đang học</span>
+                  </td>
+                  <td class="text-center score-cell">
+                    {{ en.attendance_score !== null && en.attendance_score !== undefined ? en.attendance_score : '---' }}
+                  </td>
+                  <td class="text-center score-cell">
+                    {{ en.practice_score !== null && en.practice_score !== undefined ? en.practice_score : '---' }}
+                  </td>
+                  <td class="text-center score-cell">
+                    {{ en.exam_score !== null && en.exam_score !== undefined ? en.exam_score : '---' }}
+                  </td>
+                  <td class="text-center score-final">
+                    <strong>{{ en.final_grade !== null && en.final_grade !== undefined ? en.final_grade : '---' }}</strong>
+                  </td>
+                  <td class="text-right">
+                    <button type="button" class="btn-remove" (click)="confirmRemove(en)" title="Gỡ sinh viên khỏi lớp">
+                      <svg lucideTrash2 [size]="16"></svg>
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- MODAL: GHI DANH SINH VIÊN VÀO LỚP -->
+  @if (showEnrollModal()) {
+    <div class="modal-backdrop" (click)="closeEnrollModal()">
+      <div class="modal-dialog" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <div class="modal-icon">
+              <svg lucideUserPlus [size]="20"></svg>
+            </div>
+            <h2>Ghi Danh Sinh Viên Vào Lớp</h2>
+          </div>
+          <button type="button" class="close-btn" (click)="closeEnrollModal()">
+            <svg lucideX [size]="20"></svg>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <p class="modal-intro">Chọn sinh viên từ hệ thống để thêm vào lớp <strong>{{ course()?.name }}</strong>:</p>
+
+          <div class="modal-search">
+            <svg lucideSearch [size]="18" class="search-icon"></svg>
+            <input
+              type="text"
+              placeholder="Lọc nhanh theo tên, mã SV hoặc email..."
+              [ngModel]="modalStudentSearch()"
+              (ngModelChange)="modalStudentSearch.set($event)"
+            />
+          </div>
+
+          <div class="student-select-list">
+            @if (availableStudents.length === 0) {
+              <div class="no-available">
+                <p>Không có sinh viên nào khả dụng hoặc tất cả sinh viên đã có trong lớp.</p>
+              </div>
+            } @else {
+              @for (st of availableStudents; track st.id) {
+                <label class="student-option-item" [class.selected]="selectedStudentId() === st.id">
+                  <input
+                    type="radio"
+                    name="studentChoice"
+                    [value]="st.id"
+                    [ngModel]="selectedStudentId()"
+                    (ngModelChange)="selectedStudentId.set($event)"
+                  />
+                  <div class="student-option-info">
+                    <div class="st-name">{{ st.name }}</div>
+                    <div class="st-sub">
+                      <span>Mã: {{ st.user_code || st.userCode || '---' }}</span>
+                      <span>&bull;</span>
+                      <span>{{ st.email }}</span>
+                    </div>
+                  </div>
+                </label>
+              }
+            }
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeEnrollModal()">Hủy</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="!selectedStudentId() || isEnrolling()"
+            (click)="onExecuteEnroll()"
+          >
+            @if (isEnrolling()) {
+              <span class="spinner-sm"></span>
+              <span>Đang thêm...</span>
+            } @else {
+              <svg lucideCheckCircle2 [size]="18"></svg>
+              <span>Xác nhận ghi danh</span>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: XÁC NHẬN GỠ SINH VIÊN KHỎI LỚP -->
+  @if (showRemoveModal()) {
+    <div class="modal-backdrop" (click)="cancelRemove()">
+      <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
+        <div class="delete-icon-wrapper">
+          <svg lucideAlertCircle [size]="32"></svg>
+        </div>
+        <h3 class="delete-title">Gỡ sinh viên khỏi lớp</h3>
+        <p class="delete-desc">
+          Bạn có chắc chắn muốn gỡ sinh viên <strong>{{ enrollmentToRemove()?.user_name }}</strong> khỏi lớp học phần này?
+        </p>
+        <div class="delete-actions">
+          <button type="button" class="btn btn-secondary" (click)="cancelRemove()">Hủy</button>
+          <button type="button" class="btn btn-danger" (click)="onExecuteRemove()">Xác nhận gỡ</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

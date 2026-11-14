@@ -1,0 +1,267 @@
+<div class="admin-classes-page">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Quản Lý Lớp Học Phần</h1>
+      <p class="page-subtitle">Phân công giảng viên giảng dạy, mở lớp môn thể chất và quản lý sinh viên</p>
+    </div>
+    <div>
+      <button type="button" class="btn btn-primary" (click)="openCreateModal()">
+        <svg lucidePlus [size]="18"></svg>
+        <span>Mở lớp học phần mới</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Search & Filter Row -->
+  <div class="toolbar-row">
+    <div class="search-box">
+      <svg lucideSearch [size]="18" class="search-icon"></svg>
+      <input
+        type="text"
+        placeholder="Tìm kiếm lớp theo tên, mã lớp, giảng viên..."
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event)"
+      />
+      @if (searchTerm()) {
+        <button type="button" class="clear-btn" (click)="searchTerm.set('')">
+          <svg lucideX [size]="16"></svg>
+        </button>
+      }
+    </div>
+    <div class="toolbar-stats">
+      <span>Tổng số lớp: <strong>{{ courses().length }}</strong></span>
+    </div>
+  </div>
+
+  <!-- Classes Grid / Table Card -->
+  <div class="classes-card">
+    @if (isLoading()) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <span>Đang tải danh sách lớp học phần...</span>
+      </div>
+    } @else if (filteredCourses.length === 0) {
+      <div class="empty-state">
+        <svg lucideBookOpen [size]="48"></svg>
+        <h3>Chưa có lớp học phần nào</h3>
+        <p>Bắt đầu mở lớp học phần để phân công giảng viên và thêm sinh viên vào lớp.</p>
+        <button type="button" class="btn btn-primary" (click)="openCreateModal()">
+          <svg lucidePlus [size]="18"></svg>
+          <span>Mở lớp mới ngay</span>
+        </button>
+      </div>
+    } @else {
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mã lớp</th>
+              <th>Tên lớp học phần</th>
+              <th>Môn thể chất</th>
+              <th>Giảng viên phụ trách</th>
+              <th>Sĩ số</th>
+              <th>Học kỳ</th>
+              <th>Trạng thái</th>
+              <th class="text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of filteredCourses; track c.id) {
+              <tr>
+                <td>
+                  <span class="code-badge">{{ c.code || c.key || 'LHP' }}</span>
+                </td>
+                <td>
+                  <div class="course-name-cell">
+                    <a [routerLink]="['/admin/classes', c.id]" class="course-title">{{ c.name }}</a>
+                    @if (c.desc) {
+                      <span class="course-desc">{{ c.desc }}</span>
+                    }
+                  </div>
+                </td>
+                <td>
+                  <span class="sport-badge">
+                    <svg lucideTrophy [size]="14"></svg>
+                    <span>{{ c.sport_name || 'Thể chất' }}</span>
+                  </span>
+                </td>
+                <td>
+                  <div class="teacher-cell">
+                    <svg lucideUserCheck [size]="16" class="teacher-icon"></svg>
+                    <span>{{ c.teacher_name || 'Chưa phân công' }}</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="student-pill">
+                    <svg lucideUsers [size]="14"></svg>
+                    <span>{{ c.student_total || 0 }} SV</span>
+                  </span>
+                </td>
+                <td class="semester-cell">{{ c.key || '2025-2026.1' }}</td>
+                <td>
+                  <span class="status-pill active">Đang diễn ra</span>
+                </td>
+                <td class="text-right">
+                  <div class="action-buttons">
+                    <a [routerLink]="['/admin/classes', c.id]" class="btn-icon view" title="Xem danh sách sinh viên">
+                      <svg lucideUsers [size]="16"></svg>
+                    </a>
+                    <button type="button" class="btn-icon edit" (click)="openEditModal(c)" title="Chỉnh sửa lớp">
+                      <svg lucideEdit3 [size]="16"></svg>
+                    </button>
+                    <button type="button" class="btn-icon delete" (click)="confirmDelete(c)" title="Xóa lớp">
+                      <svg lucideTrash2 [size]="16"></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+  <!-- MODAL: MỞ / SỬA LỚP HỌC PHẦN -->
+  @if (showModal()) {
+    <div class="modal-backdrop" (click)="closeModal()">
+      <div class="modal-dialog" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <div class="modal-icon">
+              <svg lucideBookOpen [size]="20"></svg>
+            </div>
+            <h2>{{ isEditMode() ? 'Chỉnh Sửa Lớp Học Phần' : 'Mở Lớp Học Phần Mới' }}</h2>
+          </div>
+          <button type="button" class="close-btn" (click)="closeModal()">
+            <svg lucideX [size]="20"></svg>
+          </button>
+        </div>
+
+        <form (submit)="onSubmitCourse(); $event.preventDefault()">
+          <div class="modal-body">
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="courseCode">Mã lớp học phần</label>
+                <input
+                  id="courseCode"
+                  type="text"
+                  class="form-control"
+                  placeholder="VD: PICKLE-01, RUN-01"
+                  [(ngModel)]="courseForm.code"
+                  name="courseCode"
+                />
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="courseKey">Học kỳ</label>
+                <input
+                  id="courseKey"
+                  type="text"
+                  class="form-control"
+                  placeholder="VD: 2025-2026.1"
+                  [(ngModel)]="courseForm.key"
+                  name="courseKey"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="courseName">Tên lớp học phần <span class="required">*</span></label>
+              <input
+                id="courseName"
+                type="text"
+                class="form-control"
+                placeholder="VD: Pickleball Cơ bản - Nhóm 01"
+                [(ngModel)]="courseForm.name"
+                name="courseName"
+                required
+              />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="sportSelect">Môn học thể chất <span class="required">*</span></label>
+                <select
+                  id="sportSelect"
+                  class="form-control"
+                  [ngModel]="courseForm.sport_id"
+                  (ngModelChange)="onSportSelect($event)"
+                  name="sportSelect"
+                  required
+                >
+                  <option value="" disabled>-- Chọn bộ môn --</option>
+                  @for (s of sports(); track s.id) {
+                    <option [value]="s.id">{{ s.name }} ({{ s.code }})</option>
+                  }
+                </select>
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="teacherSelect">Giảng viên giảng dạy <span class="required">*</span></label>
+                <select
+                  id="teacherSelect"
+                  class="form-control"
+                  [ngModel]="courseForm.teacher_id"
+                  (ngModelChange)="onTeacherSelect($event)"
+                  name="teacherSelect"
+                  required
+                >
+                  <option value="" disabled>-- Chọn giảng viên --</option>
+                  @for (t of teachers(); track t.id) {
+                    <option [value]="t.id">{{ t.name }} ({{ t.user_code || t.email }})</option>
+                  }
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="courseDesc">Mô tả / Ghi chú</label>
+              <textarea
+                id="courseDesc"
+                rows="3"
+                class="form-control"
+                placeholder="Lịch học sân bãi, thời gian, yêu cầu đồng phục..."
+                [(ngModel)]="courseForm.desc"
+                name="courseDesc"
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeModal()">Hủy</button>
+            <button type="submit" class="btn btn-primary" [disabled]="isSubmitting()">
+              @if (isSubmitting()) {
+                <span class="spinner-sm"></span>
+                <span>Đang lưu...</span>
+              } @else {
+                <svg lucideCheckCircle2 [size]="18"></svg>
+                <span>{{ isEditMode() ? 'Lưu thay đổi' : 'Mở lớp' }}</span>
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: XÁC NHẬN XÓA LỚP -->
+  @if (showDeleteModal()) {
+    <div class="modal-backdrop" (click)="cancelDelete()">
+      <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
+        <div class="delete-icon-wrapper">
+          <svg lucideAlertCircle [size]="32"></svg>
+        </div>
+        <h3 class="delete-title">Xác nhận xóa lớp học phần</h3>
+        <p class="delete-desc">
+          Bạn có chắc chắn muốn xóa lớp <strong>{{ courseToDelete()?.name }}</strong>? Dữ liệu sinh viên ghi danh và bảng điểm sẽ bị xóa.
+        </p>
+        <div class="delete-actions">
+          <button type="button" class="btn btn-secondary" (click)="cancelDelete()">Hủy</button>
+          <button type="button" class="btn btn-danger" (click)="onExecuteDelete()">Xóa vĩnh viễn</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

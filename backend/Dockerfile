@@ -1,19 +1,27 @@
-FROM python:3.11-slim
+FROM python:3.11-slim AS builder
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential gcc libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /backend
+WORKDIR /build
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
 COPY requirements.txt .
+RUN python -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+FROM python:3.11-slim AS runtime
 
-COPY . .
+WORKDIR /app
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH="/app" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
+RUN groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid 10001 --no-create-home app
+
+COPY --from=builder /opt/venv /opt/venv
+COPY --chown=app:app app/ ./app/
+
+USER 10001:10001
 EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

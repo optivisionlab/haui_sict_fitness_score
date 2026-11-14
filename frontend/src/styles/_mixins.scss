@@ -1,0 +1,21 @@
+// SCSS Mixins
+
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin glass-panel($bg: rgba(255, 255, 255, 0.85), $blur: 12px) {
+  background-color: $bg;
+  backdrop-filter: blur($blur);
+  -webkit-backdrop-filter: blur($blur);
+}
+
+@mixin card-shadow {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.02), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+}
+
+@mixin transition-default($props: all, $duration: 0.2s) {
+  transition: $props $duration ease;
+}

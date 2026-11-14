@@ -1,33 +1,57 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-
-# Distribution / packaging
-build/
-dist/
-*.egg-info/
-
 # Git
 .git
 .gitignore
 
-# VS Code
-.vscode/
+# Python cache & build
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Docker
-.dockerignore
+# Virtual Environment
+venv/
+.venv/
+ENV/
+env/
+env.bak/
+venv.bak/
 
-# Local env files
+# Environment files & Secrets
 .env
+.env.*
+!.env.example
 
-.md
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
 
-# Dockerfile 
-Dockerfile
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
 
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db

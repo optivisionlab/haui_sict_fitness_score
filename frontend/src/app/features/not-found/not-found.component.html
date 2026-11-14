@@ -1,0 +1,33 @@
+<div class="not-found-wrapper">
+  <!-- Falling Leaves Nature Background đồng bộ với Login -->
+  <div class="nature-background">
+    <div class="falling-leaf leaf-1"></div>
+    <div class="falling-leaf leaf-2"></div>
+    <div class="falling-leaf leaf-3"></div>
+    <div class="falling-leaf leaf-4"></div>
+    <div class="falling-leaf leaf-5"></div>
+    <div class="falling-leaf leaf-6"></div>
+    <div class="falling-leaf leaf-7"></div>
+    <div class="falling-leaf leaf-8"></div>
+    <div class="falling-leaf leaf-9"></div>
+    <div class="falling-leaf leaf-10"></div>
+  </div>
+
+  <!-- Central Content matching mockup -->
+  <div class="not-found-content">
+    <h1 class="error-code">404</h1>
+    <p class="error-text">Not Found</p>
+
+    <!-- Sleek glass action buttons -->
+    <div class="action-group">
+      <a routerLink="/student/home" class="glass-btn">
+        <svg lucideHome [size]="18"></svg>
+        <span>Về trang chủ</span>
+      </a>
+      <button type="button" class="glass-btn glass-btn-secondary" (click)="goBack()">
+        <svg lucideArrowLeft [size]="18"></svg>
+        <span>Quay lại</span>
+      </button>
+    </div>
+  </div>
+</div>
