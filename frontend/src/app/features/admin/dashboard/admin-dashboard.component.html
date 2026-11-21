@@ -3,7 +3,6 @@
   <div class="dashboard-header">
     <div>
       <h1 class="page-title">Hệ Thống Quản Trị Đào Tạo</h1>
-      <p class="page-subtitle">Tổng quan tình hình người dùng, môn học thể chất và các lớp học phần</p>
     </div>
     <div class="header-actions">
       <a routerLink="/admin/sports" class="btn btn-secondary">
@@ -27,7 +26,6 @@
       <div class="kpi-info">
         <span class="kpi-label">Tổng người dùng</span>
         <h3 class="kpi-value">{{ stats().totalUsers }}</h3>
-        <span class="kpi-sub">SV, Giảng viên & Admin</span>
       </div>
     </div>
 
@@ -39,7 +37,6 @@
       <div class="kpi-info">
         <span class="kpi-label">Giảng viên phụ trách</span>
         <h3 class="kpi-value">{{ stats().totalTeachers }}</h3>
-        <span class="kpi-sub">Khoa Giáo dục Thể chất</span>
       </div>
     </div>
 
@@ -51,7 +48,6 @@
       <div class="kpi-info">
         <span class="kpi-label">Sinh viên ghi danh</span>
         <h3 class="kpi-value">{{ stats().totalStudents }}</h3>
-        <span class="kpi-sub">Đang tham gia rèn luyện</span>
       </div>
     </div>
 
@@ -63,7 +59,6 @@
       <div class="kpi-info">
         <span class="kpi-label">Môn thể chất / Lớp</span>
         <h3 class="kpi-value">{{ stats().totalSports }} / {{ stats().totalCourses }}</h3>
-        <span class="kpi-sub">Đang hoạt động trong kỳ</span>
       </div>
     </div>
   </div>

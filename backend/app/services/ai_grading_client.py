@@ -127,6 +127,8 @@ class AIGradingClient:
             "aiScore": body.get("aiScore", body.get("score")),
             "aiComment": body.get("aiComment", body.get("feedback")),
             "metrics": body.get("metrics") or {},
+            # Video AI vẽ kết quả phân tích (tùy chọn): object key trong MinIO
+            "annotatedVideoKey": body.get("annotatedVideoKey") or body.get("annotated_video_key"),
         }
 
 

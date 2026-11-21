@@ -1,6 +1,6 @@
 import math
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 
 from app.models.user import User, UserRole
 from app.schemas.common import MessageResponse, PaginatedResponse
@@ -11,6 +11,7 @@ from app.schemas.course import (
     WeekCreate,
     WeekUpdate,
 )
+from app.schemas.teacher import StudentImportResult
 from app.services.auth_service import get_current_user, require_roles
 from app.services.course_service import course_service
 
@@ -114,3 +115,22 @@ def delete_week(
     """Xóa một tuần học khỏi khóa học."""
     course = course_service.delete_week(course_id, week_order)
     return CourseRead.model_validate(course)
+
+
+MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024
+
+
+@router.post("/{course_id}/import-students", response_model=StudentImportResult)
+def import_students_file(
+    course_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Admin ghi danh hàng loạt sinh viên (đã có tài khoản) vào lớp từ file .xlsx / .csv."""
+    from app.services.student_import import import_students
+
+    course_service.get_by_id(course_id)
+    data = file.file.read(MAX_IMPORT_FILE_BYTES + 1)
+    if len(data) > MAX_IMPORT_FILE_BYTES:
+        raise HTTPException(status_code=413, detail="File vượt quá 5MB")
+    return import_students(course_id, file.filename or "", data)

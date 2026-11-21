@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
@@ -157,35 +158,18 @@ class EnrollmentService:
         tasks_in_course: list,
     ) -> Optional[Enrollment]:
         """Tính lại điểm quá trình, điểm thi và điểm tổng kết cho sinh viên."""
-        practice_task_ids = [str(t.id) for t in tasks_in_course if getattr(t, "category", TaskCategory.PRACTICE) == TaskCategory.PRACTICE]
-        exam_tasks = [t for t in tasks_in_course if getattr(t, "category", TaskCategory.PRACTICE) == TaskCategory.EXAM]
-
-        exam_score = None
-        if exam_tasks:
-            # Lấy điểm bài exam đầu tiên tìm thấy
-            exam_t_id = str(exam_tasks[0].id)
-            if exam_t_id in enrollment.task_scores:
-                exam_score = enrollment.task_scores[exam_t_id]
-
-        new_grades = grading_service.compute_student_grades(
-            current_grades=enrollment.grades,
-            task_scores=enrollment.task_scores,
-            practice_task_ids=practice_task_ids,
-            formula=course.grading_formula,
-            exam_score_override=exam_score,
-        )
-
-        return crud_enrollment.update_grades_data(
-            enrollment_id=enrollment.id,
-            grades_dict=new_grades.model_dump(by_alias=True),
-        )
+        from app.services.grade_calculator import recalculate_enrollment
+        return recalculate_enrollment(enrollment, course, tasks_in_course)
 
     def batch_update_grades(
         self,
         course_id: str,
         updates: list[SingleGradeUpdate],
     ) -> int:
-        """Giáo viên cập nhật điểm chuyên cần, điểm thi hoặc ghi chú hàng loạt."""
+        """GV cập nhật điểm chuyên cần, điểm thi cuối kỳ hoặc ghi chú hàng loạt."""
+        from app.models.task import TaskKind, task_kind
+        from app.services.grade_calculator import attendance_scores_for_course, recalculate_enrollment
+
         course = crud_course.get(course_id)
         if not course:
             raise HTTPException(status_code=404, detail="Không tìm thấy khóa học")
@@ -197,7 +181,13 @@ class EnrollmentService:
             )
 
         tasks_in_course, _ = crud_task.get_by_course(course_id, limit=200)
-        practice_task_ids = [str(t.id) for t in tasks_in_course if getattr(t, "category", TaskCategory.PRACTICE) == TaskCategory.PRACTICE]
+        final_tasks = [t for t in tasks_in_course if task_kind(t) == TaskKind.FINAL]
+        attendance_map = attendance_scores_for_course(course_id)
+        if attendance_map is not None and any(item.attendance_score is not None for item in updates):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Lớp đang dùng điểm danh theo buổi, điểm chuyên cần được tính tự động",
+            )
 
         enrollment_ids = [ObjectId(item.enrollment_id) for item in updates if ObjectId.is_valid(item.enrollment_id)]
         enrollments_cursor = crud_enrollment.collection.find({"_id": {"$in": enrollment_ids}})
@@ -209,28 +199,46 @@ class EnrollmentService:
             if not enrollment or str(enrollment.course_id) != str(course_id):
                 continue
 
-            current_grades = enrollment.grades
+            set_fields: dict = {"updatedAt": datetime.now(timezone.utc)}
             if item.attendance_score is not None:
-                current_grades.attendance_score = item.attendance_score
+                set_fields["grades.attendanceScore"] = item.attendance_score
+            if item.exam_score is not None:
+                if not final_tasks:
+                    raise HTTPException(status_code=400, detail="Lớp chưa có bài thi kết thúc học phần")
+                set_fields[f"taskScoreOverrides.{final_tasks[0].id}"] = item.exam_score
+            if item.note is not None:
+                set_fields["note"] = item.note
+            crud_enrollment.collection.update_one({"_id": ObjectId(enrollment.id)}, {"$set": set_fields})
 
-            exam_override = item.exam_score if item.exam_score is not None else current_grades.exam_score
-
-            computed_grades = grading_service.compute_student_grades(
-                current_grades=current_grades,
-                task_scores=enrollment.task_scores,
-                practice_task_ids=practice_task_ids,
-                formula=course.grading_formula,
-                exam_score_override=exam_override,
-            )
-
-            crud_enrollment.update_grades_data(
-                enrollment_id=enrollment.id,
-                grades_dict=computed_grades.model_dump(by_alias=True),
-                note=item.note if item.note is not None else enrollment.note,
-            )
+            fresh = crud_enrollment.get(enrollment.id)
+            recalculate_enrollment(fresh, course, tasks_in_course, attendance_map)
             updated_count += 1
 
         return updated_count
+
+    def set_task_score_override(
+        self, course_id: str, enrollment_id: str, task_id: str, score: Optional[float]
+    ) -> Enrollment:
+        """GV nhập tay (hoặc xóa, score=None) điểm một bài cho một sinh viên."""
+        from app.services.grade_calculator import recalculate_enrollment
+
+        course = crud_course.get(course_id)
+        if not course:
+            raise HTTPException(status_code=404, detail="Không tìm thấy khóa học")
+        if course.is_grade_locked:
+            raise HTTPException(status_code=400, detail="Lớp học phần đã chốt sổ điểm, không thể chỉnh sửa điểm")
+        task = crud_task.get(task_id)
+        enrollment = crud_enrollment.get(enrollment_id)
+        if not task or str(task.course_id) != str(course_id):
+            raise HTTPException(status_code=404, detail="Bài kiểm tra không thuộc lớp này")
+        if not enrollment or str(enrollment.course_id) != str(course_id):
+            raise HTTPException(status_code=404, detail="Sinh viên không thuộc lớp này")
+
+        key = f"taskScoreOverrides.{task_id}"
+        update = {"$unset": {key: ""}} if score is None else {"$set": {key: score}}
+        update.setdefault("$set", {})["updatedAt"] = datetime.now(timezone.utc)
+        crud_enrollment.collection.update_one({"_id": ObjectId(enrollment.id)}, update)
+        return recalculate_enrollment(crud_enrollment.get(enrollment.id), course)
 
 
 enrollment_service = EnrollmentService()

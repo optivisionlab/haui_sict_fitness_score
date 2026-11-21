@@ -11,6 +11,7 @@ from app.core.enums import (
     format_semester_info,
     parse_semester_code,
 )
+from app.core.database import get_db
 from app.crud.course import crud_course
 from app.crud.enrollment import crud_enrollment
 from app.crud.sport import crud_sport
@@ -526,12 +527,50 @@ class CourseService:
 
         # Lấy danh sách tasks thuộc khóa học
         from app.services.task_service import task_service
+        from app.models.task import task_kind
+        from app.services.grade_calculator import attendance_scores_for_course
+
         tasks_in_course, _ = crud_task.get_by_course(course_id, limit=100)
+        task_ids = [str(t.id) for t in tasks_in_course]
+        # Số bài nộp kiểm tra và số bài AI đã chấm nhưng GV chưa duyệt (không tính luyện tập)
+        counts = {
+            row["_id"]: row
+            for row in get_db().video_results.aggregate([
+                {"$match": {"taskId": {"$in": task_ids}, "mode": {"$ne": "practice"}}},
+                {"$sort": {"submittedAt": -1}},
+                # Lần nộp mới nhất của mỗi sinh viên quyết định trạng thái chờ duyệt
+                {"$group": {
+                    "_id": {"taskId": "$taskId", "userId": "$userId"},
+                    "attempts": {"$sum": 1},
+                    "status": {"$first": "$status"},
+                    "finalScore": {"$first": "$finalScore"},
+                }},
+                {"$group": {
+                    "_id": "$_id.taskId",
+                    "submitted": {"$sum": "$attempts"},
+                    "pending_review": {"$sum": {"$cond": [
+                        {"$and": [
+                            {"$eq": ["$status", "completed"]},
+                            {"$eq": [{"$ifNull": ["$finalScore", None]}, None]},
+                        ]}, 1, 0,
+                    ]}},
+                }},
+            ])
+        }
         task_list = [
             GradebookTaskItem(
                 id=str(t.id),
                 title=t.title,
                 category=getattr(t, "category", TaskCategory.PRACTICE),
+                kind=task_kind(t),
+                description=t.description,
+                grading_method=t.grading_method.value if t.grading_method else None,
+                time_limit=t.time_limit,
+                open_time=t.open_time,
+                close_time=t.close_time,
+                is_locked=t.is_locked,
+                submitted_count=counts.get(str(t.id), {}).get("submitted", 0),
+                pending_review_count=counts.get(str(t.id), {}).get("pending_review", 0),
                 instruction_video_url=task_service.resolve_video_url(getattr(t, "instruction_video_url", None)),
             )
             for t in tasks_in_course
@@ -567,6 +606,7 @@ class CourseService:
                     status=doc.get("status", EnrollmentStatus.ACTIVE.value),
                     progress_percent=doc.get("progressPercent", 0.0),
                     task_scores=doc.get("taskScores", {}),
+                    task_score_overrides=doc.get("taskScoreOverrides", {}),
                     grades=grades_val,
                     note=doc.get("note"),
                 )
@@ -576,6 +616,8 @@ class CourseService:
             course_id=str(course_id),
             is_grade_locked=course.is_grade_locked,
             formula=course.grading_formula,
+            exam_eligibility=course.exam_eligibility,
+            attendance_from_sessions=attendance_scores_for_course(course_id) is not None,
             task_list=task_list,
             students=students,
         )
@@ -601,24 +643,25 @@ class CourseService:
                 detail="Lớp học phần này đã được chốt điểm trước đó",
             )
 
-        tasks_in_course, _ = crud_task.get_by_course(course_id, limit=100)
-        practice_ids = [str(t.id) for t in tasks_in_course if getattr(t, "category", TaskCategory.PRACTICE) == TaskCategory.PRACTICE]
-        exam_tasks = [t for t in tasks_in_course if getattr(t, "category", TaskCategory.PRACTICE) == TaskCategory.EXAM]
+        from app.models.task import TaskKind, task_kind
+        from app.services.grade_calculator import attendance_scores_for_course, compute_grades
+
+        tasks_in_course, _ = crud_task.get_by_course(course_id, limit=200)
+        final_task_ids = [str(t.id) for t in tasks_in_course if task_kind(t) == TaskKind.FINAL]
 
         enrollments = list(crud_enrollment.collection.find({"courseId": str(course_id), "status": "active"}))
         if not enrollments:
             raise HTTPException(status_code=400, detail="Không có sinh viên nào trong lớp để chốt điểm")
 
-        # Kiểm tra điều kiện: sinh viên có thiếu điểm thi hay không
-        missing_exam_students = []
-        if exam_tasks and not force:
-            for enr in enrollments:
-                task_scores = enr.get("taskScores", {})
-                grades_exam = enr.get("grades", {}).get("examScore")
-                has_exam_score = grades_exam is not None or any(str(et.id) in task_scores for et in exam_tasks)
-                if not has_exam_score:
-                    missing_exam_students.append(enr.get("studentCode") or str(enr["_id"]))
+        def has_final_score(enr: dict) -> bool:
+            scores = {**(enr.get("taskScores") or {}), **(enr.get("taskScoreOverrides") or {})}
+            return any(tid in scores for tid in final_task_ids)
 
+        # Kiểm tra điều kiện: sinh viên có thiếu điểm thi kết thúc hay không
+        if final_task_ids and not force:
+            missing_exam_students = [
+                enr.get("studentCode") or str(enr["_id"]) for enr in enrollments if not has_final_score(enr)
+            ]
             if missing_exam_students:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -629,39 +672,22 @@ class CourseService:
         passed_count = 0
         failed_count = 0
         student_user_ids = []
+        attendance_map = attendance_scores_for_course(course_id)
 
         for enr in enrollments:
             uid = str(enr.get("userId"))
             if uid:
                 student_user_ids.append(uid)
 
-            task_scores = enr.get("taskScores", {})
-            grades_data = enr.get("grades", {})
-            exam_score = grades_data.get("examScore")
-
-            if exam_score is None and exam_tasks:
-                exam_scores_list = [task_scores[str(et.id)] for et in exam_tasks if str(et.id) in task_scores]
-                if exam_scores_list:
-                    exam_score = round(sum(exam_scores_list) / len(exam_scores_list), 2)
-                elif force:
-                    exam_score = 0.0
-                else:
-                    exam_score = None
-
-            computed = grading_service.compute_student_grades(
-                current_grades=grades_data,
-                task_scores=task_scores,
-                practice_task_ids=practice_ids,
-                formula=course.grading_formula,
-                exam_score_override=exam_score,
-            )
+            enrollment = crud_enrollment.model.model_validate(enr)
+            # force: sinh viên chưa có điểm thi kết thúc nhận 0 điểm thi
+            computed = compute_grades(enrollment, course, tasks_in_course, attendance_map, missing_exam_as_zero=force)
 
             if computed.is_passed:
                 passed_count += 1
             else:
                 failed_count += 1
 
-            # Cập nhật enrollment
             crud_enrollment.collection.update_one(
                 {"_id": enr["_id"]},
                 {

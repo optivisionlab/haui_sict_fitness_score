@@ -5,6 +5,7 @@ from pydantic import Field
 from app.models.base import PyObjectId
 from app.models.enrollment import EnrollmentStatus
 from app.schemas.common import BaseSchema
+from app.schemas.course import ClassSessionSchema
 
 
 class StudentGradesSchema(BaseSchema):
@@ -14,6 +15,7 @@ class StudentGradesSchema(BaseSchema):
     final_score: Optional[float] = None
     letter_grade: Optional[str] = None
     is_passed: Optional[bool] = None
+    is_eligible: Optional[bool] = None
 
 
 class EnrollmentBase(BaseSchema):
@@ -84,3 +86,16 @@ class EnrollmentRead(BaseSchema):
 
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
+class StudentCourseRead(EnrollmentRead):
+    """Ghi danh kèm thông tin lớp học phần, dùng cho màn hình của sinh viên."""
+    course_code: Optional[str] = None
+    course_desc: Optional[str] = None
+    course_status: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    semester_name: Optional[str] = None
+    sport_code: Optional[str] = None
+    sport_name: Optional[str] = None
+    schedule: list[ClassSessionSchema] = Field(default_factory=list)

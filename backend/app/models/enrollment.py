@@ -19,6 +19,7 @@ class StudentGrades(EmbeddedModel):
     final_score: Optional[float] = None       # Điểm tổng kết hệ 10
     letter_grade: Optional[str] = None        # Điểm chữ: A, B+, B, C+, C, D+, D, F
     is_passed: Optional[bool] = None          # Trạng thái Đạt hay Trượt
+    is_eligible: Optional[bool] = None        # Đủ điều kiện dự thi kết thúc học phần
 
 
 class Enrollment(BaseDocument):
@@ -42,6 +43,8 @@ class Enrollment(BaseDocument):
 
     completed_task_ids: list[str] = []
     task_scores: dict[str, float] = {}
+    # Điểm GV nhập tay cho từng bài, ưu tiên hơn điểm tính từ bài nộp
+    task_score_overrides: dict[str, float] = {}
 
     # Điểm thành phần và tổng kết
     grades: StudentGrades = Field(default_factory=StudentGrades)

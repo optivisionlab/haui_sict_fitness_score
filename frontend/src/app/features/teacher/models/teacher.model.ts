@@ -50,11 +50,71 @@ export interface TeacherCourseDetail extends TeacherCourseItem {
   total_tasks: number;
 }
 
+export type TaskKind = 'regular' | 'midterm' | 'final';
+export type GradingMethod = 'highest' | 'latest' | 'average';
+
 export interface GradebookTaskItem {
   id: string;
   title: string;
   category: 'practice' | 'exam';
+  kind: TaskKind;
+  description?: string;
+  grading_method?: GradingMethod;
+  /** Thời lượng video tối đa (giây). */
+  time_limit?: number;
+  open_time?: string;
+  close_time?: string;
+  is_locked: boolean;
+  submitted_count: number;
+  /** Bài AI đã chấm nhưng GV chưa xác nhận. */
+  pending_review_count: number;
   instruction_video_url?: string;
+}
+
+/** Dữ liệu form tạo / sửa bài kiểm tra. */
+export interface TaskUpsert {
+  title: string;
+  kind: TaskKind;
+  description?: string | null;
+  grading_method: GradingMethod;
+  time_limit?: number | null;
+  open_time?: string | null;
+  close_time?: string | null;
+  is_locked: boolean;
+}
+
+export interface ExamEligibility {
+  enabled: boolean;
+  min_attendance_score: number;
+  min_process_score: number;
+}
+
+export type AttendanceState = 'present' | 'late' | 'excused' | 'absent';
+
+export interface AttendanceSession {
+  id: string;
+  date: string;
+  title?: string;
+  records: { [userId: string]: AttendanceState };
+}
+
+/** Một lượt nộp bài kiểm tra cho GV duyệt. */
+export interface TeacherSubmission {
+  id: string;
+  user_id: string;
+  student_code?: string;
+  student_name?: string;
+  attempt_no: number;
+  submitted_at?: string;
+  status: string;
+  error?: string;
+  duration_sec?: number;
+  metrics: { [key: string]: any };
+  ai_score?: number;
+  ai_comment?: string;
+  final_score?: number;
+  teacher_comment?: string;
+  graded_at?: string;
 }
 
 export interface StudentGrades {
@@ -64,6 +124,7 @@ export interface StudentGrades {
   final_score?: number;
   letter_grade?: string;
   is_passed?: boolean;
+  is_eligible?: boolean;
 }
 
 export interface GradebookStudentItem {
@@ -76,6 +137,8 @@ export interface GradebookStudentItem {
   status: 'active' | 'dropped';
   progress_percent: number;
   task_scores: { [key: string]: number };
+  /** Điểm GV nhập tay, ưu tiên hơn điểm tính từ bài nộp. */
+  task_score_overrides: { [key: string]: number };
   grades: StudentGrades;
   note?: string;
 }
@@ -84,6 +147,9 @@ export interface GradebookResponse {
   course_id: string;
   is_grade_locked: boolean;
   formula: GradingFormula;
+  exam_eligibility: ExamEligibility;
+  /** Chuyên cần đang tính tự động từ điểm danh theo buổi. */
+  attendance_from_sessions: boolean;
   task_list: GradebookTaskItem[];
   students: GradebookStudentItem[];
 }

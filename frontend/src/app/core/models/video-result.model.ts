@@ -7,6 +7,10 @@ export interface VideoResult {
   taskId: string;
   sportId?: string | null;
   attemptNo: number;
+  /** practice = luyện tập (không tính điểm), test = kiểm tra. */
+  mode?: 'practice' | 'test';
+  /** Dịch vụ AI có trả về video đã vẽ kết quả chấm. */
+  hasAnnotatedVideo?: boolean;
   status: VideoResultStatus;
   pending: boolean;
   videoUrl?: string | null;
@@ -45,6 +49,7 @@ export interface Paginated<T> {
 
 export interface VideoUploadPayload {
   file: File;
+  mode?: 'practice' | 'test';
   exercise_id: string;
   course_id?: string;
 }

@@ -20,6 +20,8 @@ class VideoResult(BaseDocument):
     task_title: Optional[str] = None
 
     attempt_no: int = 1
+    # "practice" = luyện tập (AI chấm, không tính điểm, không cần GV xác nhận); "test" = kiểm tra (tính điểm)
+    mode: str = "test"
     submitted_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
@@ -36,6 +38,8 @@ class VideoResult(BaseDocument):
     metrics: dict[str, Any] = Field(default_factory=dict)  # Schemaless theo từng môn
     ai_score: Optional[float] = None
     ai_comment: Optional[str] = None
+    # Video do AI vẽ kết quả phân tích lên (khung xương, điểm chạm...), nếu dịch vụ AI trả về
+    annotated_object_key: Optional[str] = None
 
     # GV chấm tay (override điểm AI)
     final_score: Optional[float] = None

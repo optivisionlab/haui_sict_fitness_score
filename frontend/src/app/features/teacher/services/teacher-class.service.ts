@@ -12,7 +12,11 @@ import {
   GradebookStudentItem,
   StudentGrades,
   GradingFormula,
-  ClassStatus
+  ClassStatus,
+  ExamEligibility,
+  TaskUpsert,
+  TeacherSubmission,
+  AttendanceSession
 } from '../models/teacher.model';
 import { deduceSportMetadata, parseSemesterCode } from '../../../core/constants/academic.constant';
 
@@ -93,8 +97,20 @@ export class TeacherClassService {
       id: t.id || t._id,
       title: t.title,
       category: t.category,
+      kind: t.kind || (t.category === 'exam' ? 'final' : 'regular'),
+      description: t.description || undefined,
+      grading_method: t.gradingMethod ?? t.grading_method,
+      time_limit: t.timeLimit ?? t.time_limit ?? undefined,
+      open_time: t.openTime ?? t.open_time ?? undefined,
+      close_time: t.closeTime ?? t.close_time ?? undefined,
+      is_locked: !!(t.isLocked ?? t.is_locked),
+      submitted_count: t.submittedCount ?? t.submitted_count ?? 0,
+      pending_review_count: t.pendingReviewCount ?? t.pending_review_count ?? 0,
       instruction_video_url: t.instruction_video_url || t.instructionVideoUrl || undefined
     }));
+    // Thứ tự: bài thường xuyên -> thi giữa kỳ -> thi kết thúc học phần (giống trang sinh viên)
+    const rank = (t: GradebookTaskItem) => (t.kind === 'regular' ? 0 : t.kind === 'midterm' ? 1 : 2);
+    task_list.sort((a, b) => rank(a) - rank(b) || a.title.localeCompare(b.title, 'vi', { numeric: true }));
 
     const rawFormula = data.formula || data.grading_formula || data.gradingFormula || {};
     const formula: GradingFormula = {
@@ -113,7 +129,8 @@ export class TeacherClassService {
         exam_score: g.exam_score ?? g.examScore,
         final_score: g.final_score ?? g.finalScore,
         letter_grade: g.letter_grade ?? g.letterGrade,
-        is_passed: g.is_passed ?? g.isPassed
+        is_passed: g.is_passed ?? g.isPassed,
+        is_eligible: g.is_eligible ?? g.isEligible
       };
 
       return {
@@ -126,6 +143,7 @@ export class TeacherClassService {
         status: s.status || 'active',
         progress_percent: s.progress_percent ?? s.progressPercent ?? 0,
         task_scores: s.task_scores || s.taskScores || {},
+        task_score_overrides: s.task_score_overrides || s.taskScoreOverrides || {},
         grades,
         note: s.note
       };
@@ -135,6 +153,12 @@ export class TeacherClassService {
       course_id: data.course_id || data.courseId,
       is_grade_locked: data.is_grade_locked ?? data.isGradeLocked ?? false,
       formula,
+      exam_eligibility: {
+        enabled: data.examEligibility?.enabled ?? true,
+        min_attendance_score: data.examEligibility?.minAttendanceScore ?? 5,
+        min_process_score: data.examEligibility?.minProcessScore ?? 4
+      },
+      attendance_from_sessions: !!data.attendanceFromSessions,
       task_list,
       students
     };
@@ -285,5 +309,95 @@ export class TeacherClassService {
    */
   deleteInstructionVideo(taskId: string): Observable<any> {
     return this.http.delete(`${environment.apiUrl}/tasks/${taskId}/instruction-video`);
+  }
+
+  // ==================== Cấu hình điểm ====================
+
+  saveGradingSettings(courseId: string, formula: GradingFormula, eligibility: ExamEligibility): Observable<any> {
+    return this.http.put(`${this.base(courseId)}/grading-settings`, {
+      grading_formula: {
+        attendance_weight: formula.attendance_weight,
+        practice_weight: formula.process_weight,
+        exam_weight: formula.exam_weight
+      },
+      exam_eligibility: eligibility
+    });
+  }
+
+  // ==================== Bài kiểm tra ====================
+
+  createTask(courseId: string, task: TaskUpsert): Observable<any> {
+    return this.http.post(`${this.base(courseId)}/tasks`, task);
+  }
+
+  updateTask(courseId: string, taskId: string, task: TaskUpsert): Observable<any> {
+    return this.http.put(`${this.base(courseId)}/tasks/${taskId}`, task);
+  }
+
+  deleteTask(courseId: string, taskId: string): Observable<any> {
+    return this.http.delete(`${this.base(courseId)}/tasks/${taskId}`);
+  }
+
+  // ==================== Duyệt bài nộp ====================
+
+  loadSubmissions(courseId: string, taskId: string): Observable<TeacherSubmission[]> {
+    return this.http.get<ApiResponse<any[]>>(`${this.base(courseId)}/tasks/${taskId}/submissions`).pipe(
+      map((res) => (res?.data || []).map((s: any) => ({
+        id: s.id,
+        user_id: s.userId,
+        student_code: s.studentCode,
+        student_name: s.studentName,
+        attempt_no: s.attemptNo,
+        submitted_at: s.submittedAt,
+        status: s.status,
+        error: s.error,
+        duration_sec: s.durationSec,
+        metrics: s.metrics || {},
+        ai_score: s.aiScore ?? undefined,
+        ai_comment: s.aiComment ?? undefined,
+        final_score: s.finalScore ?? undefined,
+        teacher_comment: s.teacherComment ?? undefined,
+        graded_at: s.gradedAt ?? undefined
+      })))
+    );
+  }
+
+  gradeSubmission(courseId: string, resultId: string, finalScore: number, comment: string): Observable<any> {
+    return this.http.post(`${this.base(courseId)}/submissions/${resultId}/grade`, {
+      final_score: finalScore,
+      teacher_comment: comment || null
+    });
+  }
+
+  /** Nhập tay điểm một bài cho một SV; score = null để xóa điểm nhập tay. */
+  setTaskScore(courseId: string, enrollmentId: string, taskId: string, score: number | null): Observable<any> {
+    return this.http.put(`${this.base(courseId)}/task-scores`, {
+      enrollment_id: enrollmentId,
+      task_id: taskId,
+      score
+    });
+  }
+
+  // ==================== Điểm danh ====================
+
+  loadAttendance(courseId: string): Observable<AttendanceSession[]> {
+    return this.http.get<ApiResponse<any[]>>(`${this.base(courseId)}/attendance`).pipe(
+      map((res) => (res?.data || []).map((s: any) => ({ id: s.id, date: s.date, title: s.title, records: s.records || {} })))
+    );
+  }
+
+  saveAttendance(courseId: string, session: { id?: string; date: string; title?: string; records: AttendanceSession['records'] }): Observable<any> {
+    const body = { date: session.date, title: session.title || null, records: session.records };
+    return session.id
+      ? this.http.put(`${this.base(courseId)}/attendance/${session.id}`, body)
+      : this.http.post(`${this.base(courseId)}/attendance`, body);
+  }
+
+  deleteAttendance(courseId: string, sessionId: string): Observable<any> {
+    return this.http.delete(`${this.base(courseId)}/attendance/${sessionId}`);
+  }
+
+  private base(courseId: string): string {
+    return `${environment.apiUrl}/teacher/courses/${courseId}`;
   }
 }

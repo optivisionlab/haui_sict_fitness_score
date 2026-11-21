@@ -5,9 +5,9 @@ from pydantic import Field
 from app.models.base import PyObjectId
 from app.models.course import CourseStatus
 from app.models.enrollment import EnrollmentStatus
-from app.models.task import TaskCategory
+from app.models.task import TaskCategory, TaskKind
 from app.schemas.common import BaseSchema
-from app.schemas.course import GradingFormulaSchema
+from app.schemas.course import ExamEligibilitySchema, GradingFormulaSchema
 from app.schemas.enrollment import StudentGradesSchema
 
 
@@ -67,6 +67,15 @@ class GradebookTaskItem(BaseSchema):
     id: str
     title: str
     category: TaskCategory
+    kind: TaskKind = TaskKind.REGULAR
+    description: Optional[str] = None
+    grading_method: Optional[str] = None
+    time_limit: Optional[int] = None
+    open_time: Optional[datetime] = None
+    close_time: Optional[datetime] = None
+    is_locked: bool = False
+    submitted_count: int = 0
+    pending_review_count: int = 0
     instruction_video_url: Optional[str] = None
 
 
@@ -80,6 +89,7 @@ class GradebookStudentItem(BaseSchema):
     status: EnrollmentStatus = EnrollmentStatus.ACTIVE
     progress_percent: float = 0.0
     task_scores: dict[str, float] = Field(default_factory=dict)
+    task_score_overrides: dict[str, float] = Field(default_factory=dict)
     grades: StudentGradesSchema = Field(default_factory=StudentGradesSchema)
     note: Optional[str] = None
 
@@ -88,6 +98,9 @@ class GradebookResponse(BaseSchema):
     course_id: str
     is_grade_locked: bool
     formula: GradingFormulaSchema
+    exam_eligibility: ExamEligibilitySchema = Field(default_factory=ExamEligibilitySchema)
+    # True: chuyên cần tính tự động từ điểm danh theo buổi
+    attendance_from_sessions: bool = False
     task_list: list[GradebookTaskItem] = Field(default_factory=list)
     students: list[GradebookStudentItem] = Field(default_factory=list)
 
@@ -152,3 +165,30 @@ class CourseStatsResponse(BaseSchema):
     lowest_score: float
     grade_distribution: GradeDistribution = Field(default_factory=GradeDistribution)
     submission_rate: float
+
+
+class TaskScoreOverride(BaseSchema):
+    """GV nhập tay điểm một bài cho một sinh viên; score=None để xóa điểm nhập tay."""
+    enrollment_id: str
+    task_id: str
+    score: Optional[float] = Field(default=None, ge=0.0, le=10.0)
+
+
+class AttendanceSessionUpsert(BaseSchema):
+    date: datetime
+    title: Optional[str] = Field(default=None, max_length=120)
+    # user_id -> present | late | excused | absent
+    records: dict[str, str] = Field(default_factory=dict)
+
+
+class AttendanceSessionRead(BaseSchema):
+    id: str
+    date: datetime
+    title: Optional[str] = None
+    records: dict[str, str] = Field(default_factory=dict)
+
+
+class StudentImportResult(BaseSchema):
+    enrolled: int = 0
+    already_enrolled: int = 0
+    errors: list[str] = Field(default_factory=list)

@@ -6,7 +6,7 @@ from app.crud.enrollment import crud_enrollment
 from app.crud.task import crud_task
 from app.crud.video_result import crud_video_result
 from app.models.enrollment import Enrollment
-from app.models.task import TaskCategory
+from app.models.task import TaskCategory, task_kind
 from app.models.user import User
 from app.schemas.student import StudentGradeViewResponse, StudentTaskGradeItem
 from app.services.auth_service import get_current_user, verify_student_in_course
@@ -33,7 +33,7 @@ def get_student_course_grades(
     
     # Lấy tất cả bài nộp của sinh viên cho các bài tập này trong 1 truy vấn (hạn chế N+1)
     video_results_cursor = crud_video_result.collection.find(
-        {"taskId": {"$in": task_ids}, "userId": user_id},
+        {"taskId": {"$in": task_ids}, "userId": user_id, "mode": {"$ne": "practice"}},
     ).sort("submittedAt", -1)
     
     latest_subs = {}
@@ -45,7 +45,8 @@ def get_student_course_grades(
     task_items = []
     for t in tasks:
         t_id = str(t.id)
-        score = enrollment.task_scores.get(t_id)
+        override = (enrollment.task_score_overrides or {}).get(t_id)
+        score = override if override is not None else enrollment.task_scores.get(t_id)
 
         last_sub = latest_subs.get(t_id)
 
@@ -72,7 +73,20 @@ def get_student_course_grades(
                 score=score,
                 submitted_at=submitted_at,
                 status=sub_status,
-                instruction_video_url=task_service.resolve_video_url(getattr(t, "instruction_video_url", None)),
+                # Video hướng dẫn chỉ dành cho bài thường xuyên (phần luyện tập)
+                instruction_video_url=(
+                    task_service.resolve_video_url(getattr(t, "instruction_video_url", None))
+                    if t.category == TaskCategory.PRACTICE else None
+                ),
+                kind=task_kind(t).value,
+                technical_requirements=t.description,
+                teacher_override=override is not None,
+                grading_method=t.grading_method.value if t.grading_method else None,
+                time_limit=t.time_limit,
+                max_attempts=t.max_attempts,
+                is_locked=t.is_locked,
+                open_time=t.open_time,
+                close_time=t.close_time,
             )
         )
 
@@ -88,5 +102,8 @@ def get_student_course_grades(
         final_score=grades.final_score,
         letter_grade=grades.letter_grade,
         is_passed=grades.is_passed,
+        is_eligible=grades.is_eligible,
+        min_attendance_score=course.exam_eligibility.min_attendance_score if course.exam_eligibility.enabled else None,
+        min_process_score=course.exam_eligibility.min_process_score if course.exam_eligibility.enabled else None,
         tasks=task_items,
     )

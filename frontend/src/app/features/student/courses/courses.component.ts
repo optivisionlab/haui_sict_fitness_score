@@ -27,7 +27,8 @@ import {
   Course,
   CourseDetailInfo,
   AssessmentItem,
-  AssessmentAttempt
+  AssessmentAttempt,
+  SubmissionMode
 } from './models/course-detail.model';
 
 const STATUS_POLL_INTERVAL_MS = 3000;
@@ -71,7 +72,8 @@ export class CoursesComponent implements OnInit, OnDestroy {
   searchKeyword = signal<string>('');
 
   // Selected state
-  selectedCourseId = signal<string>('pickleball');
+  selectedCourseId = signal<string>('');
+  loadError = signal(false);
   selectedAssessmentId = signal<string>('');
 
   // Modals & Upload State
@@ -84,6 +86,13 @@ export class CoursesComponent implements OnInit, OnDestroy {
   uploadProgress = signal<number>(0);
   submitNote = signal<string>('');
   selectedAttempt = signal<AssessmentAttempt | null>(null);
+
+  /** Bài thường xuyên có 2 phần: luyện tập (AI chấm, không tính điểm) và kiểm tra (tính điểm). */
+  activePart = signal<SubmissionMode>('practice');
+  /** Phần đang nộp trong modal nộp video. */
+  submitMode = signal<SubmissionMode>('test');
+  /** Trong modal xem lại: đang xem video AI chấm hay video gốc. */
+  reviewShowAnnotated = signal<boolean>(true);
 
   // Toast
   toastMessage = signal<string>('');
@@ -118,262 +127,60 @@ export class CoursesComponent implements OnInit, OnDestroy {
       }
     });
 
-    // 2. Tải danh sách khóa học của sinh viên
+    // 2. Tải danh sách khóa học của sinh viên (kèm thông tin lớp học phần từ backend)
     this.http.get<ApiResponse<any>>(`${environment.apiUrl}/enrollments/my-courses`).subscribe({
       next: (res) => {
-        const items = res?.data?.items || (Array.isArray(res?.data) ? res.data : []);
-        if (items.length > 0) {
-          const mappedCourses: Course[] = items.map((e: any) => {
-            const courseId = e.courseId || e.id || '';
-            const courseName = e.courseName || e.name || 'Giáo dục Thể chất';
-            const isBadminton = courseName.toLowerCase().includes('cầu lông') || courseName.toLowerCase().includes('badminton') || courseName.toLowerCase().includes('pickleball');
-            const avg = e.grades?.finalScore ?? e.grades?.processScore ?? e.grades?.attendanceScore ?? null;
-            return {
-              id: courseId,
-              name: courseName,
-              teacher: e.teacherName || 'Giảng viên phụ trách',
-              startDate: '01/09/2026',
-              endDate: '15/12/2026',
-              examDate: this.formatDate(e.examDate),
-              progress: Math.round(e.progressPercent || 0),
-              status: 'active',
-              iconType: isBadminton ? 'pickleball' : 'chay',
-              averageScore: avg !== null ? avg : undefined
-            };
-          });
-          this.courses.set(mappedCourses);
+        const items: any[] = res?.data?.items || (Array.isArray(res?.data) ? res.data : []);
+        const mappedCourses: Course[] = items.map((e: any) => {
+          const courseName = e.courseName || '';
+          const isRunning = (e.sportCode || '').toLowerCase().includes('chay') || /chạy|điền kinh/i.test(courseName);
+          const g = e.grades || {};
+          return {
+            id: e.courseId,
+            name: courseName,
+            code: e.courseCode || '',
+            teacher: e.teacherName || '',
+            startDate: this.formatDate(e.startDate),
+            endDate: this.formatDate(e.endDate),
+            examDate: this.formatDate(e.examDate),
+            progress: Math.round(e.progressPercent || 0),
+            status: e.status === 'done' || e.courseStatus === 'completed' ? 'done' : 'active',
+            iconType: isRunning ? 'chay' : 'pickleball',
+            averageScore: g.finalScore ?? g.processScore ?? undefined,
+            desc: e.courseDesc || ''
+          } as Course & { desc: string };
+        });
+        this.courses.set(mappedCourses);
 
-          const detailsMap: Record<string, CourseDetailInfo> = {};
-          mappedCourses.forEach((c) => {
-            detailsMap[c.id] = {
-              id: c.id,
-              title: c.name,
-              teacher: c.teacher,
-              dates: `${c.startDate} - ${c.endDate}`,
-              examDate: this.formatDate(c.examDate),
-              progress: c.progress,
-              code: c.code || (c.id || '').substring(0, 10).toUpperCase(),
-              desc: 'Học phần giáo dục thể chất đào tạo kỹ thuật chuyên môn và rèn luyện thể lực. Chấm điểm và đánh giá tự động qua video bằng AI.',
-              thumbClass: '',
-              thumbIcon: c.iconType,
-              averageScore: c.averageScore,
-              grades: c.grades,
-              assessments: this.getStandardAssessments(c.name)
-            };
-            this.loadCourseAssessments(c.id);
-          });
-          this.courseDetails.set(detailsMap);
-        } else {
-          // Dữ liệu mặc định mẫu chuẩn cho sinh viên trải nghiệm
-          const defaultC: Course = {
-            id: 'c-pickleball',
-            name: 'Pickleball - Kỹ thuật cơ bản & Nâng cao',
-            code: 'LHP-GDTC204-01',
-            teacher: 'ThS. Nguyễn Văn A',
-            startDate: '05/09/2026',
-            endDate: '25/12/2026',
-            examDate: '28/12/2026',
-            progress: 70,
-            status: 'active',
-            iconType: 'pickleball',
-            averageScore: 8.5,
-            grades: {
-              kt1: 8.5,
-              kt2: 9.0,
-              dqt: 8.8,
-              exam: 8.5,
-              final: 8.7,
-              letterGrade: 'A'
-            }
+        const detailsMap: Record<string, CourseDetailInfo> = {};
+        mappedCourses.forEach((c: any) => {
+          const prev = this.courseDetails()[c.id];
+          detailsMap[c.id] = {
+            id: c.id,
+            title: c.name,
+            teacher: c.teacher,
+            dates: c.startDate && c.endDate ? `${c.startDate} - ${c.endDate}` : '',
+            examDate: c.examDate,
+            progress: c.progress,
+            code: c.code,
+            desc: c.desc,
+            thumbClass: '',
+            thumbIcon: c.iconType,
+            averageScore: c.averageScore,
+            grades: c.grades,
+            // Giữ danh sách bài nếu loadCourseAssessments đã trả về trước
+            assessments: prev?.assessments || []
           };
-          this.courses.set([defaultC]);
-          this.courseDetails.set({
-            [defaultC.id]: {
-              id: defaultC.id,
-              title: defaultC.name,
-              teacher: defaultC.teacher,
-              dates: '05/09/2026 - 25/12/2026',
-              examDate: '28/12/2026',
-              progress: 70,
-              code: defaultC.code || 'LHP-GDTC204-01',
-              desc: 'Học phần trang bị cho sinh viên kỹ thuật cơ bản môn Pickleball. Đánh giá kết quả học tập qua hình thức nộp video thực hành để hệ thống AI chấm điểm.',
-              thumbClass: '',
-              thumbIcon: 'pickleball',
-              averageScore: 8.5,
-              grades: defaultC.grades,
-              assessments: this.getStandardAssessments(defaultC.name)
-            }
-          });
-        }
+          if (!prev) this.loadCourseAssessments(c.id);
+        });
+        this.courseDetails.set(detailsMap);
+        this.loadError.set(false);
       },
       error: () => {
-        const defaultC: Course = {
-          id: 'c-pickleball',
-          name: 'Pickleball - Kỹ thuật cơ bản & Nâng cao',
-          code: 'LHP-GDTC204-01',
-          teacher: 'ThS. Nguyễn Văn A',
-          startDate: '05/09/2026',
-          endDate: '25/12/2026',
-          examDate: '28/12/2026',
-          progress: 70,
-          status: 'active',
-          iconType: 'pickleball',
-          averageScore: 8.5,
-          grades: {
-            kt1: 8.5,
-            kt2: 9.0,
-            dqt: 8.8,
-            exam: 8.5,
-            final: 8.7,
-            letterGrade: 'A'
-          }
-        };
-        this.courses.set([defaultC]);
-        this.courseDetails.set({
-          [defaultC.id]: {
-            id: defaultC.id,
-            title: defaultC.name,
-            teacher: defaultC.teacher,
-            dates: '05/09/2026 - 25/12/2026',
-            examDate: '28/12/2026',
-            progress: 70,
-            code: defaultC.code || 'LHP-GDTC204-01',
-            desc: 'Học phần trang bị cho sinh viên kỹ thuật cơ bản môn Pickleball. Đánh giá kết quả học tập qua hình thức nộp video thực hành để hệ thống AI chấm điểm.',
-            thumbClass: '',
-            thumbIcon: 'pickleball',
-            averageScore: 8.5,
-            grades: defaultC.grades,
-            assessments: this.getStandardAssessments(defaultC.name)
-          }
-        });
+        this.courses.set([]);
+        this.loadError.set(true);
       }
     });
-  }
-
-  /**
-   * Tạo danh mục bài đánh giá chuẩn theo yêu cầu:
-   * KT1: Luyện tập & Kiểm tra (đều nộp nhiều lần; kiểm tra lấy điểm lần nộp gần nhất)
-   * KT2: Luyện tập & Kiểm tra (đều nộp nhiều lần; kiểm tra lấy điểm lần nộp gần nhất)
-   * Thi: Nộp bài thi kết thúc học phần (nộp nhiều lần, lấy điểm lần nộp gần nhất)
-   */
-  getStandardAssessments(courseName?: string): AssessmentItem[] {
-    return [
-      {
-        id: 'kt1-practice',
-        name: 'Luyện tập: Kỹ thuật giao bóng & đánh thuận tay',
-        type: 'tx1',
-        mode: 'practice',
-        groupTitle: 'KT1: Kỹ thuật 1',
-        technicalRequirements: 'Yêu cầu tư thế chuẩn bị, xoay hông, tiếp xúc bóng đúng điểm ngọt của vợt và giữ thăng bằng sau khi kết thúc cú đánh.',
-        gradingMethod: 'Nộp nhiều lần - Lấy điểm cao nhất',
-        timeLimit: 'Không giới hạn thời gian',
-        openTime: '05/09/2026 07:00',
-        closeTime: '30/11/2026 23:59',
-        status: 'graded',
-        score: 8.5,
-        aiScore: 8.5,
-        attempts: [
-          {
-            attemptNo: 2,
-            date: '20/10/2026 15:30',
-            duration: '0:48',
-            score: 8.5,
-            aiScore: 8.5,
-            aiFeedback: 'Đánh giá AI: Điểm dự kiến 8.5/10. Tư thế vung vợt đẹp, điểm tiếp xúc bóng chuẩn xác (14/15 lần đạt). Cổ tay linh hoạt.',
-            videoUrl: ''
-          },
-          {
-            attemptNo: 1,
-            date: '15/10/2026 10:15',
-            duration: '0:42',
-            score: 7.0,
-            aiScore: 7.0,
-            aiFeedback: 'Đánh giá AI: Điểm dự kiến 7.0/10. Biên độ vung vợt hơi hẹp, tiếp xúc bóng hơi muộn.',
-            videoUrl: ''
-          }
-        ]
-      },
-      {
-        id: 'kt1-exam',
-        name: 'Bài kiểm tra chính thức KT1: Kỹ thuật giao bóng',
-        type: 'tx1',
-        mode: 'exam',
-        groupTitle: 'KT1: Kỹ thuật 1',
-        technicalRequirements: 'Kiểm tra chính thức lấy điểm quá trình đợt 1. Video quay rõ góc máy, toàn thân và sân tập.',
-        gradingMethod: 'Lần nộp gần nhất',
-        timeLimit: '45 phút',
-        openTime: '15/10/2026 08:00',
-        closeTime: '30/11/2026 23:59',
-        status: 'graded',
-        score: 8.5,
-        aiScore: 8.5,
-        attempts: [
-          {
-            attemptNo: 1,
-            date: '21/10/2026 09:00',
-            duration: '1:10',
-            score: 8.5,
-            aiScore: 8.5,
-            aiFeedback: 'Đánh giá AI: Điểm dự kiến 8.5/10. Kỹ thuật giao bóng chuẩn 92%, tốc độ và hướng bóng ổn định.',
-            videoUrl: ''
-          }
-        ]
-      },
-      {
-        id: 'kt2-practice',
-        name: 'Luyện tập: Kỹ thuật Dink bóng & Volley trên lưới',
-        type: 'tx2',
-        mode: 'practice',
-        groupTitle: 'KT2: Kỹ thuật 2',
-        technicalRequirements: 'Yêu cầu giữ chân vững bên ngoài vùng cấm (Kitchen zone), điều khiển lực tay đánh bóng mềm mại sát mép lưới.',
-        gradingMethod: 'Nộp nhiều lần - Lấy điểm cao nhất',
-        timeLimit: 'Không giới hạn thời gian',
-        openTime: '01/10/2026 07:00',
-        closeTime: '05/12/2026 23:59',
-        status: 'graded',
-        score: 9.0,
-        aiScore: 9.0,
-        attempts: [
-          {
-            attemptNo: 1,
-            date: '22/10/2026 16:45',
-            duration: '0:55',
-            score: 9.0,
-            aiScore: 9.0,
-            aiFeedback: 'Đánh giá AI: Điểm dự kiến 9.0/10. Kỹ thuật Dink bóng xuất sắc, kiểm soát bóng mềm mại và độ chuẩn xác 95%.',
-            videoUrl: ''
-          }
-        ]
-      },
-      {
-        id: 'kt2-exam',
-        name: 'Bài kiểm tra chính thức KT2: Kỹ thuật Dink & Volley',
-        type: 'tx2',
-        mode: 'exam',
-        groupTitle: 'KT2: Kỹ thuật 2',
-        technicalRequirements: 'Bài kiểm tra chính thức KT2. Ghi hình liên tục không cắt ghép.',
-        gradingMethod: 'Lần nộp gần nhất',
-        timeLimit: '45 phút',
-        openTime: '20/10/2026 08:00',
-        closeTime: '05/12/2026 23:59',
-        status: 'not_submitted',
-        attempts: []
-      },
-      {
-        id: 'final-exam',
-        name: 'Thi: Nộp bài thi kết thúc học phần',
-        type: 'final',
-        mode: 'exam',
-        groupTitle: 'Thi: Kết thúc học phần',
-        technicalRequirements: 'Bài thi thực hành kết thúc học phần môn Giáo dục thể chất. Video thực hiện chuỗi giao bóng và đánh bóng đối kháng kỹ thuật.',
-        gradingMethod: 'Lần nộp gần nhất',
-        timeLimit: '60 phút',
-        openTime: '10/12/2026 08:00',
-        closeTime: '28/12/2026 17:00',
-        status: 'not_submitted',
-        attempts: []
-      }
-    ];
   }
 
   private loadCourseAssessments(courseId: string): void {
@@ -381,68 +188,58 @@ export class CoursesComponent implements OnInit, OnDestroy {
     this.http.get<ApiResponse<any>>(`${environment.apiUrl}/student/courses/${courseId}/grades`).subscribe({
       next: (res) => {
         const data = res?.data;
-        if (!data || !data.tasks || data.tasks.length === 0) return;
+        if (!data || !data.tasks) return;
 
         const mappedAssessments: AssessmentItem[] = data.tasks.map((t: any, idx: number) => {
           const isExam = t.category === 'exam';
           const titleLower = (t.taskTitle || '').toLowerCase();
-          const type = isExam
-            ? (titleLower.includes('giữa') || titleLower.includes('midterm') ? 'midterm' : 'final')
-            : (titleLower.includes('tx1') || idx === 0 ? 'tx1' : 'tx2');
+          // Loại bài do GV đặt (kind); dữ liệu cũ chưa có kind thì suy ra từ tiêu đề
+          const type = t.kind === 'final' ? 'final'
+            : t.kind === 'midterm' ? 'midterm'
+            : isExam ? (titleLower.includes('giữa') || titleLower.includes('midterm') ? 'midterm' : 'final')
+            : (titleLower.includes('tx2') ? 'tx2' : titleLower.includes('tx1') || idx === 0 ? 'tx1' : 'tx2');
           const mode: 'practice' | 'exam' = isExam ? 'exam' : 'practice';
           const groupTitle = isExam
-            ? (titleLower.includes('giữa') ? 'KT1: Kỹ thuật 1' : 'Thi: Kết thúc học phần')
-            : (idx === 0 ? 'KT1: Kỹ thuật 1' : 'KT2: Kỹ thuật 2');
+            ? (type === 'midterm' ? 'Thi giữa kỳ' : 'Thi kết thúc học phần')
+            : 'Bài thường xuyên';
           const hasScore = t.score !== null && t.score !== undefined;
           return {
-            id: t.taskId || `task-${idx}`,
-            name: t.taskTitle || (isExam ? 'Bài cuối kỳ - Thi đấu tính điểm chính thức' : `Bài thường xuyên ${idx + 1}`),
+            id: t.taskId,
+            name: t.taskTitle || '',
             type: type as any,
             mode,
             groupTitle,
-            technicalRequirements: t.technicalRequirements || (mode === 'practice' ? 'Luyện tập kỹ thuật nhiều lần để hoàn thiện động tác.' : 'Bài kiểm tra chính thức - Được nộp lại, hệ thống lấy điểm lần nộp gần nhất.'),
-            gradingMethod: isExam ? 'Lần nộp gần nhất' : 'Lần cao nhất',
-            timeLimit: isExam ? '60 phút' : 'Không giới hạn',
-            openTime: '01/09/2026 08:00',
-            closeTime: '20/11/2026 23:59',
-            instructionVideoUrl: t.instruction_video_url || t.instructionVideoUrl || undefined,
-            status: hasScore ? 'graded' : (t.status === 'pending' ? 'pending' : 'not_submitted'),
+            technicalRequirements: t.technicalRequirements || undefined,
+            gradingMethod: CoursesComponent.GRADING_LABELS[t.gradingMethod] || '',
+            timeLimit: CoursesComponent.formatDuration(t.timeLimit),
+            openTime: this.formatDateTime(t.openTime),
+            closeTime: this.formatDateTime(t.closeTime),
+            instructionVideoUrl: t.instructionVideoUrl || undefined,
+            status: t.isLocked && !hasScore
+              ? 'locked'
+              : hasScore ? 'graded' : (t.status === 'pending' ? 'pending' : 'not_submitted'),
             score: hasScore ? t.score : undefined,
             aiScore: hasScore ? t.score : undefined,
-            attempts: hasScore
-              ? [
-                  {
-                    attemptNo: 1,
-                    date: t.submittedAt ? new Date(t.submittedAt).toLocaleString('vi-VN') : 'Đã hoàn thành',
-                    duration: '0:45',
-                    score: t.score,
-                    aiScore: t.score
-                  }
-                ]
-              : []
+            // Lịch sử nộp bài lấy từ /video-results bên dưới, không tự tạo lần nộp giả
+            attempts: []
           };
         });
 
         this.courseDetails.update((prev) => {
-          const existing = prev[courseId] || {
+          const existing: CourseDetailInfo = prev[courseId] || {
+            ...this.defaultCourseDetail,
             id: courseId,
-            title: data.courseName || 'Pickleball',
-            teacher: data.teacherName || 'Đặng Văn Long',
-            dates: '01/09/2026 - 15/11/2026',
-            examDate: '20/11/2026',
-            progress: 0,
-            code: courseId.substring(0, 10).toUpperCase(),
-            desc: 'Học phần trang bị cho sinh viên kỹ thuật cơ bản môn Pickleball. Đánh giá kết quả học tập qua hình thức nộp video thực hành để hệ thống chấm điểm.',
-            thumbClass: '',
-            thumbIcon: 'pickleball',
-            averageScore: undefined,
-            assessments: []
+            title: data.courseName || '',
+            teacher: data.teacherName || ''
           };
           return {
             ...prev,
             [courseId]: {
               ...existing,
               progress: Math.round(data.progressPercent ?? existing.progress),
+              isEligible: data.isEligible !== false,
+              minAttendanceScore: data.minAttendanceScore ?? undefined,
+              minProcessScore: data.minProcessScore ?? undefined,
               averageScore: data.finalScore ?? data.processScore ?? existing.averageScore,
               assessments: mappedAssessments
             }
@@ -516,7 +313,11 @@ export class CoursesComponent implements OnInit, OnDestroy {
       error: v.error || undefined,
       score,
       feedback: v.teacherComment || v.aiComment || undefined,
-      videoResultId: v.id
+      videoResultId: v.id,
+      mode: v.mode === 'practice' ? 'practice' : 'test',
+      teacherGraded: v.finalScore !== null && v.finalScore !== undefined,
+      hasAnnotatedVideo: !!v.hasAnnotatedVideo,
+      metrics: v.metrics || undefined
     };
   }
 
@@ -550,21 +351,45 @@ export class CoursesComponent implements OnInit, OnDestroy {
   // Fallback course detail if route is loaded before items
   private defaultCourseDetail: CourseDetailInfo = {
     id: '',
-    title: 'Đang tải thông tin môn học...',
+    title: '',
     teacher: '',
     dates: '',
     examDate: '',
     progress: 0,
     code: '',
-    desc: 'Học phần trang bị cho sinh viên kỹ thuật cơ bản môn Pickleball. Đánh giá kết quả học tập qua hình thức nộp video thực hành để hệ thống chấm điểm.',
+    desc: '',
     thumbClass: '',
     thumbIcon: 'pickleball',
     averageScore: undefined,
     assessments: []
   };
 
+  private static readonly GRADING_LABELS: Record<string, string> = {
+    highest: 'Lấy điểm cao nhất',
+    latest: 'Lấy điểm lần nộp gần nhất',
+    average: 'Lấy điểm trung bình'
+  };
+
+  /** Giới hạn thời gian (giây) → "1 phút 30 giây"; không có thì "Không giới hạn". */
+  private static formatDuration(seconds?: number | null): string {
+    if (!seconds) return 'Không giới hạn';
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    if (m && s) return `${m} phút ${s} giây`;
+    return m ? `${m} phút` : `${s} giây`;
+  }
+
+  /** dd/MM/yyyy HH:mm, hoặc chuỗi rỗng nếu không có giá trị. */
+  formatDateTime(dateStr?: string): string {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
   formatDate(dateStr?: string): string {
-    if (!dateStr) return '20/11/2026';
+    if (!dateStr) return '';
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;
@@ -580,15 +405,15 @@ export class CoursesComponent implements OnInit, OnDestroy {
   });
 
   private defaultAssessment: AssessmentItem = {
-    id: 'kt1-practice',
-    name: 'Luyện tập kỹ thuật',
+    id: '',
+    name: '',
     type: 'tx1',
     mode: 'practice',
-    groupTitle: 'KT1: Kỹ thuật 1',
-    gradingMethod: 'Lần cao nhất',
-    timeLimit: 'Không giới hạn',
-    openTime: '01/09/2026',
-    closeTime: '30/11/2026',
+    groupTitle: '',
+    gradingMethod: '',
+    timeLimit: '',
+    openTime: '',
+    closeTime: '',
     status: 'not_submitted',
     attempts: []
   };
@@ -624,20 +449,57 @@ export class CoursesComponent implements OnInit, OnDestroy {
       groups.push({ title, items });
     });
 
-    return groups;
+    // Thứ tự: bài thường xuyên -> thi giữa kỳ -> thi kết thúc học phần
+    const rank = (g: { items: AssessmentItem[] }) => {
+      const t = g.items[0]?.type;
+      return t === 'final' ? 2 : t === 'midterm' ? 1 : 0;
+    };
+    return groups.sort((x, y) => rank(x) - rank(y));
   });
 
   // Điểm hiển thị: bài thi lấy lần chấm gần nhất (giống backend), bài tập lấy lần cao nhất
   highestScore = computed<number | null>(() => {
     const assessment = this.currentAssessment();
     if (!assessment || !assessment.attempts || assessment.attempts.length === 0) return null;
-    const graded = assessment.attempts.filter((a: AssessmentAttempt) => a.score !== undefined && !a.pending);
+    // Chỉ bài kiểm tra mới tính điểm; bài luyện tập không ảnh hưởng điểm học phần
+    const graded = assessment.attempts.filter(
+      (a: AssessmentAttempt) => a.score !== undefined && !a.pending && a.mode !== 'practice'
+    );
     if (graded.length === 0) return null;
     if (this.isExam(assessment)) {
       return graded.reduce((latest, a) => (a.attemptNo > latest.attemptNo ? a : latest)).score as number;
     }
     return Math.max(...graded.map((a: AssessmentAttempt) => a.score as number));
   });
+
+  /** Bài thường xuyên (không phải bài thi) có thêm phần luyện tập. */
+  hasPracticePart(assessment: AssessmentItem): boolean {
+    return !this.isExam(assessment);
+  }
+
+  private numberAttempts(list: AssessmentAttempt[]): AssessmentAttempt[] {
+    // Danh sách sắp xếp mới nhất trước; đánh số riêng trong từng phần
+    return list.map((a, i) => ({ ...a, displayNo: list.length - i }));
+  }
+
+  practiceAttempts = computed(() =>
+    this.numberAttempts((this.currentAssessment().attempts || []).filter((a) => a.mode === 'practice'))
+  );
+
+  testAttempts = computed(() =>
+    this.numberAttempts((this.currentAssessment().attempts || []).filter((a) => a.mode !== 'practice'))
+  );
+
+  /** Lịch sử nộp của phần đang xem (bài thi chỉ có phần kiểm tra). */
+  visibleAttempts = computed(() => {
+    const a = this.currentAssessment();
+    if (!this.hasPracticePart(a)) return this.testAttempts();
+    return this.activePart() === 'practice' ? this.practiceAttempts() : this.testAttempts();
+  });
+
+  setActivePart(part: SubmissionMode): void {
+    this.activePart.set(part);
+  }
 
   // Filtered courses in list view
   filteredCourses = computed(() => {
@@ -683,11 +545,13 @@ export class CoursesComponent implements OnInit, OnDestroy {
 
   onSelectAssessment(assessmentId: string): void {
     this.selectedAssessmentId.set(assessmentId);
+    this.activePart.set('practice');
     this.router.navigate(['/student/courses', this.selectedCourseId(), 'assessment', assessmentId]);
   }
 
   // Submit Video Modal handlers
-  openSubmitModal(): void {
+  openSubmitModal(mode: SubmissionMode = 'test'): void {
+    this.submitMode.set(this.hasPracticePart(this.currentAssessment()) ? mode : 'test');
     this.selectedFile.set(null);
     this.selectedFileName.set('');
     this.hasVideoSelected.set(false);
@@ -744,10 +608,12 @@ export class CoursesComponent implements OnInit, OnDestroy {
     this.isUploading.set(true);
     this.uploadProgress.set(0);
 
+    const mode = this.submitMode();
     this.videoResultService.uploadVideo({
       file,
       exercise_id: assessmentId,
-      course_id: courseId
+      course_id: courseId,
+      mode
     }).subscribe({
       next: (event) => {
         if (event.type === HttpEventType.UploadProgress && event.total) {
@@ -771,13 +637,15 @@ export class CoursesComponent implements OnInit, OnDestroy {
                 attemptNo: videoResult?.attemptNo || attemptNo,
                 date: dateStr,
                 pending: true,
-                videoResultId: videoResult?.id
+                videoResultId: videoResult?.id,
+                mode
               };
 
               const updatedAssessments = [...course.assessments];
               updatedAssessments[assessmentIndex] = {
                 ...currentAss,
-                status: 'pending',
+                // Bài luyện tập không đổi trạng thái chấm điểm của bài
+                status: mode === 'practice' ? currentAss.status : 'pending',
                 attempts: [newAttempt, ...(currentAss.attempts || [])]
               };
 
@@ -790,7 +658,10 @@ export class CoursesComponent implements OnInit, OnDestroy {
           }
 
           this.closeSubmitModal();
-          this.showToast('Nộp video thành công! Video đã lưu trữ trên MinIO và đang chờ hệ thống AI xử lý.');
+          this.activePart.set(mode);
+          this.showToast(mode === 'practice'
+            ? 'Đã nộp video luyện tập. AI đang chấm, kết quả sẽ hiện trong lịch sử luyện tập.'
+            : 'Đã nộp video kiểm tra. AI đang chấm điểm.');
           if (videoResult?.id) {
             this.pollSubmission(videoResult.id, courseId);
           }
@@ -807,7 +678,19 @@ export class CoursesComponent implements OnInit, OnDestroy {
   // Review Modal handlers
   openAttemptReview(attempt: AssessmentAttempt): void {
     this.selectedAttempt.set(attempt);
+    this.reviewShowAnnotated.set(!!attempt.hasAnnotatedVideo);
     this.isReviewModalOpen.set(true);
+
+    if (attempt.videoResultId && attempt.hasAnnotatedVideo && !attempt.annotatedVideoUrl) {
+      this.videoResultService.getVideoStreamUrl(attempt.videoResultId, true).subscribe({
+        next: (res) => {
+          if (res?.data?.videoUrl) {
+            this.selectedAttempt.update(curr => curr ? { ...curr, annotatedVideoUrl: res.data.videoUrl } : null);
+          }
+        },
+        error: () => this.reviewShowAnnotated.set(false)
+      });
+    }
 
     if (attempt.videoResultId && !attempt.videoUrl) {
       this.videoResultService.getVideoStreamUrl(attempt.videoResultId).subscribe({

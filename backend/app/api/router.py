@@ -10,6 +10,7 @@ from app.api.sports import router as sports_router
 from app.api.student import router as student_router
 from app.api.tasks import router as tasks_router
 from app.api.teacher import router as teacher_router
+from app.api.teacher_tools import router as teacher_tools_router
 from app.api.users import router as users_router
 from app.api.video_results import router as video_results_router
 
@@ -21,6 +22,7 @@ api_router.include_router(users_router)
 
 # Phân hệ Giáo viên & Sinh viên
 api_router.include_router(teacher_router)
+api_router.include_router(teacher_tools_router)
 api_router.include_router(student_router)
 
 # Phân hệ Quản lý Đào tạo cốt lõi

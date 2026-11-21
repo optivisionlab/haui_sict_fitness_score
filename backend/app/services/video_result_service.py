@@ -121,6 +121,18 @@ class VideoResultService:
                 detail="Bạn chưa ghi danh hoặc không còn quyền học khóa học này",
             )
 
+        # GUARD 0: Điều kiện dự thi kết thúc học phần
+        from app.models.task import TaskKind, task_kind
+        if (
+            task_kind(task) == TaskKind.FINAL
+            and course.exam_eligibility.enabled
+            and enrollment.grades.is_eligible is False
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn chưa đủ điều kiện dự thi kết thúc học phần (chuyên cần hoặc điểm quá trình chưa đạt)",
+            )
+
         # GUARD 1: Kiểm tra trạng thái chốt điểm của lớp học phần
         if course.is_grade_locked:
             raise HTTPException(
@@ -247,6 +259,11 @@ class VideoResultService:
                 status_code=400,
                 detail=f"Video dài {upload_in.duration_sec}s, vượt thời lượng tối đa của bài tập ({task.time_limit}s)",
             )
+        if upload_in.mode == "practice" and task.category != TaskCategory.PRACTICE:
+            raise HTTPException(
+                status_code=400,
+                detail="Chỉ bài kiểm tra thường xuyên mới có phần nộp video luyện tập",
+            )
         _, _, attempt_no = self._validate_submission_guards(task_id, user_id, task.sport_id)
         sport = crud_sport.get(task.sport_id)
         if not sport:
@@ -267,6 +284,7 @@ class VideoResultService:
             "sportMode": sport.mode.value.upper(),
             "userId": str(user_id),
             "attemptNo": attempt_no,
+            "mode": upload_in.mode,
             "bucket": minio_service.default_bucket,
             "objectKey": object_key,
             "fileName": filename,
@@ -350,6 +368,7 @@ class VideoResultService:
             "sportId": session["sportId"],
             "userId": str(user_id),
             "attemptNo": session["attemptNo"],
+            "mode": session.get("mode", "test"),
             "pending": True,
             "status": "pending",
             "videoUrl": f"{session['bucket']}/{session['objectKey']}",
@@ -377,9 +396,10 @@ class VideoResultService:
                 raise
             attempt_no = existing.get("attemptNo", session["attemptNo"])
         sessions.update_one({"_id": upload_oid}, {"$set": {"status": "confirmed", "confirmedAt": now}})
+        is_practice = session.get("mode") == "practice"
         notification_service.send_notification(
             user_id=str(user_id),
-            title=f"Đã nộp bài: {task.title}",
+            title=f"{'Đã nộp video luyện tập' if is_practice else 'Đã nộp bài'}: {task.title}",
             message=f"Bài nộp lần thứ {attempt_no} đã được xác nhận và đang chờ hệ thống AI xử lý.",
             notif_type=NotificationType.SUBMISSION_RECEIVED,
             link=f"/student/courses/{task.course_id}/grades",
@@ -549,14 +569,32 @@ class VideoResultService:
 
         return created
 
-    def get_presigned_url(self, result_id: str, current_user_id: str, role: str) -> str:
-        """Lấy Presigned URL xem video từ MinIO có kiểm tra quyền truy cập."""
+    def get_presigned_url(
+        self, result_id: str, current_user_id: str, role: str, annotated: bool = False
+    ) -> str:
+        """Lấy Presigned URL xem video từ MinIO có kiểm tra quyền truy cập.
+
+        annotated=True: video AI đã vẽ kết quả phân tích (nếu dịch vụ AI có trả về).
+        """
         result = self.get_by_id(result_id)
         if role == "student" and result.user_id != current_user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Bạn không có quyền truy cập video này",
             )
+
+        if annotated:
+            if not result.annotated_object_key:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Bài nộp này chưa có video AI chấm điểm",
+                )
+            key = result.annotated_object_key
+            if key.startswith("http://") or key.startswith("https://"):
+                return key
+            # Chấp nhận cả "bucket/key" lẫn key nằm trong bucket mặc định
+            bucket_prefix = f"{minio_service.default_bucket}/"
+            return minio_service.get_presigned_url(key if key.startswith(bucket_prefix) else bucket_prefix + key)
 
         if not result.video_url:
             raise HTTPException(
@@ -617,7 +655,7 @@ class VideoResultService:
         doc = crud_video_result.collection.find_one(
             {"_id": obj_id},
             {
-                "_id": 1, "pending": 1, "status": 1, "error": 1, "aiScore": 1, "finalScore": 1,
+                "_id": 1, "pending": 1, "status": 1, "error": 1, "aiScore": 1, "finalScore": 1, "mode": 1,
                 "userId": 1, "courseId": 1, "taskId": 1,
             },
         )
@@ -627,6 +665,7 @@ class VideoResultService:
 
         return VideoResultStatusResponse(
             id=str(doc["_id"]),
+            mode=doc.get("mode", "test"),
             pending=doc.get("pending", True),
             status=doc.get("status", "pending"),
             error=doc.get("error"),
@@ -657,7 +696,8 @@ class VideoResultService:
         self, task_id: str, status_filter: Optional[str] = None
     ) -> list[SubmissionItemResponse]:
         """Lấy danh sách bài nộp của 1 task cho giáo viên kèm thông tin sinh viên."""
-        query: dict = {"taskId": str(task_id)}
+        # Bài luyện tập không cần giảng viên xác nhận nên không đưa vào danh sách chấm
+        query: dict = {"taskId": str(task_id), "mode": {"$ne": "practice"}}
         if status_filter == "pending":
             query["pending"] = True
         elif status_filter == "ai_graded":
@@ -676,6 +716,8 @@ class VideoResultService:
                 SubmissionItemResponse(
                     id=str(doc["_id"]),
                     user_id=uid,
+                    status=doc.get("status", "pending"),
+                    error=doc.get("error"),
                     student_code=doc.get("studentCode"),
                     student_name=doc.get("studentName"),
                     attempt_no=doc.get("attemptNo", 1),
@@ -717,6 +759,17 @@ class VideoResultService:
             logger.info("Ignoring duplicate AI result for resultId=%s (already completed)", result_id)
             return self.get_by_id(result_id)
 
+        if result.mode == "practice":
+            # Luyện tập: điểm AI là kết quả cuối cùng, không tính vào điểm học phần
+            notification_service.send_notification(
+                user_id=result.user_id,
+                title=f"Kết quả luyện tập: {task.title if task else 'Bài tập'}",
+                message=f"AI chấm bài luyện tập lần {result.attempt_no}: {ai_in.ai_score} điểm. Nhận xét: {ai_in.ai_comment}",
+                notif_type=NotificationType.SUBMISSION_GRADED,
+                link=f"/student/courses/{task.course_id if task else ''}/assessment/{result.task_id}",
+            )
+            return updated
+
         # Tính điểm đại diện (effective score) dựa trên gradingMethod của task
         effective_score = self._compute_effective_score(result.task_id, result.user_id, task)
 
@@ -756,6 +809,11 @@ class VideoResultService:
     ) -> VideoResult:
         """Giáo viên chấm điểm thủ công hoặc override điểm AI."""
         result = self.get_by_id(result_id)
+        if result.mode == "practice":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bài luyện tập do AI chấm, không cần giảng viên xác nhận",
+            )
         task = crud_task.get(result.task_id)
 
         grade_in.graded_by = str(teacher_id)
@@ -790,7 +848,8 @@ class VideoResultService:
         """Tính điểm đại diện dựa trên gradingMethod: highest, latest, average."""
         attempts = list(
             crud_video_result.collection.find(
-                {"taskId": str(task_id), "userId": str(user_id)},
+                # Bài cũ chưa có trường mode được coi là bài kiểm tra
+                {"taskId": str(task_id), "userId": str(user_id), "mode": {"$ne": "practice"}},
                 {"finalScore": 1, "aiScore": 1, "submittedAt": 1},
             ).sort("submittedAt", 1)
         )

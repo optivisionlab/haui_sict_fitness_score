@@ -179,7 +179,7 @@
             @if (subject.summary) {
             <tr class="summary-row">
               <td class="text-left font-bold">Tổng</td>
-              <td class="text-left font-medium">{{ subject.summary.period }}</td>
+              <td class="text-left font-medium">{{ subject.summary.period || '—' }}</td>
               <td class="text-center font-bold">{{ subject.summary.practiceCompleted }}</td>
               <td class="text-center font-bold">{{ subject.summary.liveClassCompleted }}</td>
               <td class="text-center font-bold">{{ subject.summary.testCompleted }}</td>

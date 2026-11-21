@@ -19,8 +19,15 @@ import {
   LucideVideo,
   LucideUploadCloud,
   LucideTrash2,
-  LucideEye
+  LucideEye,
+  LucideCalendarCheck,
+  LucideSettings
 } from '@lucide/angular';
+import { Observable } from 'rxjs';
+import { ReviewPanelComponent } from './panels/review-panel.component';
+import { AttendancePanelComponent } from './panels/attendance-panel.component';
+import { SettingsPanelComponent } from './panels/settings-panel.component';
+import { TaskFormComponent } from './panels/task-form.component';
 import {
   SearchInputComponent,
   SelectComponent,
@@ -29,7 +36,9 @@ import {
 import { TeacherClassService } from '../services/teacher-class.service';
 import { VideoResultService } from '../../../core/services/video-result.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { GradebookStudentItem, GradebookTaskItem } from '../models/teacher.model';
+import { GradebookStudentItem, GradebookTaskItem, GradingMethod, TaskKind } from '../models/teacher.model';
+
+type ClassTab = 'students' | 'assessments' | 'review' | 'attendance' | 'settings' | 'stats';
 
 @Component({
   selector: 'app-teacher-class-detail',
@@ -53,6 +62,12 @@ import { GradebookStudentItem, GradebookTaskItem } from '../models/teacher.model
     LucideUploadCloud,
     LucideTrash2,
     LucideEye,
+    LucideCalendarCheck,
+    LucideSettings,
+    ReviewPanelComponent,
+    AttendancePanelComponent,
+    SettingsPanelComponent,
+    TaskFormComponent,
     SearchInputComponent,
     SelectComponent
   ],
@@ -69,8 +84,7 @@ export class TeacherClassDetailComponent implements OnInit {
   // Active class ID
   classId = signal<string>('');
 
-  // Active view tabs: 'students' | 'assessments' | 'stats'
-  activeTab = signal<'students' | 'assessments' | 'stats'>('students');
+  activeTab = signal<ClassTab>('students');
 
   // Filter state for students
   studentSearch = signal<string>('');
@@ -96,13 +110,17 @@ export class TeacherClassDetailComponent implements OnInit {
   isInstructionUploading = signal<boolean>(false);
   instructionUploadError = signal<string | null>(null);
 
-  // Submission Detail Modal
-  isSubmissionModalOpen = signal<boolean>(false);
-  selectedStudentForDetail = signal<GradebookStudentItem | null>(null);
-  selectedAssessmentForDetail = signal<GradebookTaskItem | null>(null);
-  currentSubmissionDetail = signal<any | null>(null);
-  editScoreValue = signal<number | null>(null);
-  editCommentValue = signal<string>('');
+  // Nhập điểm một sinh viên (điểm nhập tay từng bài, chuyên cần, ghi chú)
+  scoreStudent = signal<GradebookStudentItem | null>(null);
+  scoreDraft = signal<{ [taskId: string]: number | null }>({});
+  attendanceDraft = signal<number | null>(null);
+  noteDraft = signal<string>('');
+  savingScores = signal(false);
+
+  // Duyệt bài nộp & form bài kiểm tra
+  reviewTaskId = signal<string | null>(null);
+  taskFormOpen = signal(false);
+  editingTask = signal<GradebookTaskItem | null>(null);
 
   currentDetail = this.classService.currentDetail;
   currentGradebook = this.classService.currentGradebook;
@@ -178,8 +196,71 @@ export class TeacherClassDetailComponent implements OnInit {
     }
   }
 
-  setTab(tab: 'students' | 'assessments' | 'stats'): void {
+  setTab(tab: ClassTab): void {
     this.activeTab.set(tab);
+  }
+
+  pendingReviewTotal = computed(() =>
+    (this.currentGradebook()?.task_list || []).reduce((sum, t) => sum + (t.pending_review_count || 0), 0)
+  );
+
+  reloadGradebook(): void {
+    const id = this.classId();
+    if (id) this.classService.loadGradebook(id).subscribe();
+  }
+
+  kindLabel(kind: TaskKind): string {
+    return kind === 'final' ? 'Thi kết thúc' : kind === 'midterm' ? 'Thi giữa kỳ' : 'Thường xuyên';
+  }
+
+  methodLabel(method?: GradingMethod): string {
+    return method === 'latest' ? 'Lấy lần nộp gần nhất' : method === 'average' ? 'Lấy trung bình' : 'Lấy lần cao nhất';
+  }
+
+  /** "TX1: Kỹ thuật ..." -> "TX1"; tiêu đề không có tiền tố thì cắt ngắn. */
+  shortTaskTitle(task: GradebookTaskItem): string {
+    const prefix = task.title.split(':')[0].trim();
+    return prefix.length <= 16 ? prefix : prefix.slice(0, 14) + '…';
+  }
+
+  effectiveTaskScore(student: GradebookStudentItem, taskId: string): number | undefined {
+    return student.task_score_overrides?.[taskId] ?? student.task_scores?.[taskId];
+  }
+
+  // --- DUYỆT BÀI NỘP ---
+
+  openReview(taskId: string | null): void {
+    this.reviewTaskId.set(taskId);
+    this.activeTab.set('review');
+  }
+
+  openReviewFor(taskId: string): void {
+    this.closeScoreModal();
+    this.openReview(taskId);
+  }
+
+  // --- BÀI KIỂM TRA ---
+
+  openTaskForm(task: GradebookTaskItem | null): void {
+    this.editingTask.set(task);
+    this.taskFormOpen.set(true);
+  }
+
+  onTaskSaved(): void {
+    this.taskFormOpen.set(false);
+    this.reloadGradebook();
+  }
+
+  deleteTask(task: GradebookTaskItem): void {
+    const cls = this.currentDetail();
+    if (!cls || !confirm(`Xóa bài "${task.title}"?`)) return;
+    this.classService.deleteTask(cls.id, task.id).subscribe({
+      next: () => {
+        this.toastService.success('Đã xóa bài kiểm tra.');
+        this.reloadGradebook();
+      },
+      error: (err) => this.toastService.error(err?.error?.message || 'Không xóa được bài kiểm tra.')
+    });
   }
 
   // --- ACTIONS: LOCK PRACTICE & LOCK SUBMISSIONS ---
@@ -258,7 +339,7 @@ export class TeacherClassDetailComponent implements OnInit {
         this.classService.loadCourseDetail(cls.id).subscribe();
         this.classService.loadGradebook(cls.id).subscribe();
       },
-      error: () => this.toastService.error('Lỗi khi chốt điểm')
+      error: (err) => this.toastService.error(err?.error?.message || 'Lỗi khi chốt điểm')
     });
   }
 
@@ -276,107 +357,103 @@ export class TeacherClassDetailComponent implements OnInit {
     });
   }
 
-  // --- STUDENT SUBMISSION MODAL ---
+  // --- NHẬP ĐIỂM SINH VIÊN ---
 
-  openSubmissionModal(student: GradebookStudentItem, taskId?: string): void {
-    this.selectedStudentForDetail.set(student);
+  openScoreModal(student: GradebookStudentItem): void {
     const gb = this.currentGradebook();
-    
-    // Choose specific task or default to first task
-    let task = gb?.task_list.find(t => t.id === taskId) || null;
-    if (!task && gb?.task_list.length) {
-      task = gb.task_list[0];
-    }
-    
-    this.selectedAssessmentForDetail.set(task);
-
-    const score = task && student.task_scores ? student.task_scores[task.id] : null;
-    this.editScoreValue.set(score);
-    this.editCommentValue.set('');
-
-    this.isSubmissionModalOpen.set(true);
-
-    if (task) {
-      this.fetchVideoResult(student, task.id);
-    }
+    const draft: { [taskId: string]: number | null } = {};
+    gb?.task_list.forEach((t) => (draft[t.id] = student.task_score_overrides?.[t.id] ?? null));
+    this.scoreDraft.set(draft);
+    this.attendanceDraft.set(student.grades.attendance_score ?? null);
+    this.noteDraft.set(student.note || '');
+    this.scoreStudent.set(student);
   }
 
-  closeSubmissionModal(): void {
-    this.isSubmissionModalOpen.set(false);
+  closeScoreModal(): void {
+    if (!this.savingScores()) this.scoreStudent.set(null);
   }
 
-  switchAssessmentInModal(taskId: string): void {
-    const student = this.selectedStudentForDetail();
-    if (!student) return;
-    const gb = this.currentGradebook();
-    const task = gb?.task_list.find(t => t.id === taskId) || null;
-    this.selectedAssessmentForDetail.set(task);
-
-    const score = task && student.task_scores ? student.task_scores[task.id] : null;
-    this.editScoreValue.set(score);
-    this.editCommentValue.set('');
-
-    if (task) {
-      this.fetchVideoResult(student, task.id);
-    }
+  setDraft(taskId: string, value: number | string | null): void {
+    const v = value === '' || value === null || value === undefined ? null : Number(value);
+    this.scoreDraft.update((d) => ({ ...d, [taskId]: v }));
   }
 
-  private fetchVideoResult(student: GradebookStudentItem, taskId: string): void {
-    const sid = student.user_id;
-    this.videoResultService.getVideoResults({ student_id: sid, exercise_id: taskId, page_size: 100 }).subscribe({
-      next: (res) => {
-        const videos = [...(res?.data?.items || [])].sort((a, b) => b.attemptNo - a.attemptNo);
-        if (videos.length > 0) {
-          const latestVideo = videos[0];
-          this.currentSubmissionDetail.set({
-            submittedAt: new Date(latestVideo.submittedAt).toLocaleString('vi-VN'),
-            videoUrl: latestVideo.videoUrl || undefined,
-            aiScore: latestVideo.aiScore ?? undefined,
-            aiFeedback: latestVideo.aiComment || undefined,
-            status: latestVideo.status === 'completed' || latestVideo.aiScore != null ? 'graded' : 'pending'
-          });
-        } else {
-          this.currentSubmissionDetail.set(null);
-        }
-      },
-      error: () => this.currentSubmissionDetail.set(null)
-    });
-  }
-
-  saveTeacherGrading(): void {
-    const student = this.selectedStudentForDetail();
-    const task = this.selectedAssessmentForDetail();
+  saveScores(): void {
+    const student = this.scoreStudent();
     const cls = this.currentDetail();
-    if (!student || !task || !cls) return;
+    const gb = this.currentGradebook();
+    if (!student || !cls || !gb) return;
 
-    const score = this.editScoreValue();
-    if (score !== null && (score < 0 || score > 10)) {
-      this.toastService.warning('Điểm số phải từ 0 đến 10!');
+    const invalid = (v: number | null) => v !== null && (isNaN(v) || v < 0 || v > 10);
+    const draft = this.scoreDraft();
+    const attendance = this.attendanceDraft() === null || (this.attendanceDraft() as unknown) === '' ? null : Number(this.attendanceDraft());
+    if (Object.values(draft).some(invalid) || invalid(attendance)) {
+      this.toastService.warning('Điểm phải từ 0 đến 10.');
       return;
     }
 
-    // In a real scenario you would update the specific task score.
-    // However the batchUpdateGrades API takes attendance_score and exam_score directly on enrollment.
-    // Let's assume if it's an exam we map it to exam_score. If it's practice we map to attendance_score for simplicity.
-    const updates = [{
-      enrollment_id: student.enrollment_id,
-      exam_score: task.category === 'exam' ? score : undefined,
-      attendance_score: task.category === 'practice' ? score : undefined,
-      note: this.editCommentValue()
-    }];
-
-    this.classService.batchUpdateGrades(cls.id, updates).subscribe({
-      next: () => {
-        this.isSubmissionModalOpen.set(false);
-        this.toastService.success(`Đã lưu điểm cho sinh viên ${student.student_name}.`);
-        this.classService.loadGradebook(cls.id).subscribe();
-      },
-      error: () => this.toastService.error('Lỗi khi lưu điểm')
+    const requests: Observable<any>[] = [];
+    gb.task_list.forEach((t) => {
+      const before = student.task_score_overrides?.[t.id] ?? null;
+      if (draft[t.id] !== before) {
+        requests.push(this.classService.setTaskScore(cls.id, student.enrollment_id, t.id, draft[t.id]));
+      }
     });
+    const attendanceChanged = !gb.attendance_from_sessions && attendance !== null && attendance !== (student.grades.attendance_score ?? null);
+    const noteChanged = this.noteDraft() !== (student.note || '');
+    if (attendanceChanged || noteChanged) {
+      requests.push(this.classService.batchUpdateGrades(cls.id, [{
+        enrollment_id: student.enrollment_id,
+        attendance_score: attendanceChanged ? attendance : undefined,
+        note: noteChanged ? this.noteDraft() : undefined
+      }]));
+    }
+    if (!requests.length) {
+      this.scoreStudent.set(null);
+      return;
+    }
+
+    this.savingScores.set(true);
+    // Lần lượt để các lần tính lại điểm không ghi đè nhau
+    requests.reduce((chain, req) => chain.then(() => new Promise((res, rej) => req.subscribe({ next: res, error: rej }))), Promise.resolve() as Promise<unknown>)
+      .then(() => {
+        this.savingScores.set(false);
+        this.scoreStudent.set(null);
+        this.toastService.success(`Đã lưu điểm cho ${student.student_name}.`);
+        this.reloadGradebook();
+      })
+      .catch((err) => {
+        this.savingScores.set(false);
+        this.toastService.error(err?.error?.message || 'Lỗi khi lưu điểm.');
+        this.reloadGradebook();
+      });
   }
 
+  /** Xuất bảng điểm ra CSV (UTF-8 có BOM để Excel hiển thị đúng tiếng Việt). */
   exportExcel(): void {
-    this.toastService.info('Đang tạo và tải về bảng điểm Excel của lớp học phần...');
+    const gb = this.currentGradebook();
+    const cls = this.currentDetail();
+    if (!gb || !cls) return;
+    const esc = (v: unknown) => {
+      const text = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    const header = ['STT', 'Mã SV', 'Họ và tên', ...gb.task_list.map((t) => t.title),
+      'Chuyên cần', 'Quá trình', 'Thi', 'Tổng kết', 'Điểm chữ', 'Đủ ĐK dự thi', 'Ghi chú'];
+    const rows = gb.students.map((st, i) => [
+      i + 1, st.student_code, st.student_name,
+      ...gb.task_list.map((t) => this.effectiveTaskScore(st, t.id)),
+      st.grades.attendance_score, st.grades.process_score, st.grades.exam_score, st.grades.final_score,
+      st.grades.letter_grade, st.grades.is_eligible === false ? 'Không' : 'Có', st.note
+    ]);
+    const csv = [header, ...rows].map((r) => r.map(esc).join(',')).join('\r\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bang-diem-${cls.code || cls.id}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // --- INSTRUCTION VIDEO MANAGEMENT ---

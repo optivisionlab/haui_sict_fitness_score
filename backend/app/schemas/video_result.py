@@ -1,6 +1,8 @@
 from datetime import datetime
-from typing import Any, Optional
-from pydantic import Field
+from typing import Any, Literal, Optional
+from pydantic import Field, model_validator
+
+SubmissionMode = Literal["practice", "test"]
 
 from app.models.base import PyObjectId
 from app.schemas.common import BaseSchema
@@ -25,6 +27,7 @@ class VideoUploadUrlRequest(BaseSchema):
     content_type: str
     file_size: int = Field(..., gt=0)
     duration_sec: Optional[int] = Field(default=None, ge=0)
+    mode: SubmissionMode = "test"
 
 
 class VideoUploadUrlResponse(BaseSchema):
@@ -44,6 +47,7 @@ class VideoResultAIUpdate(BaseSchema):
     metrics: dict[str, Any] = Field(default_factory=dict)
     ai_score: Optional[float] = None
     ai_comment: Optional[str] = None
+    annotated_object_key: Optional[str] = None
 
 
 class VideoResultTeacherGrade(BaseSchema):
@@ -58,6 +62,8 @@ class VideoResultRead(BaseSchema):
     sport_id: str
     user_id: str
     attempt_no: int = 1
+    mode: str = "test"
+    has_annotated_video: bool = False
     submitted_at: Optional[datetime] = None
     pending: bool = True
     status: str = "pending"
@@ -78,6 +84,18 @@ class VideoResultRead(BaseSchema):
     updated_at: Optional[datetime] = None
 
 
+    @model_validator(mode="before")
+    @classmethod
+    def _flag_annotated_video(cls, data: Any) -> Any:
+        """Chỉ báo có video AI hay không; không lộ object key của MinIO ra ngoài."""
+        if isinstance(data, dict):
+            key = data.get("annotated_object_key") or data.get("annotatedObjectKey")
+            return {**data, "has_annotated_video": True} if key else data
+        if getattr(data, "annotated_object_key", None):
+            return {**data.model_dump(), "has_annotated_video": True}
+        return data
+
+
 class PresignedUrlResponse(BaseSchema):
     video_url: str
     expires_in_seconds: int = 7200
@@ -85,6 +103,7 @@ class PresignedUrlResponse(BaseSchema):
 
 class VideoResultStatusResponse(BaseSchema):
     id: str
+    mode: str = "test"
     pending: bool
     status: str = "pending"
     error: Optional[str] = None
@@ -95,6 +114,8 @@ class VideoResultStatusResponse(BaseSchema):
 class SubmissionItemResponse(BaseSchema):
     id: str
     user_id: str
+    status: str = "pending"
+    error: Optional[str] = None
     student_code: Optional[str] = None
     student_name: Optional[str] = None
     attempt_no: int = 1

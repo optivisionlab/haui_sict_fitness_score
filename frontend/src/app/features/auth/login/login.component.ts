@@ -37,8 +37,15 @@ export class LoginComponent {
     this.passwordError.set('');
     this.generalError.set('');
 
-    const emailVal = this.email().trim();
-    const passVal = this.password().trim();
+    // Trình duyệt tự điền (autofill) không phát sự kiện input nên signal có thể vẫn rỗng:
+    // đọc giá trị thật từ ô nhập và đồng bộ lại vào signal.
+    const form = event.target as HTMLFormElement;
+    const readField = (name: string, fallback: string) =>
+      ((form?.elements?.namedItem(name) as HTMLInputElement | null)?.value ?? fallback).trim();
+    const emailVal = readField('email', this.email());
+    const passVal = readField('password', this.password());
+    this.email.set(emailVal);
+    this.password.set(passVal);
 
     let hasError = false;
 

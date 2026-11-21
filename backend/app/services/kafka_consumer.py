@@ -116,6 +116,7 @@ class KafkaResultConsumerService:
                 metrics=data.get("metrics", {}),
                 ai_score=data.get("aiScore"),
                 ai_comment=data.get("aiComment"),
+                annotated_object_key=data.get("annotatedVideoKey"),
             )
             await asyncio.to_thread(video_result_service.ai_callback, result_id, ai_update)
             logger.info("✅ Kafka Consumer: Successfully processed result for resultId=%s", result_id)

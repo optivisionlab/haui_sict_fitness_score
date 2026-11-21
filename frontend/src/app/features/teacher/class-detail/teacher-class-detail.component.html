@@ -125,7 +125,7 @@
             [class.active]="activeTab() === 'students'"
             (click)="setTab('students')">
             <svg lucideUsers [size]="17"></svg>
-            <span>Danh sách sinh viên ({{ gb.students.length }})</span>
+            <span>Sinh viên ({{ gb.students.length }})</span>
           </button>
 
           <button
@@ -137,13 +137,31 @@
             <span>Bài kiểm tra ({{ gb.task_list.length }})</span>
           </button>
 
+          <button type="button" class="tab-btn" [class.active]="activeTab() === 'review'" (click)="openReview(null)">
+            <svg lucideVideo [size]="17"></svg>
+            <span>Duyệt bài</span>
+            @if (pendingReviewTotal()) {
+              <span class="tab-count">{{ pendingReviewTotal() }}</span>
+            }
+          </button>
+
+          <button type="button" class="tab-btn" [class.active]="activeTab() === 'attendance'" (click)="setTab('attendance')">
+            <svg lucideCalendarCheck [size]="17"></svg>
+            <span>Điểm danh</span>
+          </button>
+
+          <button type="button" class="tab-btn" [class.active]="activeTab() === 'settings'" (click)="setTab('settings')">
+            <svg lucideSettings [size]="17"></svg>
+            <span>Cấu hình điểm</span>
+          </button>
+
           <button
             type="button"
             class="tab-btn"
             [class.active]="activeTab() === 'stats'"
             (click)="setTab('stats')">
             <svg lucideAward [size]="17"></svg>
-            <span>Thống kê & Phổ điểm</span>
+            <span>Thống kê</span>
           </button>
         </div>
 
@@ -191,13 +209,15 @@
                     <th class="text-center col-stt">STT</th>
                     <th class="text-left col-code">Mã sinh viên</th>
                     <th class="text-left col-name">Họ và tên</th>
-                    <!-- Dynamic tasks -->
                     @for (task of gb.task_list; track task.id) {
-                      <th class="text-center col-score">{{ task.title }}<br><small>({{ task.category === 'exam' ? gb.formula.exam_weight : gb.formula.attendance_weight }}%)</small></th>
+                      <th class="text-center col-score" [title]="task.title">{{ shortTaskTitle(task) }}<br><small>{{ kindLabel(task.kind) }}</small></th>
                     }
-                    <th class="text-center col-avg">Tổng kết<br><small>(Hệ 10)</small></th>
+                    <th class="text-center col-score">Chuyên cần<br><small>× {{ gb.formula.attendance_weight }}</small></th>
+                    <th class="text-center col-score">Quá trình<br><small>× {{ gb.formula.process_weight }}</small></th>
+                    <th class="text-center col-score">Thi<br><small>× {{ gb.formula.exam_weight }}</small></th>
+                    <th class="text-center col-avg">Tổng kết</th>
                     <th class="text-center col-letter">Chữ</th>
-                    <th class="text-center col-status">Kết quả</th>
+                    <th class="text-center col-status">Dự thi</th>
                     <th class="text-center col-action">Thao tác</th>
                   </tr>
                 </thead>
@@ -205,52 +225,37 @@
                   @for (student of filteredStudents(); track student.user_id; let i = $index) {
                     <tr>
                       <td class="text-center">{{ i + 1 }}</td>
-                      <td class="text-left font-mono">{{ student.student_code || '---' }}</td>
-                      <td class="text-left student-name" (click)="openSubmissionModal(student)">
-                        {{ student.student_name || '---' }}
-                      </td>
-
-                      <!-- Task Scores -->
+                      <td class="text-left font-mono">{{ student.student_code || '—' }}</td>
+                      <td class="text-left student-name" (click)="openScoreModal(student)">{{ student.student_name || '—' }}</td>
                       @for (task of gb.task_list; track task.id) {
-                        <td class="text-center">
-                          {{ student.task_scores && student.task_scores[task.id] !== undefined ? student.task_scores[task.id] : '—' }}
+                        <td class="text-center" [class.overridden]="student.task_score_overrides[task.id] !== undefined"
+                          [title]="student.task_score_overrides[task.id] !== undefined ? 'Điểm giảng viên nhập tay' : ''">
+                          {{ effectiveTaskScore(student, task.id) ?? '—' }}
                         </td>
                       }
-
-                      <!-- Final Avg Score -->
-                      <td class="text-center font-bold">
-                        {{ student.grades.final_score !== null && student.grades.final_score !== undefined ? student.grades.final_score : '—' }}
-                      </td>
-
-                      <!-- Letter Grade -->
+                      <td class="text-center">{{ student.grades.attendance_score ?? '—' }}</td>
+                      <td class="text-center">{{ student.grades.process_score ?? '—' }}</td>
+                      <td class="text-center">{{ student.grades.exam_score ?? '—' }}</td>
+                      <td class="text-center font-bold">{{ student.grades.final_score ?? '—' }}</td>
                       <td class="text-center">
-                        {{ student.grades.letter_grade || '—' }}
+                        @if (student.grades.letter_grade) {
+                          <span class="status-text" [class.pass]="student.grades.is_passed" [class.fail]="student.grades.is_passed === false">{{ student.grades.letter_grade }}</span>
+                        } @else { — }
                       </td>
-
-                      <!-- Status -->
                       <td class="text-center">
-                        @if (student.grades.is_passed === true) {
-                          <span class="status-text pass">Đạt</span>
-                        } @else if (student.grades.is_passed === false) {
-                          <span class="status-text fail">Chưa đạt</span>
+                        @if (student.grades.is_eligible === false) {
+                          <span class="status-text fail">Không đủ ĐK</span>
                         } @else {
-                          <span class="status-text">Đang học</span>
+                          <span class="status-text pass">Đủ ĐK</span>
                         }
                       </td>
-
-                      <!-- Actions -->
                       <td class="text-center">
-                        <button
-                          type="button"
-                          class="btn-edit-score"
-                          (click)="openSubmissionModal(student)">
-                          Nhập điểm
-                        </button>
+                        <button type="button" class="btn-edit-score" (click)="openScoreModal(student)">Nhập điểm</button>
                       </td>
                     </tr>
                   } @empty {
                     <tr>
-                      <td colspan="12" class="text-center empty-table-cell">
+                      <td [attr.colspan]="gb.task_list.length + 10" class="text-center empty-table-cell">
                         Không tìm thấy sinh viên phù hợp.
                       </td>
                     </tr>
@@ -267,8 +272,10 @@
             <div class="assessments-header-intro">
               <div>
                 <h3>Danh sách các bài kiểm tra & đánh giá thể chất</h3>
-                <p>Giáo viên có thể quản lý thời gian, khóa nộp bài từng đợt và theo dõi số lượng sinh viên đã hoàn thành.</p>
               </div>
+              @if (!cls.is_grade_locked) {
+                <button type="button" class="btn btn-primary" (click)="openTaskForm(null)">Thêm bài kiểm tra</button>
+              }
             </div>
 
             <div class="assessments-list">
@@ -276,12 +283,33 @@
                 <div class="assessment-card" [class.locked]="cls.is_grade_locked || !cls.allow_exam_submission">
                   <div class="assessment-top">
                     <div class="assessment-title-wrap">
-                      <span class="weight-badge">Loại: {{ item.category === 'exam' ? 'Thi kết thúc' : 'Luyện tập' }}</span>
+                      <span class="weight-badge">{{ kindLabel(item.kind) }}</span>
                       <h4>{{ item.title }}</h4>
+                      <div class="task-facts">
+                        <span>Hạn nộp: {{ item.close_time ? (item.close_time | date: 'dd/MM/yyyy HH:mm') : 'Không giới hạn' }}</span>
+                        <span>{{ methodLabel(item.grading_method) }}</span>
+                        <span>Video tối đa: {{ item.time_limit ? item.time_limit + ' giây' : 'Không giới hạn' }}</span>
+                        <span>{{ item.submitted_count }} bài nộp</span>
+                        @if (item.pending_review_count) {
+                          <span class="pending-review">{{ item.pending_review_count }} chờ duyệt</span>
+                        }
+                        @if (item.is_locked) {
+                          <span class="pending-review">Đã khóa nộp</span>
+                        }
+                      </div>
+                      <div class="task-actions">
+                        <button type="button" class="btn-action-inst preview" (click)="openReview(item.id)">Duyệt bài nộp</button>
+                        @if (!cls.is_grade_locked) {
+                          <button type="button" class="btn-action-inst change" (click)="openTaskForm(item)">Sửa</button>
+                          @if (!item.submitted_count) {
+                            <button type="button" class="btn-action-inst delete" (click)="deleteTask(item)">Xóa</button>
+                          }
+                        }
+                      </div>
                     </div>
 
                     <div class="assessment-lock-status">
-                      @if (cls.is_grade_locked || (item.category === 'exam' && !cls.allow_exam_submission) || (item.category === 'practice' && !cls.allow_practice_submission)) {
+                      @if (item.is_locked || cls.is_grade_locked || (item.category === 'exam' && !cls.allow_exam_submission) || (item.category === 'practice' && !cls.allow_practice_submission)) {
                         <span class="lock-status-plain">Đã khóa nộp bài</span>
                       } @else {
                         <span class="lock-status-plain">Đang mở</span>
@@ -289,7 +317,8 @@
                     </div>
                   </div>
 
-                  <!-- Khu vực Hướng dẫn soạn bài bằng Video -->
+                  <!-- Video hướng dẫn kỹ thuật: chỉ bài thường xuyên (phần luyện tập của sinh viên) -->
+                  @if (item.category === 'practice') {
                   <div class="assessment-instruction-section">
                     <div class="instruction-left">
                       @if (item.instruction_video_url) {
@@ -327,9 +356,34 @@
                       }
                     </div>
                   </div>
+                  }
                 </div>
               }
             </div>
+          </div>
+        }
+
+        <!-- ==================== DUYỆT BÀI NỘP ==================== -->
+        @if (activeTab() === 'review') {
+          <div class="tab-content-pane">
+            <app-review-panel [courseId]="cls.id" [tasks]="gb.task_list" [locked]="cls.is_grade_locked"
+              [initialTaskId]="reviewTaskId()" (changed)="reloadGradebook()"></app-review-panel>
+          </div>
+        }
+
+        <!-- ==================== ĐIỂM DANH ==================== -->
+        @if (activeTab() === 'attendance') {
+          <div class="tab-content-pane">
+            <app-attendance-panel [courseId]="cls.id" [students]="gb.students" [locked]="cls.is_grade_locked"
+              (changed)="reloadGradebook()"></app-attendance-panel>
+          </div>
+        }
+
+        <!-- ==================== CẤU HÌNH ĐIỂM ==================== -->
+        @if (activeTab() === 'settings') {
+          <div class="tab-content-pane">
+            <app-settings-panel [courseId]="cls.id" [formula]="gb.formula" [eligibility]="gb.exam_eligibility"
+              [locked]="cls.is_grade_locked" (changed)="reloadGradebook()"></app-settings-panel>
           </div>
         }
 
@@ -420,134 +474,79 @@
       </div>
     }
 
-    <!-- ==================== MODAL 2: XEM BÀI NỘP & CHẤM ĐIỂM SINH VIÊN ==================== -->
-    @if (isSubmissionModalOpen()) {
-      <div class="modal-backdrop" (click)="closeSubmissionModal()">
-        <div class="modal-card modal-submission" (click)="$event.stopPropagation()">
+    <!-- ==================== MODAL: NHẬP ĐIỂM SINH VIÊN ==================== -->
+    @if (scoreStudent(); as st) {
+      <div class="modal-backdrop" (click)="closeScoreModal()">
+        <div class="modal-card modal-submission" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
           <div class="modal-header">
             <div>
-              <h3>Chi tiết bài nộp & Đánh giá thể chất</h3>
-              @if (selectedStudentForDetail(); as st) {
-                <p>Sinh viên: <strong>{{ st.student_name }}</strong> (Mã SV: {{ st.student_code }})</p>
-              }
+              <h3>{{ st.student_name }}</h3>
+              <p>Mã SV: {{ st.student_code }}</p>
             </div>
-            <button type="button" class="modal-close-btn" (click)="closeSubmissionModal()">
+            <button type="button" class="modal-close-btn" (click)="closeScoreModal()" aria-label="Đóng">
               <svg lucideX [size]="20"></svg>
             </button>
           </div>
 
           <div class="modal-body">
-            <!-- Assessment switch buttons inside modal -->
-            <div class="modal-assessment-tabs">
-              @if (currentGradebook(); as gb) {
-                @for (ass of gb.task_list; track ass.id) {
-                  <button
-                    type="button"
-                    class="modal-tab-btn"
-                    [class.active]="selectedAssessmentForDetail()?.id === ass.id"
-                    (click)="switchAssessmentInModal(ass.id)">
-                    {{ ass.title }}
-                  </button>
-                }
-              }
-            </div>
+            @if (currentGradebook(); as gb) {
+              <table class="score-edit-table">
+                <thead>
+                  <tr><th>Bài</th><th class="text-center">Điểm từ bài nộp</th><th class="text-center">Điểm nhập tay</th><th></th></tr>
+                </thead>
+                <tbody>
+                  @for (task of gb.task_list; track task.id) {
+                    <tr>
+                      <td>{{ task.title }}<br><small class="muted">{{ kindLabel(task.kind) }}</small></td>
+                      <td class="text-center">{{ st.task_scores[task.id] ?? '—' }}</td>
+                      <td class="text-center">
+                        <input type="number" min="0" max="10" step="0.1" class="score-input" [disabled]="cls.is_grade_locked"
+                          [attr.aria-label]="'Điểm nhập tay ' + task.title"
+                          [ngModel]="scoreDraft()[task.id]" (ngModelChange)="setDraft(task.id, $event)" placeholder="—" />
+                      </td>
+                      <td>
+                        <button type="button" class="link-inline" (click)="openReviewFor(task.id)">Xem bài nộp</button>
+                      </td>
+                    </tr>
+                  }
+                  <tr>
+                    <td>Chuyên cần</td>
+                    <td class="text-center muted" colspan="2">
+                      @if (gb.attendance_from_sessions) {
+                        {{ st.grades.attendance_score ?? '—' }} (tính từ điểm danh)
+                      } @else {
+                        <input type="number" min="0" max="10" step="0.1" class="score-input" [disabled]="cls.is_grade_locked"
+                          aria-label="Điểm chuyên cần" [ngModel]="attendanceDraft()" (ngModelChange)="attendanceDraft.set($event)" />
+                      }
+                    </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
 
-            <div class="submission-grid-details">
-              <!-- Left: Thông tin nộp bài -->
-              <div class="submission-info-pane">
-                <div class="info-block">
-                  <div class="info-row">
-                    <span class="info-lbl">Bài kiểm tra:</span>
-                    <strong>{{ selectedAssessmentForDetail()?.title }}</strong>
-                  </div>
-                </div>
-
-                @if (currentSubmissionDetail(); as sub) {
-                  <div class="info-block mt-2">
-                    <div class="info-row">
-                      <span class="info-lbl">Thời gian nộp:</span>
-                      <span>{{ sub.submittedAt }}</span>
-                    </div>
-                    @if (sub.aiScore !== undefined) {
-                      <div class="info-row">
-                        <span class="info-lbl">Điểm AI gợi ý:</span>
-                        <strong>{{ sub.aiScore }} / 10</strong>
-                      </div>
-                    }
-                    @if (sub.aiFeedback) {
-                      <div class="ai-note-box">
-                        <span class="info-lbl">Nhận xét từ AI:</span>
-                        <p>{{ sub.aiFeedback }}</p>
-                      </div>
-                    }
-                    @if (sub.videoUrl) {
-                      <div class="teacher-video-container mt-2">
-                        <span class="info-lbl video-tag-lbl">🎥 Video bài nộp:</span>
-                        <video [src]="sub.videoUrl" controls class="teacher-video-player" playsinline preload="metadata">
-                          Trình duyệt không hỗ trợ phát video.
-                        </video>
-                      </div>
-                    }
-                  </div>
-                } @else {
-                  <div class="not-submitted-simple">
-                    <span>Sinh viên chưa nộp bài kiểm tra này.</span>
-                  </div>
-                }
+              <div class="form-group mt-2">
+                <label for="score-note">Ghi chú</label>
+                <textarea id="score-note" rows="2" class="comment-textarea" [disabled]="cls.is_grade_locked"
+                  [ngModel]="noteDraft()" (ngModelChange)="noteDraft.set($event)"></textarea>
               </div>
-
-              <!-- Right: Teacher Grading Inputs -->
-              <div class="grading-form-block">
-                <div class="form-group">
-                  <label>Điểm đánh giá (thang điểm 10):</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="10"
-                    step="0.1"
-                    class="score-input"
-                    [disabled]="cls.is_grade_locked"
-                    [ngModel]="editScoreValue()"
-                    (ngModelChange)="editScoreValue.set($event)"
-                    placeholder="Nhập điểm..." />
-                </div>
-
-                <div class="form-group">
-                  <label>Ghi chú / Nhận xét của giảng viên:</label>
-                  <textarea
-                    rows="4"
-                    class="comment-textarea"
-                    [disabled]="cls.is_grade_locked"
-                    [ngModel]="editCommentValue()"
-                    (ngModelChange)="editCommentValue.set($event)"
-                    placeholder="Nhập nhận xét...">
-                  </textarea>
-                </div>
-
-                @if (cls.is_grade_locked) {
-                  <div class="locked-hint">
-                    <span>Lớp đã chốt điểm. Mở khóa lớp nếu muốn cập nhật.</span>
-                  </div>
-                }
-              </div>
-            </div>
+            }
           </div>
 
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" (click)="closeSubmissionModal()">
-              Đóng
-            </button>
-            <button
-              type="button"
-              class="btn btn-primary"
-              [disabled]="cls.is_grade_locked"
-              (click)="saveTeacherGrading()">
-              <svg lucideCheck [size]="16"></svg>
-              <span>Lưu điểm đánh giá</span>
-            </button>
+            <button type="button" class="btn btn-secondary" (click)="closeScoreModal()">Đóng</button>
+            @if (!cls.is_grade_locked) {
+              <button type="button" class="btn btn-primary" [disabled]="savingScores()" (click)="saveScores()">
+                <svg lucideCheck [size]="16"></svg>
+                <span>{{ savingScores() ? 'Đang lưu...' : 'Lưu điểm' }}</span>
+              </button>
+            }
           </div>
         </div>
       </div>
+    }
+
+    @if (taskFormOpen()) {
+      <app-task-form [courseId]="cls.id" [task]="editingTask()" (saved)="onTaskSaved()" (closed)="taskFormOpen.set(false)"></app-task-form>
     }
 
     <!-- ==================== MODAL: UPLOAD VIDEO HƯỚNG DẪN ==================== -->

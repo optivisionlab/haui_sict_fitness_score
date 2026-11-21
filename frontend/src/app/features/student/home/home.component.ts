@@ -51,6 +51,7 @@ export class HomeComponent implements OnInit {
 
   // Enrolled courses with progress
   enrolledCourses = signal<any[]>([]);
+  loadError = signal(false);
 
   private getInitialStudent(): StudentSummary {
     const user = this.authService.currentUser();
@@ -62,7 +63,7 @@ export class HomeComponent implements OnInit {
       faculty: 'Chưa cập nhật',
       major: 'Chưa cập nhật',
       classCode: 'Chưa cập nhật',
-      semester: 'Học kỳ hiện tại',
+      semester: '',
       gpa: 0,
       creditsEarned: 0,
       trainingScore: 0
@@ -95,67 +96,68 @@ export class HomeComponent implements OnInit {
       });
     }
 
-    // Tải các môn học thực tế đã ghi danh của sinh viên
+    // Tải các môn học thực tế đã ghi danh của sinh viên (kèm thông tin lớp học phần)
     this.http.get<ApiResponse<any>>(`${environment.apiUrl}/enrollments/my-courses`).subscribe({
       next: (res) => {
-        const items = res?.data?.items || (Array.isArray(res?.data) ? res.data : []);
-        if (items.length > 0) {
-          const mappedCourses = items.map((item: any, idx: number) => {
-            const code = item.courseCode || item.code || `GDTC0${idx + 1}`;
-            const name = item.courseName || item.name || 'Giáo dục thể chất';
-            const teacher = item.teacherName || item.teacher || 'Giảng viên phụ trách';
-            const progress = typeof item.progress === 'number' ? item.progress : (idx === 0 ? 65 : 40);
-            const iconType = (item.sportCode?.toLowerCase().includes('chay') || name.toLowerCase().includes('chạy')) ? 'chay' : 'pickleball';
-            return {
-              id: item.courseId || item.id || `c-${idx}`,
-              name,
-              code,
-              teacher,
-              progress,
-              iconType
-            };
-          });
-          this.enrolledCourses.set(mappedCourses);
+        const items: any[] = res?.data?.items || (Array.isArray(res?.data) ? res.data : []);
 
-          const mapped: ScheduleItem[] = items.map((item: any, idx: number) => ({
-            id: item.id || item.courseId || `sch-${idx}`,
-            dayOfWeek: idx % 2 === 0 ? 'T3' : 'T5',
-            date: 'Thứ Ba & Thứ Năm hàng tuần',
-            sessionPeriod: 'Buổi sáng - Tiết 1,2,3',
-            subjectName: item.courseName || item.name || 'Môn học Giáo dục Thể chất',
-            instructor: item.teacherName || 'Giảng viên phụ trách',
-            room: 'Sân Thể chất'
-          }));
-          this.todaySchedule.set(mapped);
-        } else {
-          // Khóa học mặc định mẫu nếu API chưa có dữ liệu để trải nghiệm luôn trực quan
-          this.enrolledCourses.set([
-            {
-              id: 'c-pickleball',
-              name: 'Pickleball - Kỹ thuật cơ bản & Nâng cao',
-              code: 'LHP-GDTC204-01',
-              teacher: 'ThS. Nguyễn Văn A',
-              progress: 60,
-              iconType: 'pickleball'
-            }
-          ]);
-          this.todaySchedule.set([]);
+        this.enrolledCourses.set(items.map((item: any) => {
+          const name = item.courseName || '';
+          const isRunning = (item.sportCode || '').toLowerCase().includes('chay')
+            || /chạy|điền kinh/i.test(name);
+          return {
+            id: item.courseId,
+            name,
+            code: item.courseCode || '',
+            teacher: item.teacherName || '',
+            progress: Math.round(item.progressPercent || 0),
+            iconType: isRunning ? 'chay' : 'pickleball'
+          };
+        }));
+
+        // Học kỳ lấy từ lớp học phần đầu tiên có khai báo học kỳ
+        const semester = items.find((i: any) => i.semesterName)?.semesterName;
+        if (semester) {
+          this.student.update((s) => ({ ...s, semester }));
         }
+
+        // Lịch học: mỗi buổi học cố định trong tuần của từng lớp, sắp xếp theo thứ
+        const sessions: (ScheduleItem & { sortKey: number })[] = [];
+        items.forEach((item: any) => {
+          (item.schedule || []).forEach((sess: any, idx: number) => {
+            sessions.push({
+              id: `${item.courseId}-${idx}`,
+              sortKey: sess.dayOfWeek * 100 + parseInt(sess.periods, 10) || 0,
+              dayOfWeek: sess.dayOfWeek === 8 ? 'CN' : `T${sess.dayOfWeek}`,
+              date: HomeComponent.DAY_NAMES[sess.dayOfWeek] || '',
+              sessionPeriod: `${HomeComponent.sessionOfDay(sess.periods)} · Tiết ${sess.periods}`,
+              subjectName: item.courseName || '',
+              instructor: item.teacherName || '',
+              room: sess.location || ''
+            });
+          });
+        });
+        sessions.sort((a, b) => a.sortKey - b.sortKey);
+        this.todaySchedule.set(sessions);
       },
       error: () => {
-        this.enrolledCourses.set([
-          {
-            id: 'c-pickleball',
-            name: 'Pickleball - Kỹ thuật cơ bản & Nâng cao',
-            code: 'LHP-GDTC204-01',
-            teacher: 'ThS. Nguyễn Văn A',
-            progress: 60,
-            iconType: 'pickleball'
-          }
-        ]);
+        this.enrolledCourses.set([]);
         this.todaySchedule.set([]);
+        this.loadError.set(true);
       }
     });
+  }
+
+  private static readonly DAY_NAMES: Record<number, string> = {
+    2: 'Thứ Hai', 3: 'Thứ Ba', 4: 'Thứ Tư', 5: 'Thứ Năm', 6: 'Thứ Sáu', 7: 'Thứ Bảy', 8: 'Chủ nhật'
+  };
+
+  /** Tiết 1–6: sáng, 7–12: chiều, từ 13: tối. */
+  private static sessionOfDay(periods: string): string {
+    const first = parseInt(periods, 10);
+    if (first >= 13) return 'Buổi tối';
+    if (first >= 7) return 'Buổi chiều';
+    return 'Buổi sáng';
   }
 
   private updateStudentInfo(user: any): void {

@@ -1,5 +1,14 @@
+export type SubmissionMode = 'practice' | 'test';
+
 export interface AssessmentAttempt {
   attemptNo: number;
+  /** Số thứ tự hiển thị trong từng phần (luyện tập / kiểm tra). */
+  displayNo?: number;
+  mode?: SubmissionMode;
+  teacherGraded?: boolean;
+  hasAnnotatedVideo?: boolean;
+  annotatedVideoUrl?: string;
+  metrics?: Record<string, any>;
   date: string;
   duration?: string;
   score?: number;
@@ -68,6 +77,10 @@ export interface CourseDetailInfo {
   thumbIcon: 'pickleball' | 'chay';
   averageScore?: number;
   grades?: CourseGrades;
+  /** Đủ điều kiện dự thi kết thúc học phần (backend tính). */
+  isEligible?: boolean;
+  minAttendanceScore?: number;
+  minProcessScore?: number;
   assessments: AssessmentItem[];
 }
 

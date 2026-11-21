@@ -5,9 +5,6 @@
       <h1 class="banner-title">
         {{ greeting() }}, <span class="highlight">{{ student().fullName }}</span>! 👋
       </h1>
-      <p class="banner-desc">
-        Chúc bạn một ngày học tập hứng khởi và đạt nhiều kết quả xuất sắc.
-      </p>
       <!-- Mã SV đã hiển thị ở header (user pill) nên không lặp lại ở đây -->
       @let hasClass = student().classCode && student().classCode !== 'Chưa cập nhật';
       @let hasSemester = student().semester && student().semester !== 'Chưa cập nhật';
@@ -39,7 +36,6 @@
         </div>
         <div>
           <h2 class="card-title">Môn học đang học & Tiến độ</h2>
-          <span class="card-subtitle">Theo dõi tiến độ học tập và bài kiểm tra các học phần</span>
         </div>
       </div>
       <button type="button" class="btn-link-action" (click)="navigateToCourse()">
@@ -88,7 +84,11 @@
         </div>
       } @empty {
         <div class="empty-state">
-          Bạn chưa được ghi danh vào môn học nào.
+          @if (loadError()) {
+            Không tải được danh sách môn học. Vui lòng tải lại trang.
+          } @else {
+            Bạn chưa được ghi danh vào môn học nào.
+          }
         </div>
       }
     </div>

@@ -1,16 +1,9 @@
 <div class="teacher-classes-page">
   <!-- Breadcrumb -->
-  <div class="breadcrumb">
-    <span>Cổng thông tin Giảng viên</span>
-    <span class="separator">/</span>
-    <span class="current">Học phần hiện tại</span>
-  </div>
-
   <!-- Page Header -->
   <div class="page-header-row">
     <div>
       <h1 class="page-title">Học phần hiện tại</h1>
-      <p class="page-subtitle">Theo dõi tiến độ giảng dạy, kiểm soát nộp bài, luyện tập và thực hiện chốt điểm các lớp đang diễn ra.</p>
     </div>
   </div>
 
@@ -63,7 +56,6 @@
     <div class="filters-row">
       <div class="filter-search">
         <app-search-input
-          label="Tìm kiếm lớp học phần"
           placeholder="Nhập tên môn học, mã lớp (GDTC-PB01, Pickleball...)..."
           [(value)]="searchKeyword">
         </app-search-input>
@@ -131,7 +123,6 @@
               <svg lucideBookOpen [size]="48"></svg>
             </div>
             <h3>Không tìm thấy học phần hiện tại phù hợp</h3>
-            <p>Thử thay đổi từ khóa tìm kiếm hoặc kiểm tra danh mục trong phần Học phần.</p>
           </div>
         }
       </div>

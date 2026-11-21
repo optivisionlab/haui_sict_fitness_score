@@ -27,7 +27,8 @@ export class VideoResultService {
       course_id: payload.course_id,
       file_name: payload.file.name,
       content_type: payload.file.type || 'application/octet-stream',
-      file_size: payload.file.size
+      file_size: payload.file.size,
+      mode: payload.mode || 'test'
     }).pipe(
       switchMap((response) => {
         const upload = response.data;
@@ -90,7 +91,8 @@ export class VideoResultService {
   /**
    * Lấy link presigned trực tiếp để phát video từ MinIO
    */
-  getVideoStreamUrl(id: string): Observable<ApiResponse<{ videoUrl: string; expiresInSeconds: number }>> {
-    return this.http.get<ApiResponse<{ videoUrl: string; expiresInSeconds: number }>>(`${this.baseUrl}/${id}/video-url`);
+  getVideoStreamUrl(id: string, annotated = false): Observable<ApiResponse<{ videoUrl: string; expiresInSeconds: number }>> {
+    const params = annotated ? new HttpParams().set('annotated', 'true') : undefined;
+    return this.http.get<ApiResponse<{ videoUrl: string; expiresInSeconds: number }>>(`${this.baseUrl}/${id}/video-url`, { params });
   }
 }

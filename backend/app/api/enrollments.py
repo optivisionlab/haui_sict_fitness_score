@@ -2,11 +2,12 @@ import math
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.crud.course import crud_course
 from app.crud.enrollment import crud_enrollment
 from app.models.enrollment import EnrollmentStatus
 from app.models.user import User, UserRole
 from app.schemas.common import MessageResponse, PaginatedResponse
-from app.schemas.enrollment import EnrollmentCreate, EnrollmentRead
+from app.schemas.enrollment import EnrollmentCreate, EnrollmentRead, StudentCourseRead
 from app.services.auth_service import get_current_user
 from app.services.enrollment_service import enrollment_service
 
@@ -26,7 +27,28 @@ def enroll_course(
     return EnrollmentRead.model_validate(enrollment)
 
 
-@router.get("/my-courses", response_model=PaginatedResponse[EnrollmentRead])
+def _with_course_info(enrollment) -> StudentCourseRead:
+    """Gắn thông tin lớp học phần (mã lớp, thời gian, học kỳ, lịch học) vào bản ghi danh."""
+    data = EnrollmentRead.model_validate(enrollment).model_dump()
+    course = crud_course.get(enrollment.course_id)
+    if course:
+        data.update(
+            course_code=course.code,
+            course_desc=course.desc,
+            course_status=course.status.value if course.status else None,
+            start_date=course.start_date,
+            end_date=course.end_date,
+            semester_name=course.semester_name,
+            sport_code=course.sport_code,
+            sport_name=course.sport_name,
+            schedule=[s.model_dump() for s in course.schedule],
+        )
+        # Ngày thi trên lớp là nguồn chuẩn nếu bản ghi danh chưa đồng bộ
+        data["exam_date"] = data.get("exam_date") or course.exam_date
+    return StudentCourseRead.model_validate(data)
+
+
+@router.get("/my-courses", response_model=PaginatedResponse[StudentCourseRead])
 def get_my_courses(
     status_filter: Optional[EnrollmentStatus] = None,
     page: int = Query(default=1, ge=1),
@@ -43,8 +65,8 @@ def get_my_courses(
     )
     total_pages = math.ceil(total / page_size) if page_size > 0 else 0
 
-    return PaginatedResponse[EnrollmentRead](
-        items=[EnrollmentRead.model_validate(e) for e in items],
+    return PaginatedResponse[StudentCourseRead](
+        items=[_with_course_info(e) for e in items],
         total=total,
         page=page,
         page_size=page_size,

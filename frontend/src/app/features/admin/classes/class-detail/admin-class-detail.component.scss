@@ -645,3 +645,79 @@
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Kết quả import danh sách sinh viên */
+.class-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.import-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.import-card {
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 22px;
+  border-radius: 14px;
+  background: #ffffff;
+
+  h3 {
+    margin: 0 0 16px;
+    font-size: 1.1rem;
+  }
+}
+
+.import-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+
+  div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px;
+    border-radius: 10px;
+    background: #f8fafc;
+  }
+
+  strong {
+    font-size: 1.4rem;
+  }
+
+  span {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .has-error strong {
+    color: #dc2626;
+  }
+}
+
+.import-errors {
+  margin: 14px 0 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+  color: #b91c1c;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}

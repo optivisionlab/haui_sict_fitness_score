@@ -14,9 +14,10 @@ import {
   LucideSearch,
   LucideCheckCircle2,
   LucideAlertCircle,
-  LucideX
+  LucideX,
+  LucideFileSpreadsheet
 } from '@lucide/angular';
-import { AdminService, Course, Enrollment } from '@core/services/admin.service';
+import { AdminService, Course, Enrollment, StudentImportResult } from '@core/services/admin.service';
 import { User } from '@core/models/auth.model';
 import { ToastService } from '@core/services/toast.service';
 
@@ -38,6 +39,7 @@ import { ToastService } from '@core/services/toast.service';
     LucideSearch,
     LucideCheckCircle2,
     LucideAlertCircle,
+    LucideFileSpreadsheet,
     LucideX
   ],
   templateUrl: './admin-class-detail.component.html',
@@ -99,7 +101,7 @@ export class AdminClassDetailComponent implements OnInit {
     });
 
     // Tải danh sách tất cả sinh viên để phục vụ thêm vào lớp
-    this.adminService.getUsers('student', 1, 200).subscribe({
+    this.adminService.getUsers('student', 1, 100).subscribe({
       next: (res) => {
         this.allStudents.set(res.items || []);
       }
@@ -128,6 +130,33 @@ export class AdminClassDetailComponent implements OnInit {
         (s.user_code && s.user_code.toLowerCase().includes(term)) ||
         (s.email && s.email.toLowerCase().includes(term))
       );
+    });
+  }
+
+  // --- Import danh sách sinh viên từ Excel / CSV ---
+  isImporting = signal(false);
+  importResult = signal<StudentImportResult | null>(null);
+
+  onImportFile(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    if (!/\.(xlsx|csv)$/i.test(file.name)) {
+      this.toastService.error('Chỉ hỗ trợ file .xlsx hoặc .csv');
+      return;
+    }
+    this.isImporting.set(true);
+    this.adminService.importStudents(this.courseId(), file).subscribe({
+      next: (res) => {
+        this.isImporting.set(false);
+        this.importResult.set(res);
+        this.loadCourseData();
+      },
+      error: (err) => {
+        this.isImporting.set(false);
+        this.toastService.error(err?.error?.message || 'Không import được file');
+      }
     });
   }
 

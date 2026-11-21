@@ -64,15 +64,16 @@ export class GradesComponent implements OnInit {
         if (items.length > 0) {
           const mapped: GradeSubject[] = items.map((e: any, idx: number) => {
             const courseId = e.courseId || e.id || `sub-${idx}`;
-            const isEligible = (e.grades?.attendanceScore ?? 0) >= 5.0 && (e.grades?.processScore === null || e.grades?.processScore >= 4.0);
-            const createdDate = e.createdAt ? new Date(e.createdAt).toLocaleDateString('vi-VN') : 'Chưa cập nhật';
+            // Điều kiện dự thi do backend tính theo cấu hình của giảng viên
+            const isEligible = e.grades?.isEligible !== false;
+            const startDate = e.startDate ? new Date(e.startDate).toLocaleDateString('vi-VN') : '';
             return {
               id: courseId,
               name: e.courseName || e.name || 'Giáo dục Thể chất',
-              classCode: courseId.substring(0, 10).toUpperCase(),
-              startDate: createdDate,
+              classCode: e.courseCode || '',
+              startDate,
               regularGradeDeadline: 'Chưa cập nhật',
-              regularScore: e.grades?.processScore ?? e.grades?.attendanceScore ?? null,
+              regularScore: e.grades?.processScore ?? null,
               score: e.grades?.finalScore ?? null,
               letterGrade: e.grades?.letterGrade ?? null,
               liveClassCompleted: e.grades?.attendanceScore !== null && e.grades?.attendanceScore !== undefined ? e.grades.attendanceScore : 0,
@@ -82,10 +83,10 @@ export class GradesComponent implements OnInit {
               status: e.status === 'active' ? 'active' : 'completed',
               weeklyDetails: [],
               summary: {
-                period: 'Học kỳ hiện tại',
+                period: e.semesterName || '',
                 practiceCompleted: `${Math.round(e.progressPercent || 0)}%`,
                 liveClassCompleted: e.grades?.attendanceScore !== null && e.grades?.attendanceScore !== undefined ? `${e.grades.attendanceScore} đ` : 'Chưa có',
-                testCompleted: e.grades?.examScore !== null && e.grades?.examScore !== undefined ? `${e.grades.examScore} đ` : (e.grades?.processScore !== null && e.grades?.processScore !== undefined ? `${e.grades.processScore} đ` : 'Chưa có'),
+                testCompleted: e.grades?.examScore !== null && e.grades?.examScore !== undefined ? `${e.grades.examScore} đ` : 'Chưa có',
                 examCondition: isEligible ? 'Đủ điều kiện' : 'Không đủ điều kiện'
               }
             };

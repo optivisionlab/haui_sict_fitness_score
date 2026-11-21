@@ -1,0 +1,213 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="735" viewBox="0 0 1480 735" font-family="Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#000"/>
+    </marker>
+  </defs>
+  <rect width="1480" height="735" fill="#fff"/>
+  <style>
+    .t{font-size:14px;text-anchor:middle}
+    .b{font-weight:bold}
+    .s{font-size:12px;text-anchor:middle}
+    .l{font-size:12px}
+    .ln{stroke:#000;stroke-width:1.4;fill:none}
+    .dash{stroke-dasharray:6 4}
+  </style>
+
+  <!-- ===== Containers ===== -->
+  <rect x="120" y="40" width="650" height="640" fill="none" stroke="#000" stroke-width="1.4" class="dash"/>
+  <text x="132" y="62" class="l" font-size="15">HaUI Fitness Platform [Docker Compose]</text>
+
+  <rect x="960" y="40" width="500" height="640" fill="none" stroke="#000" stroke-width="1.4" class="dash"/>
+  <text x="1450" y="62" class="l" font-size="15" text-anchor="end">AI Processing Service [GPU]</text>
+
+  <!-- ===== Actor ===== -->
+  <g stroke="#000" stroke-width="1.6" fill="none">
+    <circle cx="55" cy="95" r="12"/>
+    <line x1="55" y1="107" x2="55" y2="145"/>
+    <line x1="30" y1="120" x2="80" y2="120"/>
+    <line x1="55" y1="145" x2="35" y2="175"/>
+    <line x1="55" y1="145" x2="75" y2="175"/>
+  </g>
+  <text x="55" y="195" class="t">User</text>
+  <text x="55" y="211" class="s" font-size="10">(Student /</text>
+  <text x="55" y="224" class="s" font-size="10">Teacher /</text>
+  <text x="55" y="237" class="s" font-size="10">Admin)</text>
+
+  <!-- User -> Frontend -->
+  <line x1="82" y1="115" x2="300" y2="115" class="ln" marker-end="url(#a)"/>
+  <rect x="150" y="106" width="104" height="16" fill="#fff"/>
+  <text x="202" y="119" class="s">Request (HTTPS)</text>
+
+  <!-- ===== Frontend ===== -->
+  <rect x="300" y="85" width="240" height="60" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.4"/>
+  <text x="420" y="110" class="t b">Frontend / 4200</text>
+  <text x="420" y="130" class="s">[Angular SPA + Nginx]</text>
+
+  <!-- ===== Role boundaries ===== -->
+  <rect x="255" y="172" width="330" height="92" rx="12" fill="none" stroke="#000" stroke-width="1.2" class="dash"/>
+  <text x="248" y="182" class="l" font-size="11" text-anchor="end">Role-based</text>
+  <text x="248" y="196" class="l" font-size="11" text-anchor="end">views</text>
+
+  <g stroke="#000" stroke-width="1.2">
+    <rect x="268" y="190" width="95" height="60" fill="#fff"/>
+    <rect x="373" y="190" width="95" height="60" fill="#fff"/>
+    <rect x="478" y="190" width="95" height="60" fill="#fff"/>
+  </g>
+  <text x="315" y="215" class="t b">Student</text>
+  <text x="315" y="233" class="s" font-size="10">(Submit video)</text>
+  <text x="420" y="215" class="t b">Teacher</text>
+  <text x="420" y="233" class="s" font-size="10">(Review, grade)</text>
+  <text x="525" y="215" class="t b">Admin</text>
+  <text x="525" y="233" class="s" font-size="10">(Users, sports)</text>
+
+  <!-- Frontend -> roles -->
+  <path d="M420,145 V158 M315,158 H525" class="ln"/>
+  <line x1="315" y1="158" x2="315" y2="190" class="ln" marker-end="url(#a)"/>
+  <line x1="420" y1="158" x2="420" y2="190" class="ln" marker-end="url(#a)"/>
+  <line x1="525" y1="158" x2="525" y2="190" class="ln" marker-end="url(#a)"/>
+
+  <!-- roles -> Backend -->
+  <path d="M315,250 V300 H525 V250 M420,250 V300" class="ln"/>
+  <line x1="420" y1="300" x2="420" y2="350" class="ln" stroke-width="2" marker-end="url(#a)"/>
+  <rect x="426" y="314" width="70" height="16" fill="#fff"/>
+  <text x="430" y="326" class="l" font-size="11">REST + JWT</text>
+
+
+
+  <!-- ===== MongoDB (cylinder) ===== -->
+  <g fill="#ffe6cc" stroke="#d79b00" stroke-width="1.4">
+    <path d="M135,410 V475 A65,11 0 0 0 265,475 V410"/>
+    <ellipse cx="200" cy="410" rx="65" ry="11"/>
+  </g>
+  <text x="200" y="440" class="t b">MongoDB</text>
+  <text x="200" y="457" class="s" font-size="10">(users, courses,</text>
+  <text x="200" y="470" class="s" font-size="10">results, outbox)</text>
+  <text x="200" y="504" class="s" font-size="11">Retrieve / Update state</text>
+  <line x1="268" y1="440" x2="320" y2="440" class="ln" marker-start="url(#a)" marker-end="url(#a)"/>
+
+  <!-- ===== Redis (cylinder) ===== -->
+  <g fill="#ffe6cc" stroke="#d79b00" stroke-width="1.4">
+    <path d="M150,565 V615 A50,9 0 0 0 250,615 V565"/>
+    <ellipse cx="200" cy="565" rx="50" ry="9"/>
+  </g>
+  <text x="200" y="593" class="t b">Redis</text>
+  <text x="200" y="609" class="s" font-size="10">(cache, events)</text>
+  <path d="M252,592 H380 V470" class="ln" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="300" y="585" class="s" font-size="11">Cache</text>
+
+  <!-- ===== Backend (engine) ===== -->
+  <rect x="320" y="350" width="200" height="120" fill="#f8cecc" stroke="#b85450" stroke-width="1.6"/>
+  <text x="420" y="395" class="t b" font-size="16">Backend API / 8000</text>
+  <text x="420" y="415" class="s">[FastAPI · Grading outbox</text>
+  <text x="420" y="431" class="s">· Result consumer]</text>
+
+  <!-- Backend -> Frontend: return -->
+  <path d="M520,362 H650 V135 H540" class="ln" marker-end="url(#a)"/>
+  <text x="0" y="0" class="s" transform="translate(656,250) rotate(90)">Return score + notification</text>
+
+
+  <!-- Backend <-> Kafka -->
+  <line x1="520" y1="428" x2="820" y2="428" class="ln" stroke-width="2" marker-end="url(#a)"/>
+  <text x="670" y="421" class="s" font-size="11">Grading job (small / large lane)</text>
+  <line x1="820" y1="456" x2="520" y2="456" class="ln" marker-end="url(#a)"/>
+  <text x="670" y="472" class="s" font-size="11">Grading result</text>
+
+  <!-- ===== Middle column ===== -->
+
+  <!-- AI Worker Pool -->
+  <rect x="820" y="210" width="80" height="120" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.4"/>
+  <text x="852" y="270" class="t b" transform="rotate(-90 852 270)">AI Worker</text>
+  <text x="872" y="270" class="s" transform="rotate(-90 872 270)">[aiokafka]</text>
+
+  <!-- Kafka -->
+  <rect x="820" y="380" width="80" height="180" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.4"/>
+  <text x="852" y="470" class="t b" transform="rotate(-90 852 470)">Kafka / 9092</text>
+  <text x="874" y="470" class="s" transform="rotate(-90 874 470)">[jobs · results · DLQ]</text>
+
+  <!-- Kafka <-> Worker -->
+  <line x1="845" y1="380" x2="845" y2="330" class="ln" marker-end="url(#a)"/>
+  <line x1="875" y1="330" x2="875" y2="380" class="ln" marker-end="url(#a)"/>
+  <text x="838" y="360" class="l" font-size="10" text-anchor="end">consume</text>
+  <text x="882" y="360" class="l" font-size="10">publish</text>
+
+  <!-- Worker <-> Switch API -->
+  <line x1="900" y1="275" x2="985" y2="275" class="ln" marker-end="url(#a)"/>
+  <text x="942" y="268" class="s" font-size="10">/process</text>
+  <line x1="985" y1="310" x2="900" y2="310" class="ln" marker-end="url(#a)"/>
+  <text x="942" y="325" class="s" font-size="10">metrics</text>
+
+
+  <!-- ===== AI service internals ===== -->
+  <rect x="985" y="230" width="140" height="100" fill="#fff2cc" stroke="#d6b656" stroke-width="1.4"/>
+  <text x="1055" y="273" class="t b">Switch API</text>
+  <text x="1055" y="291" class="s">[per sport]</text>
+
+  <!-- fan-out -->
+  <path d="M1125,280 H1160 M1160,140 V420" class="ln"/>
+  <line x1="1160" y1="140" x2="1195" y2="140" class="ln" marker-end="url(#a)"/>
+  <line x1="1160" y1="280" x2="1195" y2="280" class="ln" marker-end="url(#a)"/>
+  <line x1="1160" y1="420" x2="1195" y2="420" class="ln dash" marker-end="url(#a)"/>
+
+  <!-- sport model cylinders -->
+  <g fill="#ffe6cc" stroke="#d79b00" stroke-width="1.4">
+    <path d="M1195,108 V172 A60,10 0 0 0 1315,172 V108"/>
+    <ellipse cx="1255" cy="108" rx="60" ry="10"/>
+    <path d="M1195,248 V312 A60,10 0 0 0 1315,312 V248"/>
+    <ellipse cx="1255" cy="248" rx="60" ry="10"/>
+  </g>
+  <g fill="#fff" stroke="#d79b00" stroke-width="1.4" stroke-dasharray="5 3">
+    <path d="M1195,388 V452 A60,10 0 0 0 1315,452 V388"/>
+    <ellipse cx="1255" cy="388" rx="60" ry="10"/>
+  </g>
+  <text x="1255" y="142" class="t b">Pickleball</text>
+  <text x="1255" y="159" class="s" font-size="10">(pose + ball)</text>
+  <text x="1255" y="282" class="t b">Running</text>
+  <text x="1255" y="299" class="s" font-size="10">(lap counting)</text>
+  <text x="1255" y="422" class="t b">Basketball, ...</text>
+  <text x="1255" y="439" class="s" font-size="10">(extensible)</text>
+
+  <!-- merge -->
+  <path d="M1315,140 H1350 V275 M1315,280 H1345 M1315,420 H1350 V285" class="ln"/>
+  <circle cx="1350" cy="280" r="5.5" fill="#000"/>
+
+  <!-- scoring config -->
+  <path d="M1375,190 H1450 V240 C1432,230 1412,252 1394,244 C1385,240 1380,244 1375,246 Z" fill="#d5e8d4" stroke="#82b366" stroke-width="1.4"/>
+  <text x="1412" y="210" class="s b" font-size="11">Scoring</text>
+  <text x="1412" y="225" class="s b" font-size="11">config</text>
+  <path d="M1412,247 V280 H1357" class="ln" marker-end="url(#a)"/>
+
+  <!-- score engine -->
+  <line x1="1350" y1="286" x2="1350" y2="500" class="ln" marker-end="url(#a)"/>
+  <path d="M1295,500 H1405 V560 C1380,548 1355,575 1330,565 C1316,560 1305,565 1295,568 Z" fill="#d5e8d4" stroke="#82b366" stroke-width="1.4"/>
+  <text x="1350" y="523" class="t b">Score</text>
+  <text x="1350" y="540" class="s" font-size="10">(0–10 scale)</text>
+
+  <!-- score -> Switch API -->
+  <path d="M1295,530 H1055 V330" class="ln" marker-end="url(#a)"/>
+  <text x="1175" y="523" class="s" font-size="11">Metrics + score</text>
+
+  <text x="1210" y="640" class="t">Per-sport AI models</text>
+  <text x="1210" y="658" class="t">(pose estimation, object tracking)</text>
+
+
+  <!-- ===== MinIO (middle column) ===== -->
+  <path d="M788,75 H932 V150 C898,137 866,170 830,155 C812,149 798,153 788,157 Z" fill="#f8cecc" stroke="#b85450" stroke-width="1.4"/>
+  <text x="860" y="103" class="t b">MinIO</text>
+  <text x="860" y="121" class="s" font-size="11">Object storage</text>
+  <text x="860" y="136" class="s" font-size="10">(video files)</text>
+
+  <!-- Frontend <-> MinIO -->
+  <line x1="540" y1="97" x2="788" y2="97" class="ln" marker-end="url(#a)"/>
+  <text x="664" y="90" class="s" font-size="11">Upload video (presigned PUT)</text>
+  <line x1="788" y1="115" x2="540" y2="115" class="ln" marker-end="url(#a)"/>
+  <text x="715" y="129" class="s" font-size="10">Playback (presigned GET)</text>
+
+  <!-- MinIO -> Switch API -->
+  <path d="M932,112 H1055 V230" class="ln" marker-end="url(#a)"/>
+  <rect x="955" y="93" width="90" height="15" fill="#fff"/>
+  <text x="1000" y="105" class="s" font-size="11">Fetch video</text>
+
+  <!-- ===== Caption ===== -->
+  <text x="40" y="718" font-size="15"><tspan font-weight="bold">Fig. 2</tspan>  Architecture of the HaUI fitness scoring system and flow of video grading requests/responses</text>
+</svg>

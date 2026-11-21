@@ -207,6 +207,7 @@ class GradingOutboxDispatcher:
                 metrics=ai_res.get("metrics", {}),
                 ai_score=ai_res.get("aiScore"),
                 ai_comment=ai_res.get("aiComment"),
+                annotated_object_key=ai_res.get("annotatedVideoKey"),
             )
             await asyncio.to_thread(video_result_service.ai_callback, result_id, ai_update)
             await collection.update_one(

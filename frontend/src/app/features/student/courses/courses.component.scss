@@ -1320,4 +1320,137 @@ $primary-blue-light: #eff6ff;
     border-radius: 4px;
     display: inline-block;
   }
-}
+}
+/* --- Bài thường xuyên: 2 phần Luyện tập / Kiểm tra --- */
+.part-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.part-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #475569;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    border-color: #bfdbfe;
+    color: $primary-blue;
+  }
+
+  &.active {
+    border-color: $primary-blue;
+    background: #eff6ff;
+    color: $primary-blue;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $primary-blue;
+    outline-offset: 2px;
+  }
+
+  .part-count {
+    min-width: 22px;
+    padding: 1px 7px;
+    border-radius: 9999px;
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 0.75rem;
+    text-align: center;
+
+    &.score {
+      background: #dcfce7;
+      color: #15803d;
+    }
+  }
+}
+
+.part-note {
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.score-display-cell .ai-score-badge.teacher {
+  color: #15803d;
+  background-color: #dcfce7;
+}
+
+.video-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  background: #f1f5f9;
+}
+
+.video-switch-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &.active {
+    background: #ffffff;
+    color: $primary-blue;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  }
+}
+
+@media (max-width: 640px) {
+  .part-tab {
+    flex: 1;
+    justify-content: center;
+    padding: 10px 12px;
+  }
+}
+
+/* Hàng nút nộp bài trong khung Luyện tập / Kiểm tra (ngoài .assessment-detail-header) */
+.assessment-action-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  .btn-exam {
+    background-color: #ea580c;
+
+    &:hover:not(:disabled) {
+      background-color: #c2410c;
+    }
+  }
+
+  .submit-rule-hint {
+    font-size: 0.82rem;
+    color: #64748b;
+
+    &.exam {
+      color: #c2410c;
+    }
+  }
+}
+
+.eligibility-warning {
+  border-style: solid;
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}

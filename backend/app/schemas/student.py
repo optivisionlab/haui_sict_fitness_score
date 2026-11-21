@@ -15,6 +15,17 @@ class StudentTaskGradeItem(BaseSchema):
     submitted_at: Optional[datetime] = None
     status: str = "not_submitted"  # "not_submitted" | "pending" | "graded"
     instruction_video_url: Optional[str] = None
+    kind: Optional[str] = None                     # regular | midterm | final
+    technical_requirements: Optional[str] = None
+    teacher_override: bool = False                 # Điểm do GV nhập tay
+
+    # Cấu hình bài do giảng viên đặt (để FE không phải tự điền giá trị mặc định)
+    grading_method: Optional[str] = None   # "highest" | "latest" | "average"
+    time_limit: Optional[int] = None       # Giây; None = không giới hạn
+    max_attempts: Optional[int] = None     # None = không giới hạn
+    is_locked: bool = False
+    open_time: Optional[datetime] = None
+    close_time: Optional[datetime] = None
 
 
 class StudentGradeViewResponse(BaseSchema):
@@ -29,5 +40,8 @@ class StudentGradeViewResponse(BaseSchema):
     final_score: Optional[float] = None
     letter_grade: Optional[str] = None
     is_passed: Optional[bool] = None
+    is_eligible: Optional[bool] = None
+    min_attendance_score: Optional[float] = None
+    min_process_score: Optional[float] = None
 
     tasks: list[StudentTaskGradeItem] = Field(default_factory=list)

@@ -14,9 +14,17 @@ class CourseStatus(str, Enum):
 
 
 class GradingFormula(EmbeddedModel):
-    attendance_weight: float = Field(default=0.2, ge=0.0, le=1.0)
+    """Điểm tổng kết = Chuyên cần × attendance + Quá trình × practice + Thi × exam."""
+    attendance_weight: float = Field(default=0.1, ge=0.0, le=1.0)
     practice_weight: float = Field(default=0.3, ge=0.0, le=1.0)
-    exam_weight: float = Field(default=0.5, ge=0.0, le=1.0)
+    exam_weight: float = Field(default=0.6, ge=0.0, le=1.0)
+
+
+class ExamEligibility(EmbeddedModel):
+    """Điều kiện được dự thi kết thúc học phần (GV cấu hình theo lớp)."""
+    enabled: bool = True
+    min_attendance_score: float = Field(default=5.0, ge=0.0, le=10.0)
+    min_process_score: float = Field(default=4.0, ge=0.0, le=10.0)
 
 
 class LessonItemType(str, Enum):
@@ -28,6 +36,13 @@ class LessonItem(EmbeddedModel):
     title: str
     type: LessonItemType
     task_id: Optional[str] = None
+
+
+class ClassSession(EmbeddedModel):
+    """Một buổi học cố định trong tuần của lớp học phần."""
+    day_of_week: int = Field(ge=2, le=8)    # 2 = Thứ Hai ... 7 = Thứ Bảy, 8 = Chủ nhật
+    periods: str                            # VD: "1-3" (tiết 1 đến 3)
+    location: Optional[str] = None          # VD: "Sân Pickleball - Cơ sở 1"
 
 
 class Week(EmbeddedModel):
@@ -69,7 +84,9 @@ class Course(BaseDocument):
     allow_exam_submission: bool = True
 
     grading_formula: GradingFormula = Field(default_factory=GradingFormula)
+    exam_eligibility: ExamEligibility = Field(default_factory=ExamEligibility)
 
     student_total: int = 0
+    schedule: list[ClassSession] = []
     weeks: list[Week] = []
 

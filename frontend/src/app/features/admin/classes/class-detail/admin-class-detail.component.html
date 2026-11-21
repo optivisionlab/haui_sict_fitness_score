@@ -37,6 +37,12 @@
     </div>
 
     <div class="class-header-actions">
+      <input #importInput type="file" accept=".xlsx,.csv" hidden (change)="onImportFile($event)" />
+      <button type="button" class="btn btn-secondary" [disabled]="isImporting()" (click)="importInput.click()"
+        title="File có cột Mã SV hoặc Email; sinh viên phải có tài khoản">
+        <svg lucideFileSpreadsheet [size]="18"></svg>
+        <span>{{ isImporting() ? 'Đang import...' : 'Import Excel' }}</span>
+      </button>
       <button type="button" class="btn btn-primary" (click)="openEnrollModal()">
         <svg lucideUserPlus [size]="18"></svg>
         <span>Ghi danh sinh viên</span>
@@ -78,7 +84,6 @@
         <div class="empty-state">
           <svg lucideUsers [size]="44"></svg>
           <h3>Chưa có sinh viên nào trong lớp</h3>
-          <p>Bấm nút "Ghi danh sinh viên" để thêm sinh viên vào lớp học phần này.</p>
           <button type="button" class="btn btn-sm btn-primary" (click)="openEnrollModal()">
             <svg lucideUserPlus [size]="16"></svg>
             <span>Ghi danh ngay</span>
@@ -94,8 +99,8 @@
                 <th>Mã sinh viên</th>
                 <th>Trạng thái</th>
                 <th class="text-center">Điểm chuyên cần</th>
-                <th class="text-center">Điểm giữa kỳ</th>
-                <th class="text-center">Điểm cuối kỳ</th>
+                <th class="text-center">Điểm quá trình</th>
+                <th class="text-center">Điểm thi</th>
                 <th class="text-center">Tổng kết</th>
                 <th class="text-right">Gỡ lớp</th>
               </tr>
@@ -242,3 +247,25 @@
     </div>
   }
 </div>
+
+<!-- Kết quả import -->
+@if (importResult(); as r) {
+  <div class="import-backdrop" (click)="importResult.set(null)">
+    <div class="import-card" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="import-title">
+      <h3 id="import-title">Kết quả import</h3>
+      <div class="import-stats">
+        <div><strong>{{ r.enrolled }}</strong><span>Đã ghi danh</span></div>
+        <div><strong>{{ r.already_enrolled }}</strong><span>Đã có trong lớp</span></div>
+        <div [class.has-error]="r.errors.length"><strong>{{ r.errors.length }}</strong><span>Lỗi</span></div>
+      </div>
+      @if (r.errors.length) {
+        <ul class="import-errors">
+          @for (e of r.errors; track $index) { <li>{{ e }}</li> }
+        </ul>
+      }
+      <div class="import-actions">
+        <button type="button" class="btn btn-primary" (click)="importResult.set(null)">Đóng</button>
+      </div>
+    </div>
+  </div>
+}

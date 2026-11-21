@@ -1,8 +1,6 @@
 <div class="teacher-courses-page">
   <!-- Dynamic Breadcrumb -->
   <div class="breadcrumb">
-    <span>Cổng thông tin Giảng viên</span>
-    <span class="separator">/</span>
     <span [class.breadcrumb-link]="viewMode() === 'tree' && currentLevel() !== 'semester'" (click)="goToSemesterLevel()">
       Học phần
     </span>
@@ -40,16 +38,12 @@
       <div class="header-titles">
         @if (viewMode() === 'flat') {
           <h1 class="page-title">Quản lý Học phần theo Kỳ & Môn</h1>
-          <p class="page-subtitle">Xem toàn bộ các lớp học phần phụ trách, tìm kiếm và lọc linh hoạt theo kỳ đào tạo và bộ môn thể chất.</p>
         } @else if (currentLevel() === 'semester') {
           <h1 class="page-title">Quản lý Học phần theo Cây Học kỳ</h1>
-          <p class="page-subtitle">Chọn kỳ học chuẩn để xem các môn thể chất và lớp học phần bạn phụ trách.</p>
         } @else if (currentLevel() === 'sport') {
           <h1 class="page-title">Môn học thể chất · {{ selectedSemesterName() }}</h1>
-          <p class="page-subtitle">Danh sách các môn học thể dục bạn giảng dạy trong học kỳ này.</p>
         } @else {
-          <h1 class="page-title">Lớp học phần {{ selectedSportName() }}</h1>
-          <p class="page-subtitle">{{ selectedSemesterName() }} · Danh sách lớp học phần và sĩ số sinh viên.</p>
+          <h1 class="page-title">Lớp học phần {{ selectedSportName() }} · {{ selectedSemesterName() }}</h1>
         }
       </div>
     </div>
@@ -229,7 +223,6 @@
                 <svg lucideBookOpen [size]="48"></svg>
               </div>
               <h3>Không tìm thấy lớp học phần phù hợp</h3>
-              <p>Thử thay đổi bộ lọc học kỳ, môn học hoặc từ khóa tìm kiếm.</p>
               @if (activeFiltersCount() > 0) {
                 <button type="button" class="btn btn-secondary" style="margin-top: 1rem;" (click)="resetFilters()">
                   Đặt lại toàn bộ bộ lọc
@@ -309,7 +302,6 @@
                 <svg lucideCalendar [size]="48"></svg>
               </div>
               <h3>Không tìm thấy học kỳ phù hợp</h3>
-              <p>Vui lòng thử lại với từ khóa tìm kiếm khác.</p>
             </div>
           }
         </div>
@@ -375,7 +367,6 @@
                   <svg lucideTrophy [size]="48"></svg>
                 </div>
                 <h3>Không tìm thấy môn học nào phù hợp</h3>
-                <p>Thử tìm kiếm với tên môn thể thao khác.</p>
               </div>
             }
           </div>
@@ -389,7 +380,6 @@
         <div class="filters-row">
           <div class="filter-search">
             <app-search-input
-              label="Tìm kiếm lớp học phần"
               placeholder="Nhập tên lớp, mã lớp (GDTC-PB01...)..."
               [(value)]="searchKeyword">
             </app-search-input>
@@ -448,7 +438,6 @@
                 <svg lucideBookOpen [size]="48"></svg>
               </div>
               <h3>Không tìm thấy lớp học phần phù hợp</h3>
-              <p>Vui lòng thử lại với từ khóa tìm kiếm khác.</p>
             </div>
           }
         </div>

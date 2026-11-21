@@ -135,6 +135,11 @@ class TaskService:
     def upload_instruction_video(self, task_id: str, file: UploadFile) -> Task:
         """Upload video hướng dẫn soạn bài/thực hiện lên MinIO và gán vào bài kiểm tra."""
         task = self.get_by_id(task_id)
+        if task.category != TaskCategory.PRACTICE:
+            raise HTTPException(
+                status_code=400,
+                detail="Chỉ bài kiểm tra thường xuyên mới có video hướng dẫn kỹ thuật",
+            )
         obj_id = to_object_id(task_id)
         if not obj_id:
             raise HTTPException(status_code=400, detail="Mã bài tập không hợp lệ")
@@ -225,7 +230,7 @@ class TaskService:
         counts = {
             row["_id"]: row
             for row in crud_video_result.collection.aggregate([
-                {"$match": {"taskId": {"$in": task_ids}}},
+                {"$match": {"taskId": {"$in": task_ids}, "mode": {"$ne": "practice"}}},
                 {"$group": {
                     "_id": "$taskId",
                     "submitted": {"$sum": 1},

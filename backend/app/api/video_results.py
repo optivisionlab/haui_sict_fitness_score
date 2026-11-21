@@ -133,6 +133,7 @@ def submit_video(
 @router.get("/{result_id}/presigned-url", response_model=PresignedUrlResponse, include_in_schema=False)
 def get_presigned_url(
     result_id: str,
+    annotated: bool = Query(default=False, description="True: video AI đã vẽ kết quả chấm điểm"),
     current_user: User = Depends(get_current_user),
 ):
     """Lấy presigned URL tạm thời để xem hoặc tải video từ MinIO."""
@@ -140,6 +141,7 @@ def get_presigned_url(
         result_id=result_id,
         current_user_id=str(current_user.id),
         role=_role_value(current_user),
+        annotated=annotated,
     )
     return PresignedUrlResponse(video_url=url, expires_in_seconds=7200)
 
