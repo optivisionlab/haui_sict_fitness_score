@@ -28,7 +28,8 @@ export class VideoResultService {
       file_name: payload.file.name,
       content_type: payload.file.type || 'application/octet-stream',
       file_size: payload.file.size,
-      mode: payload.mode || 'test'
+      mode: payload.mode || 'test',
+      ...(payload.court_points ? { court_points: payload.court_points } : {})
     }).pipe(
       switchMap((response) => {
         const upload = response.data;

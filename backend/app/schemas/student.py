@@ -26,6 +26,9 @@ class StudentTaskGradeItem(BaseSchema):
     is_locked: bool = False
     open_time: Optional[datetime] = None
     close_time: Optional[datetime] = None
+    # Cách quay: direct (trực diện) | match (đối kháng: SV đánh dấu sân khi nộp)
+    recording_mode: str = "direct"
+    target_zone: Optional[str] = None
 
 
 class StudentGradeViewResponse(BaseSchema):

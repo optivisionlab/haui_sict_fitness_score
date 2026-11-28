@@ -28,6 +28,19 @@ class VideoUploadUrlRequest(BaseSchema):
     file_size: int = Field(..., gt=0)
     duration_sec: Optional[int] = Field(default=None, ge=0)
     mode: SubmissionMode = "test"
+    # Bài đối kháng: 4 góc nửa sân đối phương trên khung hình đầu, chuẩn hóa [0, 1], theo thứ tự
+    # lưới-trái, lưới-phải, cuối sân-phải, cuối sân-trái (nhìn từ camera). Bỏ trống: AI tự ước lượng lưới.
+    court_points: Optional[list[list[float]]] = None
+
+    @model_validator(mode="after")
+    def _check_court_points(self):
+        pts = self.court_points
+        if pts is not None:
+            if len(pts) != 4 or any(len(p) != 2 for p in pts):
+                raise ValueError("court_points phải gồm đúng 4 điểm [x, y]")
+            if any(not 0.0 <= c <= 1.0 for p in pts for c in p):
+                raise ValueError("Tọa độ court_points phải nằm trong [0, 1]")
+        return self
 
 
 class VideoUploadUrlResponse(BaseSchema):

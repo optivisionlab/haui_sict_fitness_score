@@ -69,7 +69,23 @@ export interface GradebookTaskItem {
   /** Bài AI đã chấm nhưng GV chưa xác nhận. */
   pending_review_count: number;
   instruction_video_url?: string;
+  /** Cách quay: trực diện (VideoMAE) hoặc đối kháng (YOLO26s). */
+  recording_mode: RecordingMode;
+  target_zone?: TargetZone | null;
 }
+
+export type RecordingMode = 'direct' | 'match';
+
+/** Vùng đích trên nửa sân đối phương (bài đối kháng). */
+export type TargetZone = 'full' | 'kitchen' | 'deep' | 'service_left' | 'service_right';
+
+export const TARGET_ZONE_LABELS: Record<TargetZone, string> = {
+  full: 'Cả nửa sân đối phương',
+  kitchen: 'Vùng cấm vô lê (Kitchen) – bài Dink',
+  deep: 'Sau vùng cấm vô lê – bài đánh sâu',
+  service_left: 'Ô giao bóng bên trái (nhìn từ camera)',
+  service_right: 'Ô giao bóng bên phải (nhìn từ camera)'
+};
 
 /** Dữ liệu form tạo / sửa bài kiểm tra. */
 export interface TaskUpsert {
@@ -81,6 +97,8 @@ export interface TaskUpsert {
   open_time?: string | null;
   close_time?: string | null;
   is_locked: boolean;
+  recording_mode: RecordingMode;
+  target_zone?: TargetZone | null;
 }
 
 export interface ExamEligibility {
@@ -136,7 +154,7 @@ export interface GradebookStudentItem {
   gender?: string;
   status: 'active' | 'dropped';
   progress_percent: number;
-  task_scores: { [key: string]: number };
+  task_scores: { [key: string]: number | undefined };
   /** Điểm GV nhập tay, ưu tiên hơn điểm tính từ bài nộp. */
   task_score_overrides: { [key: string]: number };
   grades: StudentGrades;

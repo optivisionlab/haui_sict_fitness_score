@@ -2,8 +2,8 @@ from datetime import datetime
 from typing import Optional
 
 from app.models.base import PyObjectId
-from app.models.task import GradingMethod, TaskCategory, TaskKind
-from pydantic import Field
+from app.models.task import GradingMethod, RecordingMode, TargetZone, TaskCategory, TaskKind
+from pydantic import Field, model_validator
 
 from app.schemas.common import BaseSchema
 
@@ -23,6 +23,8 @@ class TaskBase(BaseSchema):
     close_time: Optional[datetime] = None
     camera_id: Optional[str] = None
     instruction_video_url: Optional[str] = None
+    recording_mode: Optional[RecordingMode] = None
+    target_zone: Optional[TargetZone] = None
 
 
 class TaskCreate(TaskBase):
@@ -44,6 +46,8 @@ class TaskUpdate(BaseSchema):
     close_time: Optional[datetime] = None
     camera_id: Optional[str] = None
     instruction_video_url: Optional[str] = None
+    recording_mode: Optional[RecordingMode] = None
+    target_zone: Optional[TargetZone] = None
 
 
 class TaskLockUpdate(BaseSchema):
@@ -68,6 +72,8 @@ class TaskRead(BaseSchema):
     close_time: Optional[datetime] = None
     camera_id: Optional[str] = None
     instruction_video_url: Optional[str] = None
+    recording_mode: Optional[RecordingMode] = None
+    target_zone: Optional[TargetZone] = None
     submitted_count: Optional[int] = None
     graded_count: Optional[int] = None
     created_at: Optional[datetime] = None
@@ -84,3 +90,14 @@ class TeacherTaskUpsert(BaseSchema):
     open_time: Optional[datetime] = None
     close_time: Optional[datetime] = None
     is_locked: bool = False
+    # Cách quay: trực diện (VideoMAE) hoặc đối kháng (YOLO26s, cần vùng đích)
+    recording_mode: RecordingMode = RecordingMode.DIRECT
+    target_zone: Optional[TargetZone] = None
+
+    @model_validator(mode="after")
+    def _match_needs_zone(self):
+        if self.recording_mode == RecordingMode.MATCH:
+            self.target_zone = self.target_zone or TargetZone.FULL
+        else:
+            self.target_zone = None
+        return self

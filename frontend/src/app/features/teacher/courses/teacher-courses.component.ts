@@ -12,7 +12,6 @@ import {
   LucideBookOpen,
   LucideTrophy,
   LucideChevronRight,
-  LucideFilter,
   LucideRotateCcw,
   LucideLayoutGrid,
   LucideLayers
@@ -45,7 +44,6 @@ export interface SportViewItem {
     LucideBookOpen,
     LucideTrophy,
     LucideChevronRight,
-    LucideFilter,
     LucideRotateCcw,
     LucideLayoutGrid,
     LucideLayers,

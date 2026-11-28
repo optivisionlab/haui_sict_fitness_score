@@ -454,6 +454,12 @@
         <div class="task-deadline">
           {{ submitMode() === 'practice' ? 'Luyện tập: AI chấm ngay, không tính vào điểm.' : 'Kiểm tra: điểm được tính vào kết quả học phần.' }}
         </div>
+        @if (currentAssessment().recordingMode === 'match') {
+          <div class="task-deadline">
+            Bài đối kháng: đặt điện thoại phía sau đường cuối sân của bạn, quay thấy cả sân, lưới và quả bóng.
+            Cú trúng là bóng qua lưới và nảy vào {{ targetZoneLabel(currentAssessment().targetZone) }}.
+          </div>
+        }
       </div>
 
 
@@ -476,6 +482,13 @@
         }
       </div>
       <input #fileInput type="file" accept="video/mp4,video/quicktime,video/webm,video/*" class="hidden" (change)="onFileSelected($event)" />
+
+      @if (currentAssessment().recordingMode === 'match' && selectedFile()) {
+        <app-court-marker
+          [file]="selectedFile()"
+          [zoneLabel]="targetZoneLabel(currentAssessment().targetZone)"
+          (pointsChange)="courtPoints.set($event)" />
+      }
 
       <!-- Progress bar -->
       @if (isUploading()) {
@@ -546,6 +559,25 @@
             <strong>{{ att.feedback }}</strong>
           </div>
         }
+        @if (metricChips(att.metrics).length) {
+          <div class="metric-chips">
+            @for (m of metricChips(att.metrics); track m.key) {
+              <span class="metric-chip">{{ m.label }}: <strong>{{ m.value }}</strong></span>
+            }
+          </div>
+        }
+        @if (shotEvents(att.metrics).length) {
+          <div class="shot-list">
+            <span class="shot-list-title">Các cú đánh AI ghi nhận (bấm để xem lại)</span>
+            @for (e of shotEvents(att.metrics); track $index) {
+              <button type="button" class="shot-item" [class.hit]="e.hit" (click)="seekReview(e.time)">
+                <span class="shot-time">{{ e.timeText }}</span>
+                <span>{{ e.hit ? 'Trúng' : 'Trượt' }}</span>
+                <span class="shot-reason">{{ e.reason }}</span>
+              </button>
+            }
+          </div>
+        }
       </div>
 
       @if (att.hasAnnotatedVideo) {
@@ -560,7 +592,7 @@
             Trình duyệt không hỗ trợ phát video trực tiếp.
           </video>
         } @else if (!(att.hasAnnotatedVideo && reviewShowAnnotated()) && att.videoUrl) {
-          <video [src]="att.videoUrl" controls class="video-player" preload="metadata" playsinline>
+          <video #reviewVideo [src]="att.videoUrl" controls class="video-player" preload="metadata" playsinline>
             Trình duyệt không hỗ trợ phát video trực tiếp.
           </video>
         } @else {

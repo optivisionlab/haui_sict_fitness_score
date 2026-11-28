@@ -52,6 +52,8 @@ export interface VideoUploadPayload {
   mode?: 'practice' | 'test';
   exercise_id: string;
   course_id?: string;
+  /** Bài đối kháng: 4 góc nửa sân đối phương [x, y] chuẩn hóa [0, 1]. */
+  court_points?: number[][] | null;
 }
 
 export interface VideoUploadUrl {

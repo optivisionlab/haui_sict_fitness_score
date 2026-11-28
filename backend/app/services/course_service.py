@@ -527,7 +527,7 @@ class CourseService:
 
         # Lấy danh sách tasks thuộc khóa học
         from app.services.task_service import task_service
-        from app.models.task import task_kind
+        from app.models.task import task_kind, task_recording_mode
         from app.services.grade_calculator import attendance_scores_for_course
 
         tasks_in_course, _ = crud_task.get_by_course(course_id, limit=100)
@@ -572,6 +572,8 @@ class CourseService:
                 submitted_count=counts.get(str(t.id), {}).get("submitted", 0),
                 pending_review_count=counts.get(str(t.id), {}).get("pending_review", 0),
                 instruction_video_url=task_service.resolve_video_url(getattr(t, "instruction_video_url", None)),
+                recording_mode=task_recording_mode(t).value,
+                target_zone=getattr(getattr(t, "target_zone", None), "value", None),
             )
             for t in tasks_in_course
         ]

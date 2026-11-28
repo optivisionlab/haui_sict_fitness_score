@@ -1,4 +1,6 @@
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, computed, inject, signal } from '@angular/core';
+import {
+  Component, ElementRef, EventEmitter, Input, OnChanges, Output, SimpleChanges, ViewChild, computed, inject, signal
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideX } from '@lucide/angular';
@@ -6,6 +8,7 @@ import { TeacherClassService } from '../../services/teacher-class.service';
 import { VideoResultService } from '../../../../core/services/video-result.service';
 import { ToastService } from '../../../../core/services/toast.service';
 import { GradebookTaskItem, TeacherSubmission } from '../../models/teacher.model';
+import { metricChips, shotEvents } from '../../../../core/utils/match-metrics';
 
 type ReviewFilter = 'pending' | 'latest' | 'all';
 
@@ -24,6 +27,11 @@ type ReviewFilter = 'pending' | 'latest' | 'all';
     .ai-score { font-size: 1.6rem; font-weight: 700; color: var(--accent-blue); }
     .ai-comment { padding: 10px 12px; border-radius: 8px; background: #f8fafc; font-size: 0.88rem; line-height: 1.5; }
     .metrics { display: flex; flex-wrap: wrap; gap: 6px; }
+    .shots { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; font-size: 0.85rem; }
+    .shot { display: grid; grid-template-columns: 56px 52px 1fr; gap: 6px; align-items: center; text-align: left;
+      padding: 4px 8px; border: 1px solid #fecaca; border-radius: 6px; background: #fef2f2; cursor: pointer; }
+    .shot.hit { border-color: #bbf7d0; background: #f0fdf4; }
+    .shot-time { font-variant-numeric: tabular-nums; font-weight: 600; }
     .score-input { max-width: 140px; }
     @media (max-width: 860px) { .review-layout { grid-template-columns: 1fr; } }
   `],
@@ -95,7 +103,7 @@ type ReviewFilter = 'pending' | 'latest' | 'all';
             <div class="review-layout">
               <div class="video-box">
                 @if (videoUrl()) {
-                  <video [src]="videoUrl()" controls playsinline preload="metadata"></video>
+                  <video #reviewVideo [src]="videoUrl()" controls playsinline preload="metadata"></video>
                 } @else {
                   <span>{{ videoError() || 'Đang tải video...' }}</span>
                 }
@@ -107,9 +115,21 @@ type ReviewFilter = 'pending' | 'latest' | 'all';
                   <span class="ai-score">{{ s.ai_score ?? '—' }}</span>
                 </div>
                 @if (s.ai_comment) { <div class="ai-comment">{{ s.ai_comment }}</div> }
-                @if (metricKeys(s).length) {
+                @if (metricChips(s.metrics).length) {
                   <div class="metrics">
-                    @for (k of metricKeys(s); track k) { <span class="pill info">{{ k }}: {{ s.metrics[k] }}</span> }
+                    @for (m of metricChips(s.metrics); track m.key) { <span class="pill info">{{ m.label }}: {{ m.value }}</span> }
+                  </div>
+                }
+                @if (shotEvents(s.metrics).length) {
+                  <div class="shots">
+                    <span class="muted">Các cú đánh (bấm để tua video)</span>
+                    @for (e of shotEvents(s.metrics); track $index) {
+                      <button type="button" class="shot" [class.hit]="e.hit" (click)="seek(e.time)">
+                        <span class="shot-time">{{ e.timeText }}</span>
+                        <span>{{ e.hit ? 'Trúng' : 'Trượt' }}</span>
+                        <span class="muted">{{ e.reason }}</span>
+                      </button>
+                    }
                   </div>
                 }
 
@@ -209,8 +229,16 @@ export class ReviewPanelComponent implements OnChanges {
     });
   }
 
-  metricKeys(s: TeacherSubmission): string[] {
-    return Object.keys(s.metrics || {});
+  readonly metricChips = metricChips;
+  readonly shotEvents = shotEvents;
+  @ViewChild('reviewVideo') private reviewVideo?: ElementRef<HTMLVideoElement>;
+
+  /** Tua video tới cú đánh (giảng viên kiểm tra lại kết quả AI). */
+  seek(time: number): void {
+    const video = this.reviewVideo?.nativeElement;
+    if (!video) return;
+    video.currentTime = Math.max(0, time - 1);
+    void video.play().catch(() => undefined);
   }
 
   open(s: TeacherSubmission): void {

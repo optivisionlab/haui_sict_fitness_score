@@ -6,7 +6,7 @@ from app.crud.enrollment import crud_enrollment
 from app.crud.task import crud_task
 from app.crud.video_result import crud_video_result
 from app.models.enrollment import Enrollment
-from app.models.task import TaskCategory, task_kind
+from app.models.task import TaskCategory, task_kind, task_recording_mode
 from app.models.user import User
 from app.schemas.student import StudentGradeViewResponse, StudentTaskGradeItem
 from app.services.auth_service import get_current_user, verify_student_in_course
@@ -87,6 +87,8 @@ def get_student_course_grades(
                 is_locked=t.is_locked,
                 open_time=t.open_time,
                 close_time=t.close_time,
+                recording_mode=task_recording_mode(t).value,
+                target_zone=getattr(getattr(t, "target_zone", None), "value", None),
             )
         )
 

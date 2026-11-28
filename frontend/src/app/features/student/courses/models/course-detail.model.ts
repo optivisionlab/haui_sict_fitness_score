@@ -37,6 +37,9 @@ export interface AssessmentItem {
   score?: number;
   aiScore?: number;
   instructionVideoUrl?: string;
+  /** Cách quay: direct (trực diện) | match (đối kháng, SV đánh dấu sân khi nộp). */
+  recordingMode?: 'direct' | 'match';
+  targetZone?: string;
   attempts: AssessmentAttempt[];
 }
 

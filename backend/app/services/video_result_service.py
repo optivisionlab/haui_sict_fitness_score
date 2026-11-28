@@ -18,7 +18,7 @@ from app.core.database import get_db
 from app.models.course import Course
 from app.models.notification import NotificationType
 from app.models.sport import SportMode
-from app.models.task import GradingMethod, Task, TaskCategory
+from app.models.task import GradingMethod, RecordingMode, Task, TaskCategory, grading_mode, task_recording_mode
 from app.models.user import UserRole
 from app.models.video_result import VideoResult
 from app.schemas.video_result import (
@@ -50,6 +50,17 @@ logger = logging.getLogger(__name__)
 # Số lần thử lấy attemptNo mới khi nhiều bài nộp đồng thời
 ATTEMPT_INSERT_RETRIES = 5
 
+
+
+def match_court(task, court_points) -> dict | None:
+    """Cấu hình sân gửi AI cho bài quay đối kháng; None với bài quay trực diện."""
+    if task_recording_mode(task) != RecordingMode.MATCH:
+        return None
+    zone = getattr(task, "target_zone", None)
+    court = {"target_zone": getattr(zone, "value", zone) or "full", "student_side": "near"}
+    if court_points:
+        court["points"] = [[float(x), float(y)] for x, y in court_points]
+    return court
 
 class VideoResultService:
     @staticmethod
@@ -282,6 +293,9 @@ class VideoResultService:
             "sportId": str(task.sport_id),
             "sportCode": sport.code.upper(),
             "sportMode": sport.mode.value.upper(),
+            # Mode gửi AI (MATCH với bài quay đối kháng) và cấu hình sân của bài đối kháng
+            "gradingMode": grading_mode(task, sport.mode.value),
+            "court": match_court(task, upload_in.court_points),
             "userId": str(user_id),
             "attemptNo": attempt_no,
             "mode": upload_in.mode,
@@ -354,12 +368,13 @@ class VideoResultService:
         job = build_grading_job(
             result_id=result_id,
             sport_code=session["sportCode"],
-            mode=session["sportMode"],
+            mode=session.get("gradingMode") or session["sportMode"],
             bucket=session["bucket"],
             object_key=session["objectKey"],
             attempt_no=session["attemptNo"],
             duration_sec=session.get("durationSec"),
             file_size=object_stat.size,
+            court=session.get("court"),
         )
         data = {
             "_id": result_id,
@@ -536,12 +551,14 @@ class VideoResultService:
             "gradingJob": build_grading_job(
                 result_id=None,
                 sport_code=sport_code,
-                mode=sport_mode,
+                mode=grading_mode(task, sport_mode),
                 bucket=settings.MINIO_BUCKET_NAME,
                 object_key=object_name,
                 attempt_no=next_attempt,
                 duration_sec=duration_sec,
                 file_size=file_size,
+                # Upload cũ (multipart) không có điểm đánh dấu sân: AI tự ước lượng lưới
+                court=match_court(task, None),
             ),
             "gradingJobStatus": "pending",
             "gradingJobAttempts": 0,

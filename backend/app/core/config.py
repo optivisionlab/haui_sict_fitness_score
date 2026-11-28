@@ -80,6 +80,8 @@ class Settings:
     AI_PICKLEBALL_VIDEO_URL: str = os.getenv(
         "AI_PICKLEBALL_VIDEO_URL", "http://0.0.0.0:8888/api/v1/process"
     )
+    # Bài quay đối kháng (mode MATCH, YOLO26s). Trống = dùng AI_PICKLEBALL_VIDEO_URL (cùng dịch vụ AI)
+    AI_PICKLEBALL_MATCH_URL: str = os.getenv("AI_PICKLEBALL_MATCH_URL", "")
     # AI xử lý video đồng bộ trong 1 request nên cần timeout dài
     AI_API_TIMEOUT_SECONDS: float = float(os.getenv("AI_API_TIMEOUT_SECONDS", "600"))
     AI_ROUTER_ENABLED: bool = os.getenv("AI_ROUTER_ENABLED", "true").lower() == "true"

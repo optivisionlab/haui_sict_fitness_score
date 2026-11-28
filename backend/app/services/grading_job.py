@@ -2,7 +2,8 @@
 
 Chỉ giữ những trường worker/AI thực sự dùng (~200 byte thay vì ~700 byte):
 - jobId (= resultId): khóa job, dùng để cập nhật kết quả và chống chấm trùng
-- sportCode, mode: định tuyến tới endpoint AI
+- sportCode, mode: định tuyến tới endpoint AI (mode MATCH = bài quay đối kháng)
+- court: bài đối kháng, {points?, target_zone} gửi nguyên cho AI
 - bucket, objectKey: AI tự tải video từ MinIO
 - attemptNo: số lần nộp (log/AI)
 - durationSec, fileSize: chọn làn small/large và tính timeout gọi AI
@@ -15,6 +16,7 @@ JOB_SCHEMA_VERSION = 2
 
 _JOB_FIELDS = (
     "jobId", "sportCode", "mode", "bucket", "objectKey", "attemptNo", "durationSec", "fileSize", "schemaVersion",
+    "court",
 )
 
 
@@ -28,6 +30,7 @@ def build_grading_job(
     attempt_no: int,
     duration_sec: Optional[float] = None,
     file_size: Optional[int] = None,
+    court: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     job: dict[str, Any] = {
         "jobId": str(result_id) if result_id is not None else None,
@@ -42,6 +45,8 @@ def build_grading_job(
         job["durationSec"] = duration_sec
     if file_size is not None:
         job["fileSize"] = int(file_size)
+    if court:
+        job["court"] = court
     return job
 
 

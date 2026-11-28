@@ -77,6 +77,8 @@ class GradebookTaskItem(BaseSchema):
     submitted_count: int = 0
     pending_review_count: int = 0
     instruction_video_url: Optional[str] = None
+    recording_mode: str = "direct"           # direct | match (đối kháng)
+    target_zone: Optional[str] = None
 
 
 class GradebookStudentItem(BaseSchema):

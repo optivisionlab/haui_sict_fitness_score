@@ -106,7 +106,9 @@ export class TeacherClassService {
       is_locked: !!(t.isLocked ?? t.is_locked),
       submitted_count: t.submittedCount ?? t.submitted_count ?? 0,
       pending_review_count: t.pendingReviewCount ?? t.pending_review_count ?? 0,
-      instruction_video_url: t.instruction_video_url || t.instructionVideoUrl || undefined
+      instruction_video_url: t.instruction_video_url || t.instructionVideoUrl || undefined,
+      recording_mode: (t.recordingMode ?? t.recording_mode) === 'match' ? 'match' : 'direct',
+      target_zone: t.targetZone ?? t.target_zone ?? null
     }));
     // Thứ tự: bài thường xuyên -> thi giữa kỳ -> thi kết thúc học phần (giống trang sinh viên)
     const rank = (t: GradebookTaskItem) => (t.kind === 'regular' ? 0 : t.kind === 'midterm' ? 1 : 2);

@@ -64,6 +64,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9093
       AI_API_URL: ${AI_SERVICE_URL:-http://100.95.228.82:8888/api/v1/process}
       AI_PICKLEBALL_VIDEO_URL: ${AI_SERVICE_URL:-http://100.95.228.82:8888/api/v1/process}
+      # Bài quay đối kháng (mode MATCH): cùng dịch vụ AI, chọn YOLO26s theo trường mode
+      AI_PICKLEBALL_MATCH_URL: ${AI_MATCH_SERVICE_URL:-${AI_SERVICE_URL:-http://100.95.228.82:8888/api/v1/process}}
       # AI đọc MinIO qua mạng nội bộ, tách khỏi endpoint public mà trình duyệt dùng
       AI_MINIO_ENDPOINT: ${AI_MINIO_ENDPOINT:-100.95.228.82:9000}
     read_only: true

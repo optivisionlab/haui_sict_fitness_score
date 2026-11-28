@@ -42,6 +42,8 @@ class AIGradingClient:
         """
         Định tuyến adapter tới endpoint AI phù hợp:
         - Môn Pickleball (code PICKLE/PICKLEBALL), mode VIDEO: AI_PICKLEBALL_VIDEO_URL
+        - Môn Pickleball, mode MATCH (bài quay đối kháng, YOLO26s): AI_PICKLEBALL_MATCH_URL
+          (mặc định cùng endpoint, dịch vụ AI tự chọn mô hình theo trường mode)
         - Môn/mode chưa có AI: lỗi unsupported_route, không đoán endpoint
         """
         code = str(sport_code or "").strip().upper()
@@ -49,6 +51,8 @@ class AIGradingClient:
 
         if code in PICKLEBALL_CODES and m == "VIDEO":
             return settings.AI_PICKLEBALL_VIDEO_URL or settings.AI_API_URL
+        if code in PICKLEBALL_CODES and m == "MATCH":
+            return settings.AI_PICKLEBALL_MATCH_URL or settings.AI_PICKLEBALL_VIDEO_URL or settings.AI_API_URL
 
         raise AIGradingError("unsupported_route", retryable=False)
 
@@ -79,6 +83,9 @@ class AIGradingClient:
         }
         if settings.AI_MINIO_ENDPOINT:
             request["minio_endpoint"] = settings.AI_MINIO_ENDPOINT
+        if request["mode"] == "MATCH" and job.get("court"):
+            # Bài đối kháng: vùng đích + (tùy chọn) 4 góc sân SV đánh dấu
+            request["court"] = job["court"]
         return request
 
     async def grade(self, job: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
@@ -89,7 +96,10 @@ class AIGradingClient:
                 "status": "completed",
                 "aiScore": 8.5,
                 "aiComment": "Bài tập Pickleball đạt yêu cầu kỹ thuật cơ bản.",
-                "metrics": {"accuracy": 0.85, "hitCount": 17, "missCount": 3},
+                "metrics": {"accuracy": 0.85, "hitCount": 17, "missCount": 3}
+                if request_data["mode"] != "MATCH"
+                else {"accuracy": 0.85, "hitCount": 17, "missCount": 3, "swingTotal": 20, "inCourtCount": 15,
+                      "calibration": "auto", "events": []},
             }
 
         endpoint = self.resolve_endpoint(job.get("sportCode") or job.get("sport_code"), request_data["mode"])

@@ -1,4 +1,4 @@
-import { Component, signal, computed, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, ElementRef, ViewChild, signal, computed, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpEventType } from '@angular/common/http';
@@ -23,6 +23,8 @@ import { ApiResponse } from '../../../core/models/auth.model';
 import { AuthService } from '../../../core/services/auth.service';
 import { VideoResultService } from '../../../core/services/video-result.service';
 import { VideoResult } from '../../../core/models/video-result.model';
+import { metricChips, shotEvents } from '../../../core/utils/match-metrics';
+import { CourtMarkerComponent } from '../../../shared/components/court-marker/court-marker.component';
 import {
   Course,
   CourseDetailInfo,
@@ -41,6 +43,7 @@ const STATUS_POLL_TIMEOUT_MS = 15 * 60 * 1000;
     CommonModule,
     FormsModule,
     SearchInputComponent,
+    CourtMarkerComponent,
     LucideDumbbell,
     LucideFootprints,
     LucideUser,
@@ -86,6 +89,33 @@ export class CoursesComponent implements OnInit, OnDestroy {
   uploadProgress = signal<number>(0);
   submitNote = signal<string>('');
   selectedAttempt = signal<AssessmentAttempt | null>(null);
+  /** Bài đối kháng: 4 góc nửa sân đối phương SV đánh dấu (null = để AI tự ước lượng lưới). */
+  courtPoints = signal<number[][] | null>(null);
+
+  readonly metricChips = metricChips;
+  readonly shotEvents = shotEvents;
+  @ViewChild('reviewVideo') private reviewVideo?: ElementRef<HTMLVideoElement>;
+
+  static readonly TARGET_ZONE_LABELS: Record<string, string> = {
+    full: 'cả nửa sân đối phương',
+    kitchen: 'vùng cấm vô lê (Kitchen)',
+    deep: 'sau vùng cấm vô lê',
+    service_left: 'ô giao bóng bên trái',
+    service_right: 'ô giao bóng bên phải'
+  };
+
+  targetZoneLabel(zone?: string | null): string {
+    return CoursesComponent.TARGET_ZONE_LABELS[zone || 'full'] || '';
+  }
+
+  /** Xem lại bài đối kháng: tua video gốc tới trước cú đánh 1 giây. */
+  seekReview(time: number): void {
+    this.reviewShowAnnotated.set(false);
+    const video = this.reviewVideo?.nativeElement;
+    if (!video) return;
+    video.currentTime = Math.max(0, time - 1);
+    void video.play().catch(() => undefined);
+  }
 
   /** Bài thường xuyên có 2 phần: luyện tập (AI chấm, không tính điểm) và kiểm tra (tính điểm). */
   activePart = signal<SubmissionMode>('practice');
@@ -215,6 +245,8 @@ export class CoursesComponent implements OnInit, OnDestroy {
             openTime: this.formatDateTime(t.openTime),
             closeTime: this.formatDateTime(t.closeTime),
             instructionVideoUrl: t.instructionVideoUrl || undefined,
+            recordingMode: t.recordingMode === 'match' ? 'match' : 'direct',
+            targetZone: t.targetZone || undefined,
             status: t.isLocked && !hasScore
               ? 'locked'
               : hasScore ? 'graded' : (t.status === 'pending' ? 'pending' : 'not_submitted'),
@@ -552,6 +584,7 @@ export class CoursesComponent implements OnInit, OnDestroy {
   // Submit Video Modal handlers
   openSubmitModal(mode: SubmissionMode = 'test'): void {
     this.submitMode.set(this.hasPracticePart(this.currentAssessment()) ? mode : 'test');
+    this.courtPoints.set(null);
     this.selectedFile.set(null);
     this.selectedFileName.set('');
     this.hasVideoSelected.set(false);
@@ -609,11 +642,13 @@ export class CoursesComponent implements OnInit, OnDestroy {
     this.uploadProgress.set(0);
 
     const mode = this.submitMode();
+    const isMatch = this.currentAssessment()?.recordingMode === 'match';
     this.videoResultService.uploadVideo({
       file,
       exercise_id: assessmentId,
       course_id: courseId,
-      mode
+      mode,
+      court_points: isMatch ? this.courtPoints() : null
     }).subscribe({
       next: (event) => {
         if (event.type === HttpEventType.UploadProgress && event.total) {

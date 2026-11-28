@@ -3,7 +3,9 @@ import { FormsModule } from '@angular/forms';
 import { LucideX } from '@lucide/angular';
 import { TeacherClassService } from '../../services/teacher-class.service';
 import { ToastService } from '../../../../core/services/toast.service';
-import { GradebookTaskItem, GradingMethod, TaskKind, TaskUpsert } from '../../models/teacher.model';
+import {
+  GradebookTaskItem, GradingMethod, RecordingMode, TARGET_ZONE_LABELS, TargetZone, TaskKind, TaskUpsert
+} from '../../models/teacher.model';
 
 /** Chuyển ISO <-> giá trị của input datetime-local (giờ địa phương). */
 function toLocalInput(iso?: string): string {
@@ -72,6 +74,29 @@ function fromLocalInput(value: string): string | null {
               <input id="tf-limit" type="number" min="1" max="3600" [(ngModel)]="timeLimit" placeholder="Không giới hạn" />
             </div>
 
+            <div class="field">
+              <label for="tf-recording">Cách quay video</label>
+              <select id="tf-recording" [(ngModel)]="recordingMode">
+                <option value="direct">Trực diện (gần người đánh)</option>
+                <option value="match">Đối kháng (quay xa, thấy cả sân)</option>
+              </select>
+              <span class="hint">{{ recordingMode === 'match'
+                ? 'AI (YOLO26s) theo dõi bóng: trúng khi bóng qua lưới và nảy trong vùng đích'
+                : 'AI nghe tiếng chạm bóng và nhìn động tác' }}</span>
+            </div>
+
+            @if (recordingMode === 'match') {
+              <div class="field">
+                <label for="tf-zone">Vùng đích</label>
+                <select id="tf-zone" [(ngModel)]="targetZone">
+                  @for (z of zones; track z.value) {
+                    <option [value]="z.value">{{ z.label }}</option>
+                  }
+                </select>
+                <span class="hint">Sinh viên đánh dấu 4 góc sân khi nộp để AI kiểm tra vùng đích</span>
+              </div>
+            }
+
             <div class="field" style="justify-content: flex-end;">
               <label class="check-row">
                 <input type="checkbox" [(ngModel)]="isLocked" />
@@ -118,6 +143,11 @@ export class TaskFormComponent implements OnChanges {
   closeTime = '';
   timeLimit: number | null = null;
   isLocked = false;
+  recordingMode: RecordingMode = 'direct';
+  targetZone: TargetZone = 'full';
+  readonly zones = (Object.keys(TARGET_ZONE_LABELS) as TargetZone[]).map(value => ({
+    value, label: TARGET_ZONE_LABELS[value]
+  }));
 
   saving = signal(false);
   error = signal('');
@@ -132,6 +162,8 @@ export class TaskFormComponent implements OnChanges {
     this.closeTime = toLocalInput(t?.close_time);
     this.timeLimit = t?.time_limit ?? null;
     this.isLocked = t?.is_locked ?? false;
+    this.recordingMode = t?.recording_mode ?? 'direct';
+    this.targetZone = t?.target_zone ?? 'full';
     this.error.set('');
   }
 
@@ -162,7 +194,9 @@ export class TaskFormComponent implements OnChanges {
       time_limit: this.timeLimit ? Number(this.timeLimit) : null,
       open_time: fromLocalInput(this.openTime),
       close_time: fromLocalInput(this.closeTime),
-      is_locked: this.isLocked
+      is_locked: this.isLocked,
+      recording_mode: this.recordingMode,
+      target_zone: this.recordingMode === 'match' ? this.targetZone : null
     };
     this.saving.set(true);
     this.error.set('');

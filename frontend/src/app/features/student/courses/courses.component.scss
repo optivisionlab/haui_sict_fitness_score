@@ -1454,3 +1454,60 @@ $primary-blue-light: #eff6ff;
   background: #fef2f2;
   color: #b91c1c;
 }
+
+// Chỉ số AI và danh sách cú đánh (bài quay đối kháng)
+.metric-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+
+  .metric-chip {
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1e3a8a;
+    font-size: 0.82rem;
+  }
+}
+
+.shot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  font-size: 0.85rem;
+
+  .shot-list-title {
+    color: #64748b;
+    font-size: 0.8rem;
+  }
+
+  .shot-item {
+    display: grid;
+    grid-template-columns: 56px 52px 1fr;
+    gap: 6px;
+    align-items: center;
+    text-align: left;
+    padding: 4px 8px;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    background: #fef2f2;
+    cursor: pointer;
+
+    &.hit {
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+    }
+  }
+
+  .shot-time {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+
+  .shot-reason {
+    color: #64748b;
+  }
+}
